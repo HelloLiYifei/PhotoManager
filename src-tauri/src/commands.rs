@@ -508,7 +508,13 @@ use tokio::sync::Semaphore;
 static THUMB_SEMAPHORE: OnceLock<Semaphore> = OnceLock::new();
 
 fn get_thumb_semaphore() -> &'static Semaphore {
-    THUMB_SEMAPHORE.get_or_init(|| Semaphore::new(3))
+    THUMB_SEMAPHORE.get_or_init(|| {
+        let cores = std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(4);
+        // Size semaphore to CPU threads to run many decodes concurrently
+        Semaphore::new(cores * 2)
+    })
 }
 
 #[tauri::command]
@@ -567,7 +573,7 @@ pub async fn get_image_thumbnail_by_path(path: String, is_raw: bool) -> Result<S
         let thumb = if is_exif_thumb && img.width() <= 400 && img.height() <= 400 {
             img
         } else {
-            img.resize(400, 400, image::imageops::FilterType::Triangle)
+            img.thumbnail(400, 400)
         };
         
         let mut buffer = std::io::Cursor::new(Vec::new());

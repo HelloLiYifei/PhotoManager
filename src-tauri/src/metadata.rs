@@ -2,7 +2,7 @@ use std::fs::File;
 use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::path::Path;
 use exif::{In, Tag, Value};
-use image::{imageops::FilterType, ImageFormat};
+use image::ImageFormat;
 
 #[derive(Debug, Default, Clone)]
 pub struct ImageMetadata {
@@ -368,8 +368,8 @@ pub fn generate_thumbnail<P: AsRef<Path>>(
     let width = img.width() as i32;
     let height = img.height() as i32;
 
-    // Resize to max 300px on either side, maintaining aspect ratio
-    let thumb = img.resize(300, 300, FilterType::Lanczos3);
+    // Resize to max 300px on either side, maintaining aspect ratio using fast box thumbnail
+    let thumb = img.thumbnail(300, 300);
 
     // Save as JPEG to cache path
     let mut out_file = File::create(cache_path).map_err(|e| format!("无法创建缩略图缓存文件: {}", e))?;

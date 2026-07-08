@@ -25,7 +25,7 @@ rusqlite = { version = "=0.32.0", features = ["bundled"] }
 kamadak-exif = "=0.6.0"
 chrono = { version = "=0.4.38", features = ["serde"] }
 uuid = { version = "=1.10.0", features = ["v4", "serde"] }
-image = { version = "=0.25.2", default-features = false, features = ["jpeg", "png"] }
+image = { version = "=0.25.2", default-features = false, features = ["jpeg", "png", "rayon"] }
 walkdir = "=2.5.0"
 idna_adapter = "=1.2.0"
 toml = "=1.0.2"

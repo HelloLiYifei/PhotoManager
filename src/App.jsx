@@ -509,7 +509,7 @@ function AlbumCover({ photoId }) {
   useEffect(() => {
     if (!photoId) return;
     invoke("get_photo_thumbnail_base64", { id: photoId })
-      .then((b64) => setSrc(`data:image/jpeg;base64,${b64}`))
+      .then((b64) => setSrc(b64))
       .catch((e) => console.error(e));
   }, [photoId]);
 

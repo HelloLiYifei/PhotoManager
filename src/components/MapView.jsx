@@ -106,7 +106,7 @@ export default function MapView({ onShowPhoto }) {
             const base64 = await invoke("get_photo_thumbnail_base64", { id: photo.id });
             
             const img = document.createElement("img");
-            img.src = `data:image/jpeg;base64,${base64}`;
+            img.src = base64;
             img.className = "map-popup-img";
             img.onclick = () => {
               if (onShowPhoto) onShowPhoto(photo);
@@ -198,7 +198,7 @@ function GpsOfflineCard({ photo, onShowPhoto }) {
   return (
     <div className="masonry-item" onClick={() => onShowPhoto(photo)}>
       {thumb ? (
-        <img src={`data:image/jpeg;base64,${thumb}`} alt={photo.filename} />
+        <img src={thumb} alt={photo.filename} />
       ) : (
         <div style={{ height: "150px", background: "#222", borderRadius: "6px" }} />
       )}

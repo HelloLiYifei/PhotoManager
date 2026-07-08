@@ -50,7 +50,7 @@ function ThumbnailImage({ id, alt }) {
   return (
     <img
       ref={imgRef}
-      src={src ? `data:image/jpeg;base64,${src}` : "/placeholder.svg"}
+      src={src || "/placeholder.svg"}
       alt={alt}
       style={{ width: "100%", height: "auto", display: "block", borderRadius: "6px" }}
       loading="lazy"
@@ -68,7 +68,7 @@ function ComparePreviewImage({ id }) {
     invoke("get_photo_preview_base64", { id })
       .then((b64) => {
         if (active) {
-          setSrc(`data:image/jpeg;base64,${b64}`);
+          setSrc(b64);
           setLoading(false);
         }
       })

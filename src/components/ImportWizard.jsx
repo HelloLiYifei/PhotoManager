@@ -24,16 +24,15 @@ export default function ImportWizard({ onClose, onImportComplete }) {
 
   // Listen to import progress events from Rust backend
   useEffect(() => {
-    let unlisten = null;
-    async function setupListener() {
+    const unlistenPromise = (async () => {
       const { listen } = await import("@tauri-apps/api/event");
-      unlisten = await listen("import-progress", (event) => {
+      return listen("import-progress", (event) => {
         setImportProgress(event.payload);
       });
-    }
-    setupListener();
+    })();
+
     return () => {
-      if (unlisten) unlisten.then((f) => f());
+      unlistenPromise.then((unlistenFn) => unlistenFn());
     };
   }, []);
 

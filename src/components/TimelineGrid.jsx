@@ -79,16 +79,15 @@ export default function TimelineGrid({
 
   // Set up scan progress event listener from Tauri
   useEffect(() => {
-    let unlisten = null;
-    async function setupListener() {
+    const unlistenPromise = (async () => {
       const { listen } = await import("@tauri-apps/api/event");
-      unlisten = await listen("scan-progress", (event) => {
+      return listen("scan-progress", (event) => {
         setScanProgress(event.payload);
       });
-    }
-    setupListener();
+    })();
+
     return () => {
-      if (unlisten) unlisten.then((f) => f());
+      unlistenPromise.then((unlistenFn) => unlistenFn());
     };
   }, []);
 

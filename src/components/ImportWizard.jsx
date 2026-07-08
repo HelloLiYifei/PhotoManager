@@ -75,6 +75,24 @@ export default function ImportWizard({ onClose, onImportComplete }) {
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(null);
   const [scanning, setScanning] = useState(false);
+  
+  const [visibleLimit, setVisibleLimit] = useState(48);
+  const sentinelRef = useRef(null);
+
+  // Auto load more when scroll reaches bottom
+  useEffect(() => {
+    if (!sentinelRef.current) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setVisibleLimit((prev) => Math.min(photos.length, prev + 48));
+        }
+      },
+      { threshold: 0.1 }
+    );
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, [visibleLimit, photos.length]);
 
   // Detect drives on mount
   useEffect(() => {
@@ -111,6 +129,7 @@ export default function ImportWizard({ onClose, onImportComplete }) {
     setSelectedCard(card);
     setScanning(true);
     setPhotos([]);
+    setVisibleLimit(48);
     try {
       const list = await invoke("scan_card", { path: card.path });
       setPhotos(list);
@@ -315,7 +334,7 @@ export default function ImportWizard({ onClose, onImportComplete }) {
               </div>
             ) : (
               <div className="wizard-grid">
-                {photos.map((photo) => {
+                {photos.slice(0, visibleLimit).map((photo) => {
                   const isSel = selectedPhotos.includes(photo.absolute_path);
                   return (
                     <div
@@ -332,6 +351,11 @@ export default function ImportWizard({ onClose, onImportComplete }) {
                     </div>
                   );
                 })}
+                {visibleLimit < photos.length && (
+                  <div ref={sentinelRef} style={{ gridColumn: "1 / -1", textAlign: "center", padding: "16px", color: "var(--text-muted)", fontSize: "12px" }}>
+                    正在加载更多照片...
+                  </div>
+                )}
               </div>
             )}
           </div>

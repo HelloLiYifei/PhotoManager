@@ -474,29 +474,46 @@ pub fn select_directory() -> Option<String> {
     dir.map(|p| p.to_string_lossy().to_string())
 }
 
+use std::sync::OnceLock;
+use tokio::sync::Semaphore;
+
+static THUMB_SEMAPHORE: OnceLock<Semaphore> = OnceLock::new();
+
+fn get_thumb_semaphore() -> &'static Semaphore {
+    THUMB_SEMAPHORE.get_or_init(|| Semaphore::new(3))
+}
+
 #[tauri::command]
-pub fn get_image_thumbnail_by_path(path: String, is_raw: bool) -> Result<String, String> {
-    let p = Path::new(&path);
-    if !p.exists() {
-        return Err("文件不存在".to_string());
-    }
+pub async fn get_image_thumbnail_by_path(path: String, is_raw: bool) -> Result<String, String> {
+    let sem = get_thumb_semaphore();
+    let _permit = sem.acquire().await.map_err(|e| e.to_string())?;
 
-    let bytes = if is_raw {
-        crate::metadata::extract_raw_preview(p)
-            .map_err(|e| format!("RAW预览图提取失败: {}", e))?
-    } else {
-        std::fs::read(p).map_err(|e| e.to_string())?
-    };
+    tokio::task::spawn_blocking(move || {
+        let p = Path::new(&path);
+        if !p.exists() {
+            return Err("文件不存在".to_string());
+        }
 
-    let img = image::load_from_memory_with_format(&bytes, image::ImageFormat::Jpeg)
-        .map_err(|e| format!("图片解码失败: {}", e))?;
+        let bytes = if is_raw {
+            crate::metadata::extract_raw_preview(p)
+                .map_err(|e| format!("RAW预览图提取失败: {}", e))?
+        } else {
+            std::fs::read(p).map_err(|e| e.to_string())?
+        };
+
+        let img = image::load_from_memory_with_format(&bytes, image::ImageFormat::Jpeg)
+            .map_err(|e| format!("图片解码失败: {}", e))?;
+            
+        // Nearest neighbor scaling is 10x-50x faster than Lanczos3
+        let thumb = img.resize(120, 120, image::imageops::FilterType::Nearest);
         
-    let thumb = img.resize(150, 150, image::imageops::FilterType::Lanczos3);
-    
-    let mut buffer = std::io::Cursor::new(Vec::new());
-    thumb.write_to(&mut buffer, image::ImageFormat::Jpeg)
-        .map_err(|e| format!("图片压缩失败: {}", e))?;
-        
-    let b64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, buffer.into_inner());
-    Ok(format!("data:image/jpeg;base64,{}", b64))
+        let mut buffer = std::io::Cursor::new(Vec::new());
+        thumb.write_to(&mut buffer, image::ImageFormat::Jpeg)
+            .map_err(|e| format!("图片压缩失败: {}", e))?;
+            
+        let b64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, buffer.into_inner());
+        Ok(format!("data:image/jpeg;base64,{}", b64))
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }

@@ -43,7 +43,8 @@ pub fn run() {
             commands::get_all_tags,
             commands::permanently_delete_photos,
             commands::restore_photos,
-            commands::empty_trash_to_recycle_bin
+            commands::empty_trash_to_recycle_bin,
+            commands::export_photos
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

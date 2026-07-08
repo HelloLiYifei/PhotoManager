@@ -33,7 +33,6 @@ function ThumbnailImage({ id, alt }) {
           setLoading(false);
         }
       } catch (err) {
-        // Fallback or ignore
         if (active) setLoading(false);
       }
     }
@@ -45,51 +44,89 @@ function ThumbnailImage({ id, alt }) {
   }, [id]);
 
   if (loading) {
-    return <div ref={imgRef} className="photo-card-img" style={{ background: "#1A1A24", display: "flex", alignItems: "center", justifyItems: "center" }} />;
+    return <div ref={imgRef} className="photo-card-img" style={{ minHeight: "120px", background: "#1A1A24", display: "flex", alignItems: "center", justifyItems: "center" }} />;
   }
 
   return (
     <img
       ref={imgRef}
-      src={src || "/placeholder.svg"}
+      src={src ? `data:image/jpeg;base64,${src}` : "/placeholder.svg"}
       alt={alt}
-      className="photo-card-img"
+      style={{ width: "100%", height: "auto", display: "block", borderRadius: "6px" }}
       loading="lazy"
     />
   );
 }
 
+// Sub-component to load medium-res preview in Compare mode
+function ComparePreviewImage({ id }) {
+  const [src, setSrc] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    invoke("get_photo_preview_base64", { id })
+      .then((b64) => {
+        if (active) {
+          setSrc(`data:image/jpeg;base64,${b64}`);
+          setLoading(false);
+        }
+      })
+      .catch((e) => {
+        console.error(e);
+        if (active) setLoading(false);
+      });
+    return () => { active = false; };
+  }, [id]);
+
+  if (loading) {
+    return <div style={{ color: "var(--text-muted)", fontSize: "14px" }}>正在读取高清对比图...</div>;
+  }
+
+  return <img src={src} className="compare-locked-img" alt="对比锁定图" />;
+}
+
 export default function TimelineGrid({
-  currentView, // "photos", "favorites", "trash", "album"
+  currentView, // "albums", "album", "favorites", "trash"
   albumId,
   onPhotoClick,
   onPhotosUpdated,
-  refreshTrigger, // parent trigger to force refresh
+  refreshTrigger,
 }) {
   const [photos, setPhotos] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [ratingFilter, setRatingFilter] = useState(0);
-  const [zoomLevel, setZoomLevel] = useState(160); // minmax(zoomLevel px)
-  const [scanning, setScanning] = useState(false);
-  const [scanProgress, setScanProgress] = useState(null);
+  const [tagFilter, setTagFilter] = useState("");
+  const [allTags, setAllTags] = useState([]);
+
+  // Selection states
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [primaryPhoto, setPrimaryPhoto] = useState(null); // Photo currently shown in right details drawer
+  const [primaryTags, setPrimaryTags] = useState([]);
+  const [newTagInput, setNewTagInput] = useState("");
+
+  // Compare mode states
+  const [compareMode, setCompareMode] = useState(false);
+  const [compareLockedId, setCompareLockedId] = useState(null);
+
+  // Move album modal state
+  const [showMoveModal, setShowMoveModal] = useState(false);
+  const [albumsList, setAlbumsList] = useState([]);
 
   useEffect(() => {
     fetchPhotosList();
-  }, [currentView, albumId, ratingFilter, searchQuery, refreshTrigger]);
+    loadAllTags();
+    setSelectedIds([]);
+    setPrimaryPhoto(null);
+  }, [currentView, albumId, ratingFilter, searchQuery, tagFilter, refreshTrigger]);
 
-  // Set up scan progress event listener from Tauri
   useEffect(() => {
-    const unlistenPromise = (async () => {
-      const { listen } = await import("@tauri-apps/api/event");
-      return listen("scan-progress", (event) => {
-        setScanProgress(event.payload);
-      });
-    })();
-
-    return () => {
-      unlistenPromise.then((unlistenFn) => unlistenFn());
-    };
-  }, []);
+    if (primaryPhoto) {
+      loadPhotoTags(primaryPhoto.id);
+    } else {
+      setPrimaryTags([]);
+    }
+  }, [primaryPhoto]);
 
   const fetchPhotosList = async () => {
     try {
@@ -99,6 +136,7 @@ export default function TimelineGrid({
         deletedOnly: currentView === "trash",
         albumId: albumId || null,
         ratingFilter: ratingFilter > 0 ? ratingFilter : null,
+        tagFilter: tagFilter || null,
       });
       setPhotos(list);
     } catch (e) {
@@ -106,60 +144,292 @@ export default function TimelineGrid({
     }
   };
 
-  const handleScanWorkspace = async () => {
-    setScanning(true);
-    setScanProgress({ scanned: 0, total: 0, current_file: "准备中..." });
+  const loadAllTags = async () => {
     try {
-      const added = await invoke("scan_workspace");
-      alert(`相册扫描完成！新增了 ${added} 张照片`);
-      fetchPhotosList();
-      if (onPhotosUpdated) onPhotosUpdated();
+      const tags = await invoke("get_all_tags");
+      setAllTags(tags);
     } catch (e) {
-      alert("扫描失败: " + e);
-    } finally {
-      setScanning(false);
-      setScanProgress(null);
+      console.error(e);
     }
   };
 
-  const handleToggleFav = async (id, isFav, e) => {
-    e.stopPropagation();
+  const loadPhotoTags = async (id) => {
     try {
-      await invoke("toggle_favorite", { id, isFavorite: !isFav });
-      fetchPhotosList();
-      if (onPhotosUpdated) onPhotosUpdated();
+      const tags = await invoke("get_photo_tags", { photoId: id });
+      setPrimaryTags(tags);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const loadAlbumsListForMove = async () => {
+    try {
+      const list = await invoke("get_albums");
+      setAlbumsList(list);
+      setShowMoveModal(true);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Selection handling
+  const handlePhotoSelect = (photo, e) => {
+    e.stopPropagation();
+    
+    // Check double click -> open Lightbox viewer
+    if (e.detail === 2) {
+      const idx = photos.findIndex(p => p.id === photo.id);
+      onPhotoClick(photos, idx);
+      return;
+    }
+
+    let updated = [];
+    if (e.ctrlKey) {
+      // Toggle selection
+      if (selectedIds.includes(photo.id)) {
+        updated = selectedIds.filter(id => id !== photo.id);
+      } else {
+        updated = [...selectedIds, photo.id];
+      }
+    } else {
+      // Single select: if clicked again, deselect. Otherwise, select only this.
+      if (selectedIds.includes(photo.id) && selectedIds.length === 1) {
+        updated = [];
+      } else {
+        updated = [photo.id];
+      }
+    }
+
+    setSelectedIds(updated);
+    
+    if (updated.length > 0) {
+      // Set primary photo as the last selected
+      const primary = photos.find(p => p.id === updated[updated.length - 1]);
+      setPrimaryPhoto(primary);
+    } else {
+      setPrimaryPhoto(null);
+    }
+  };
+
+  // Add tag to primary photo
+  const handleAddTagSubmit = async (e) => {
+    e.preventDefault();
+    if (!newTagInput.trim() || !primaryPhoto) return;
+
+    try {
+      await invoke("add_tag_to_photo", {
+        photoId: primaryPhoto.id,
+        tagName: newTagInput.trim(),
+      });
+      setNewTagInput("");
+      loadPhotoTags(primaryPhoto.id);
+      loadAllTags();
     } catch (err) {
       console.error(err);
     }
   };
 
-  // Group photos by date taken (YYYY-MM-DD)
-  const groupPhotosByDate = () => {
-    const groups = {};
-    photos.forEach((photo) => {
-      const dateStr = photo.date_taken ? photo.date_taken.split(" ")[0] : "未知日期";
-      if (!groups[dateStr]) {
-        groups[dateStr] = [];
-      }
-      groups[dateStr].push(photo);
-    });
-    // Sort dates descending
-    return Object.keys(groups)
-      .sort((a, b) => b.localeCompare(a))
-      .map((date) => ({
-        date,
-        items: groups[date],
-      }));
+  // Remove tag from primary photo
+  const handleRemoveTag = async (tagName) => {
+    if (!primaryPhoto) return;
+    try {
+      await invoke("remove_tag_from_photo", {
+        photoId: primaryPhoto.id,
+        tagName,
+      });
+      loadPhotoTags(primaryPhoto.id);
+      loadAllTags();
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  const groupedPhotos = groupPhotosByDate();
+  // Bottom toolbar actions
+  const handleBatchFavorite = async () => {
+    if (selectedIds.length === 0) return;
+    try {
+      // Determine action based on the first selected photo
+      const first = photos.find(p => p.id === selectedIds[0]);
+      const nextFav = first ? !first.is_favorite : true;
+      
+      await Promise.all(selectedIds.map(id =>
+        invoke("toggle_favorite", { id, isFavorite: nextFav })
+      ));
+      
+      fetchPhotosList();
+      if (onPhotosUpdated) onPhotosUpdated();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleBatchDelete = async () => {
+    if (selectedIds.length === 0) return;
+    const isTrashView = currentView === "trash";
+    
+    if (isTrashView) {
+      // Trash view: "转移至回收站" (Move to OS Recycle Bin)
+      if (confirm(`确定要将选中的 ${selectedIds.length} 张照片转移至操作系统回收站吗？物理文件将被删除并放入回收站！`)) {
+        try {
+          await invoke("permanently_delete_photos", { ids: selectedIds });
+          setSelectedIds([]);
+          setPrimaryPhoto(null);
+          fetchPhotosList();
+          if (onPhotosUpdated) onPhotosUpdated();
+        } catch (e) {
+          alert("转移至回收站失败: " + e);
+        }
+      }
+    } else {
+      // Normal view: mark as deleted (is_deleted = 1)
+      try {
+        await Promise.all(selectedIds.map(id =>
+          invoke("delete_photo", { id, isDeleted: true })
+        ));
+        setSelectedIds([]);
+        setPrimaryPhoto(null);
+        fetchPhotosList();
+        if (onPhotosUpdated) onPhotosUpdated();
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  };
+
+  const handleBatchRestore = async () => {
+    if (selectedIds.length === 0) return;
+    try {
+      await invoke("restore_photos", { ids: selectedIds });
+      setSelectedIds([]);
+      setPrimaryPhoto(null);
+      fetchPhotosList();
+      if (onPhotosUpdated) onPhotosUpdated();
+    } catch (e) {
+      alert("还原失败: " + e);
+    }
+  };
+
+  const handleBatchMoveSubmit = async (targetAlbId) => {
+    try {
+      await invoke("move_photos_to_album", {
+        photoIds: selectedIds,
+        targetAlbumId: targetAlbId,
+      });
+      setShowMoveModal(false);
+      setSelectedIds([]);
+      setPrimaryPhoto(null);
+      fetchPhotosList();
+      if (onPhotosUpdated) onPhotosUpdated();
+      alert("物理移动完成！");
+    } catch (e) {
+      alert("移动失败: " + e);
+    }
+  };
+
+  const handleBatchExport = async () => {
+    try {
+      const destPath = await invoke("select_directory");
+      if (!destPath) return;
+
+      // Ask Rust to get the absolute paths for these IDs and copy them
+      // To keep it simple, we retrieve the active workspace path, build the absolute paths, and copy them in JS or Rust.
+      // Let's copy them in Rust or simply let the user know. Wait, let's write a small command or do a copy loop.
+      // But wait! We can just fetch the active workspace path, and copy them!
+      // Actually, let's copy them by triggering a file write or let's create a move/copy logic in Rust.
+      // Wait, is there a copy command? Let's check: the user says "导出，选中图片后可以导出图片到外部路径".
+      // We can add a simple command in Rust if needed, or simply invoke copy.
+      // Wait! We can call a tauri command that does batch copy.
+      // Let's see: we don't have a copy command, but we can write a quick Tauri command or write it directly!
+      // Wait, let's verify if we can add a batch copy command `export_photos(ids: Vec<String>, dest_dir: String)` to `commands.rs`.
+      // Yes! That would be extremely clean and robust! Let's do that right away so the frontend doesn't need to do file IO!
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleToggleCompare = () => {
+    if (compareMode) {
+      setCompareMode(false);
+      setCompareLockedId(null);
+    } else {
+      if (selectedIds.length === 0) {
+        alert("请先选择一张作为对比基准的主照片！");
+        return;
+      }
+      setCompareLockedId(selectedIds[selectedIds.length - 1]);
+      setCompareMode(true);
+    }
+  };
+
+  // Custom Tagging dialog
+  const handleBatchAddTag = async () => {
+    const tagName = prompt("请输入要为选中照片批量添加的标签名称：");
+    if (!tagName || !tagName.trim()) return;
+    try {
+      await Promise.all(selectedIds.map(id =>
+        invoke("add_tag_to_photo", { photoId: id, tagName: tagName.trim() })
+      ));
+      if (primaryPhoto) loadPhotoTags(primaryPhoto.id);
+      loadAllTags();
+      alert("批量添加标签成功！");
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Render the core waterfall card grid
+  const renderMasonryGrid = () => {
+    return (
+      <div className="masonry-grid">
+        {photos.map((photo) => {
+          const isSelected = selectedIds.includes(photo.id);
+          const isCompareBase = compareLockedId === photo.id;
+
+          return (
+            <div
+              key={photo.id}
+              className={`masonry-item ${isSelected ? "selected" : ""} ${isCompareBase ? "compare-base" : ""}`}
+              onClick={(e) => handlePhotoSelect(photo, e)}
+              style={{
+                border: isCompareBase ? "2px solid #EF4444" : isSelected ? "2px solid var(--primary-start)" : "2px solid transparent",
+              }}
+            >
+              <ThumbnailImage id={photo.id} alt={photo.filename} />
+              
+              {/* Badges overlay */}
+              {photo.file_type !== "JPG" && photo.file_type !== "JPEG" && (
+                <div className="photo-card-badge" style={{ zIndex: 5 }}>{photo.file_type}</div>
+              )}
+
+              {photo.is_favorite && (
+                <div className="photo-card-badge" style={{ right: "8px", left: "auto", background: "rgba(239, 68, 68, 0.8)", zIndex: 5 }}>❤️</div>
+              )}
+
+              <div className="photo-card-overlay" style={{ padding: "8px", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+                <div style={{ fontSize: "11px", fontWeight: "600", color: "#FFF", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textShadow: "0 1px 3px rgba(0,0,0,0.8)" }}>
+                  {photo.filename}
+                </div>
+                {photo.rating > 0 && (
+                  <span style={{ fontSize: "10px", color: "#FBBF24", textShadow: "0 1px 3px rgba(0,0,0,0.8)", marginTop: "2px" }}>
+                    ★ {photo.rating}
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   return (
-    <div className="timeline-viewport">
-      <div className="timeline-toolbar">
+    <div className="timeline-viewport animate-fade-in" style={{ display: "flex", flexDirection: "column", height: "100%", width: "100%", overflow: "hidden" }}>
+      
+      {/* Top filters and search */}
+      <div className="timeline-toolbar" style={{ flexShrink: 0 }}>
         {/* Search */}
         <div className="search-bar-container">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="11" cy="11" r="8"></circle>
             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
           </svg>
@@ -170,6 +440,22 @@ export default function TimelineGrid({
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="搜索文件名、相机、参数..."
           />
+        </div>
+
+        {/* Tag filter */}
+        <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+          <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>标签筛选:</span>
+          <select
+            value={tagFilter}
+            onChange={(e) => setTagFilter(e.target.value)}
+            className="text-input"
+            style={{ width: "110px", padding: "6px", fontSize: "12px" }}
+          >
+            <option value="">全部</option>
+            {allTags.map(t => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
         </div>
 
         {/* Rating Filter */}
@@ -187,120 +473,210 @@ export default function TimelineGrid({
             <option value="5">5星专属</option>
           </select>
         </div>
+      </div>
 
-        {/* Zoom Slider */}
-        <div className="zoom-slider-container">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="3" width="7" height="7"></rect>
-            <rect x="14" y="3" width="7" height="7"></rect>
-            <rect x="14" y="14" width="7" height="7"></rect>
-            <rect x="3" y="14" width="7" height="7"></rect>
-          </svg>
-          <input
-            type="range"
-            min="80"
-            max="300"
-            value={zoomLevel}
-            onChange={(e) => setZoomLevel(Number(e.target.value))}
-            className="zoom-slider"
-          />
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-          </svg>
+      {/* Main Grid display area */}
+      <div style={{ display: "flex", flexGrow: 1, overflow: "hidden", position: "relative", width: "100%" }}>
+        
+        {/* Core photo grid (with splits if in compare mode) */}
+        <div style={{ flexGrow: 1, overflowY: "auto", paddingRight: "8px", height: "100%" }}>
+          {photos.length === 0 ? (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "100px 0", color: "var(--text-muted)", gap: "12px" }}>
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                <polyline points="21 15 16 10 5 21"></polyline>
+              </svg>
+              <span style={{ fontSize: "15px" }}>未发现照片数据</span>
+            </div>
+          ) : compareMode ? (
+            /* Compare Mode Split view */
+            <div className="compare-container animate-fade-in">
+              <div className="compare-left">
+                {renderMasonryGrid()}
+              </div>
+              <div className="compare-right">
+                <button className="compare-exit-btn" onClick={handleToggleCompare}>退出对比</button>
+                <div className="compare-locked-img-wrapper">
+                  <ComparePreviewImage id={compareLockedId} />
+                  <div className="compare-title">📌 对比锁定基准图</div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* Standard Masonry view */
+            renderMasonryGrid()
+          )}
         </div>
 
-        {/* Scan Button */}
-        {currentView === "photos" && (
-          <button
-            onClick={handleScanWorkspace}
-            disabled={scanning}
-            className="gradient-btn"
-            style={{ padding: "8px 16px", borderRadius: "8px", fontSize: "13px", display: "flex", alignItems: "center", gap: "6px" }}
-          >
-            {scanning ? "扫描中..." : "同步磁盘相册"}
-          </button>
+        {/* Right drawer properties panel */}
+        {primaryPhoto && (
+          <aside className="glass-panel animate-fade-in" style={{ width: "280px", marginLeft: "16px", padding: "16px", display: "flex", flexDirection: "column", gap: "16px", borderLeft: "1px solid var(--border-color)", flexShrink: 0, overflowY: "auto" }}>
+            <div>
+              <h3 style={{ margin: "0 0 8px 0", fontSize: "15px", fontWeight: "600" }}>📝 照片详细参数</h3>
+              <div style={{ fontSize: "12px", color: "var(--text-muted)", wordBreak: "break-all", display: "flex", flexDirection: "column", gap: "6px" }}>
+                <div><strong>名称:</strong> {primaryPhoto.filename}</div>
+                <div><strong>路径:</strong> {primaryPhoto.path}</div>
+                <div><strong>格式:</strong> {primaryPhoto.file_type}</div>
+                <div><strong>尺寸:</strong> {primaryPhoto.width && primaryPhoto.height ? `${primaryPhoto.width} x ${primaryPhoto.height}` : "未知"}</div>
+                <div><strong>大小:</strong> {(primaryPhoto.file_size / (1024 * 1024)).toFixed(2)} MB</div>
+                <div><strong>拍摄日期:</strong> {primaryPhoto.date_taken || "无"}</div>
+                {primaryPhoto.camera_make && (
+                  <div><strong>相机制造:</strong> {primaryPhoto.camera_make}</div>
+                )}
+                {primaryPhoto.camera_model && (
+                  <div><strong>相机型号:</strong> {primaryPhoto.camera_model}</div>
+                )}
+                {primaryPhoto.lens_model && (
+                  <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}><strong>镜头:</strong> {primaryPhoto.lens_model}</div>
+                )}
+                {primaryPhoto.exposure_time && (
+                  <div><strong>曝光时间:</strong> {primaryPhoto.exposure_time} s</div>
+                )}
+                {primaryPhoto.f_number && (
+                  <div><strong>光圈:</strong> F/{primaryPhoto.f_number}</div>
+                )}
+                {primaryPhoto.iso && (
+                  <div><strong>ISO:</strong> {primaryPhoto.iso}</div>
+                )}
+                {primaryPhoto.focal_length && (
+                  <div><strong>焦距:</strong> {primaryPhoto.focal_length} mm</div>
+                )}
+              </div>
+            </div>
+
+            <div style={{ borderTop: "1px solid var(--border-color)", paddingTop: "16px" }}>
+              <h3 style={{ margin: "0 0 10px 0", fontSize: "15px", fontWeight: "600" }}>🏷️ 照片标签</h3>
+              
+              {/* Tag chip list */}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "12px" }}>
+                {primaryTags.length === 0 ? (
+                  <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>暂无标签</span>
+                ) : (
+                  primaryTags.map(tag => (
+                    <span key={tag} style={{ display: "inline-flex", alignItems: "center", background: "rgba(96,165,250,0.15)", color: "#93C5FD", fontSize: "11px", padding: "4px 8px", borderRadius: "20px", border: "1px solid rgba(96,165,250,0.25)" }}>
+                      {tag}
+                      <button onClick={() => handleRemoveTag(tag)} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", marginLeft: "4px", padding: 0, fontWeight: "bold", fontSize: "10px" }}>×</button>
+                    </span>
+                  ))
+                )}
+              </div>
+
+              {/* Tag Input Form */}
+              <form onSubmit={handleAddTagSubmit} style={{ display: "flex", gap: "6px" }}>
+                <input
+                  type="text"
+                  className="text-input"
+                  value={newTagInput}
+                  onChange={(e) => setNewTagInput(e.target.value)}
+                  placeholder="新建标签..."
+                  style={{ padding: "6px", fontSize: "12px", borderRadius: "6px", flexGrow: 1 }}
+                />
+                <button type="submit" className="gradient-btn" style={{ padding: "6px 12px", fontSize: "12px", borderRadius: "6px" }}>添加</button>
+              </form>
+            </div>
+          </aside>
         )}
       </div>
 
-      {scanning && scanProgress && (
-        <div className="glass-panel" style={{ padding: "16px", marginBottom: "24px", display: "flex", flexDirection: "column", gap: "10px", background: "rgba(59, 130, 246, 0.05)" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
-            <span>🔍 正在扫描工作空间照片文件...</span>
-            <span style={{ fontWeight: 600 }}>{scanProgress.scanned} / {scanProgress.total}</span>
-          </div>
-          <div className="progress-track">
-            <div
-              className="progress-bar"
-              style={{ width: `${scanProgress.total > 0 ? (scanProgress.scanned / scanProgress.total) * 100 : 0}%` }}
-            />
-          </div>
-          <span style={{ fontSize: "11px", color: "var(--text-dark)", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
-            当前: {scanProgress.current_file}
+      {/* Floating Bottom Toolbar (slides up when photos are selected) */}
+      {selectedIds.length > 0 && (
+        <div className="glass-panel animate-fade-in" style={{
+          position: "absolute",
+          bottom: "24px",
+          left: "50%",
+          transform: "translateX(-50%)",
+          display: "flex",
+          alignItems: "center",
+          gap: "12px",
+          padding: "12px 20px",
+          borderRadius: "16px",
+          boxShadow: "0 10px 30px rgba(0, 0, 0, 0.5)",
+          border: "1px solid var(--border-color)",
+          zIndex: 100,
+          background: "rgba(10, 10, 15, 0.95)",
+        }}>
+          <span style={{ fontSize: "12px", color: "var(--text-muted)", marginRight: "8px", fontWeight: "600" }}>
+            已选中 {selectedIds.length} 项
           </span>
-        </div>
-      )}
 
-      {photos.length === 0 ? (
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "80px 0", color: "var(--text-muted)", gap: "12px" }}>
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-            <circle cx="8.5" cy="8.5" r="1.5"></circle>
-            <polyline points="21 15 16 10 5 21"></polyline>
-          </svg>
-          <span style={{ fontSize: "15px" }}>相册空空如也</span>
-          {currentView === "photos" && (
-            <button onClick={handleScanWorkspace} className="text-input" style={{ width: "auto", padding: "6px 12px", border: "1px solid var(--border-color)", cursor: "pointer", background: "rgba(255,255,255,0.03)" }}>
-              立即同步扫描此文件夹
+          <button onClick={handleBatchFavorite} className="text-input" style={{ width: "auto", padding: "6px 12px", fontSize: "12px", cursor: "pointer" }} title="喜欢">
+            💖 喜欢
+          </button>
+
+          <button onClick={handleToggleCompare} className="text-input" style={{ width: "auto", padding: "6px 12px", fontSize: "12px", cursor: "pointer", background: compareMode ? "var(--primary-start)" : "none" }} title="对比">
+            ⚖️ 对比
+          </button>
+
+          <button onClick={loadAlbumsListForMove} className="text-input" style={{ width: "auto", padding: "6px 12px", fontSize: "12px", cursor: "pointer" }} title="移动到其他相册">
+            📁 移动
+          </button>
+
+          <button onClick={handleBatchAddTag} className="text-input" style={{ width: "auto", padding: "6px 12px", fontSize: "12px", cursor: "pointer" }} title="批量打标签">
+            🏷️ 贴标
+          </button>
+
+          {/* Export Action */}
+          <button onClick={async () => {
+            try {
+              const destPath = await invoke("select_directory");
+              if (!destPath) return;
+
+              // To avoid files lock and perform copy in backend, we can write a simple copy logic.
+              // Wait, since we don't have an export command, let's write it in commands.rs!
+              // Ah! We can easily call standard rust fs::copy through commands. Let's create a quick rust command `export_photos`
+              // so that it copies files directly!
+              // Yes, let's call the command:
+              await invoke("export_photos", { photoIds: selectedIds, destDir: destPath });
+              alert("导出成功！");
+            } catch (err) {
+              alert("导出失败: " + err);
+            }
+          }} className="text-input" style={{ width: "auto", padding: "6px 12px", fontSize: "12px", cursor: "pointer" }} title="导出到外部路径">
+            📤 导出
+          </button>
+
+          {currentView === "trash" ? (
+            <>
+              <button onClick={handleBatchRestore} className="gradient-btn" style={{ padding: "6px 12px", fontSize: "12px", cursor: "pointer", background: "linear-gradient(135deg, #10B981 0%, #059669 100%)" }} title="撤销删除">
+                ↩️ 还原
+              </button>
+              <button onClick={handleBatchDelete} className="gradient-btn" style={{ padding: "6px 12px", fontSize: "12px", cursor: "pointer", background: "linear-gradient(135deg, #EF4444 0%, #DC2626 100%)" }} title="移入系统回收站">
+                🗑️ 彻底删除
+              </button>
+            </>
+          ) : (
+            <button onClick={handleBatchDelete} className="gradient-btn" style={{ padding: "6px 12px", fontSize: "12px", cursor: "pointer", background: "linear-gradient(135deg, #EF4444 0%, #DC2626 100%)" }} title="移入垃圾桶">
+              🗑️ 删除
             </button>
           )}
         </div>
-      ) : (
-        groupedPhotos.map((group) => (
-          <div key={group.date} className="date-group">
-            <div className="date-group-header">
-              <span>{group.date}</span>
-              <span className="date-group-count">{group.items.length} 张照片</span>
-            </div>
-            <div
-              className="photo-grid"
-              style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${zoomLevel}px, 1fr))` }}
-            >
-              {group.items.map((photo, index) => (
-                <div
-                  key={photo.id}
-                  className="photo-card"
-                  onClick={() => onPhotoClick(photos, photos.findIndex(p => p.id === photo.id))}
-                >
-                  <ThumbnailImage id={photo.id} alt={photo.filename} />
-                  
-                  {/* File Type Badge (e.g. RAW / CR2 / ARW) */}
-                  {photo.file_type !== "JPG" && photo.file_type !== "JPEG" && (
-                    <div className="photo-card-badge">{photo.file_type}</div>
-                  )}
+      )}
 
-                  <div className="photo-card-overlay">
-                    <div className="photo-card-actions">
-                      <button
-                        className={`photo-action-btn ${photo.is_favorite ? "active-fav" : ""}`}
-                        onClick={(e) => handleToggleFav(photo.id, photo.is_favorite, e)}
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill={photo.is_favorite ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2">
-                          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-                        </svg>
-                      </button>
-                    </div>
-                    {photo.rating > 0 && (
-                      <span style={{ fontSize: "11px", fontWeight: "600", color: "#FBBF24", textShadow: "0 1px 3px rgba(0,0,0,0.8)" }}>
-                        ★ {photo.rating}
-                      </span>
-                    )}
-                  </div>
-                </div>
+      {/* Move Album Modal */}
+      {showMoveModal && (
+        <div className="wizard-overlay" style={{ zIndex: 1100 }}>
+          <div className="welcome-card glass-panel" style={{ maxWidth: "360px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+              <span className="header-title" style={{ fontSize: "15px" }}>📁 移动照片到目标相册</span>
+              <button className="photo-action-btn" onClick={() => setShowMoveModal(false)} style={{ fontSize: "18px", padding: 0 }}>×</button>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "250px", overflowY: "auto" }}>
+              {albumsList.map((alb) => (
+                <button
+                  key={alb.id}
+                  onClick={() => handleBatchMoveSubmit(alb.id)}
+                  className="text-input"
+                  style={{ width: "100%", padding: "10px", textAlign: "left", cursor: "pointer" }}
+                >
+                  📁 {alb.name}
+                </button>
               ))}
             </div>
           </div>
-        ))
+        </div>
       )}
+
     </div>
   );
 }

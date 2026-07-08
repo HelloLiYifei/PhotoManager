@@ -768,3 +768,45 @@ pub fn empty_trash_to_recycle_bin(state: State<'_, DbState>) -> Result<(), Strin
 
     Ok(())
 }
+
+#[tauri::command]
+pub fn export_photos(state: State<'_, DbState>, photo_ids: Vec<String>, dest_dir: String) -> Result<(), String> {
+    let current_path_guard = state.current_path.lock().unwrap();
+    let workspace_root_str = match &*current_path_guard {
+        Some(path) => path.clone(),
+        None => return Err("没有打开的工作空间".to_string()),
+    };
+    let workspace_root = Path::new(&workspace_root_str);
+
+    let conn_guard = state.conn.lock().unwrap();
+    let conn = conn_guard.as_ref().ok_or("数据库未连接")?;
+
+    let dest_path = Path::new(&dest_dir);
+    if !dest_path.exists() {
+        return Err("目标文件夹不存在".to_string());
+    }
+
+    for id in photo_ids {
+        let mut stmt = conn.prepare("SELECT path, filename FROM photos WHERE id = ?1").map_err(|e| e.to_string())?;
+        if let Ok((rel_path, filename)) = stmt.query_row([&id], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        }) {
+            let src_path = workspace_root.join(&rel_path);
+            let target_path = dest_path.join(&filename);
+            
+            if src_path.exists() {
+                let mut final_target = target_path.clone();
+                let file_ext = target_path.extension().and_then(|s| s.to_str()).unwrap_or("jpg");
+                let file_stem = target_path.file_stem().and_then(|s| s.to_str()).unwrap_or("exported");
+                let mut idx = 1;
+                while final_target.exists() {
+                    final_target = dest_path.join(format!("{}_{}.{}", file_stem, idx, file_ext));
+                    idx += 1;
+                }
+                let _ = fs::copy(&src_path, &final_target);
+            }
+        }
+    }
+
+    Ok(())
+}

@@ -731,6 +731,77 @@ body {
   color: #FBBF24; /* Amber star */
 }
 
+/* Album Overview Grid */
+.albums-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 24px;
+  padding: 16px 0;
+}
+
+.album-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+}
+
+.album-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--primary-start);
+  box-shadow: 0 8px 24px rgba(96, 165, 250, 0.15);
+}
+
+.album-cover-wrapper {
+  aspect-ratio: 1 / 1;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.02);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 14px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.album-cover-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.album-card-info {
+  padding: 12px;
+}
+
+.album-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-main);
+  margin-bottom: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.album-card-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.album-cover-placeholder {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 /* Import Wizard overlay */
 .wizard-overlay {
   position: fixed;
@@ -883,3 +954,243 @@ body {
   transition: width 0.1s ease;
   box-shadow: 0 0 10px var(--primary-end);
 }
+
+/* ==========================================================================
+   NEW WORKSPACE ADJUSTMENTS & MASONRY LAYOUT
+   ========================================================================== */
+
+/* Foldable Sidebar styling */
+.sidebar.collapsed {
+  width: 72px;
+}
+
+.sidebar.collapsed .sidebar-text,
+.sidebar.collapsed .album-name,
+.sidebar.collapsed .album-desc,
+.sidebar.collapsed .nav-text,
+.sidebar.collapsed .nav-header {
+  display: none !important;
+}
+
+.sidebar.collapsed .nav-item {
+  justify-content: center;
+  padding: 12px;
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  margin: 8px auto;
+}
+
+.sidebar.collapsed .album-item {
+  justify-content: center;
+}
+
+.sidebar.collapsed .album-icon-circle {
+  margin-right: 0 !important;
+}
+
+/* Masonry Pinterest-style Grid */
+.masonry-grid {
+  column-count: 4;
+  column-gap: 16px;
+  width: 100%;
+}
+
+@media (max-width: 1200px) {
+  .masonry-grid {
+    column-count: 3;
+  }
+}
+
+@media (max-width: 800px) {
+  .masonry-grid {
+    column-count: 2;
+  }
+}
+
+@media (max-width: 500px) {
+  .masonry-grid {
+    column-count: 1;
+  }
+}
+
+.masonry-item {
+  break-inside: avoid;
+  margin-bottom: 16px;
+  cursor: pointer;
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid transparent;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.masonry-item:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.masonry-item.selected {
+  border-color: var(--primary-start);
+  box-shadow: 0 0 15px rgba(59, 130, 246, 0.4);
+}
+
+.masonry-item img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 6px;
+}
+
+/* Brush cursor in import wizard */
+.brush-cursor {
+  cursor: cell !important;
+}
+
+/* Green duplicate highlighters in import card list */
+.already-imported {
+  border: 2px solid #10B981 !important;
+  background: rgba(16, 185, 129, 0.08) !important;
+  opacity: 0.8;
+}
+
+.already-imported-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: #10B981;
+  color: white;
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-weight: bold;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  z-index: 10;
+}
+
+/* Compare splits styling */
+.compare-container {
+  display: flex;
+  flex-grow: 1;
+  overflow: hidden;
+  height: 100%;
+  width: 100%;
+}
+
+.compare-left {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 16px;
+  border-right: 1px solid var(--border-color);
+  height: 100%;
+}
+
+.compare-right {
+  flex: 1;
+  overflow-y: auto;
+  padding-left: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+  position: relative;
+  height: 100%;
+  border-radius: 12px;
+  margin-left: 16px;
+}
+
+.compare-locked-img-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  max-width: 90%;
+  max-height: 80%;
+}
+
+.compare-locked-img {
+  max-width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.7);
+  border: 2px solid var(--primary-start);
+}
+
+.compare-exit-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: #EF4444;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  z-index: 20;
+}
+
+.compare-exit-btn:hover {
+  background: #DC2626;
+}
+
+.compare-title {
+  color: var(--text-main);
+  font-size: 14px;
+  margin-top: 12px;
+  text-align: center;
+  opacity: 0.8;
+}
+
+/* Map page and leaflet mapping */
+.map-wrapper {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.map-container {
+  width: 100%;
+  flex-grow: 1;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  background: #111116;
+  min-height: 450px;
+}
+
+.map-popup-img {
+  width: 140px;
+  height: 105px;
+  object-fit: cover;
+  border-radius: 6px;
+  margin-top: 6px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  transition: transform 0.2s ease;
+}
+
+.map-popup-img:hover {
+  transform: scale(1.05);
+}
+
+.map-popup-text {
+  font-family: inherit;
+  color: #333; /* Leaflet popups are white bg by default */
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.map-popup-title {
+  font-weight: bold;
+  font-size: 13px;
+  margin-bottom: 2px;
+}
+

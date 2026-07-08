@@ -253,79 +253,87 @@ pub fn permanently_delete_photo(state: State<'_, DbState>, id: String) -> Result
 // --- PHOTO LOADING COMMANDS (BASE64) ---
 
 #[tauri::command]
-pub fn get_photo_thumbnail_base64(state: State<'_, DbState>, id: String) -> Result<String, String> {
-    let current_path_guard = state.current_path.lock().unwrap();
-    let workspace_root = current_path_guard.as_ref().ok_or("没有打开的工作空间")?;
+pub async fn get_photo_thumbnail_base64(state: State<'_, DbState>, id: String) -> Result<String, String> {
+    let workspace_root = {
+        let current_path_guard = state.current_path.lock().unwrap();
+        current_path_guard.as_ref().ok_or("没有打开的工作空间")?.clone()
+    };
 
-    let thumbnail_path = Path::new(workspace_root)
-        .join(".photomanager")
-        .join("thumbnails")
-        .join(format!("{}.jpg", id));
+    tokio::task::spawn_blocking(move || {
+        let thumbnail_path = Path::new(&workspace_root)
+            .join(".photomanager")
+            .join("thumbnails")
+            .join(format!("{}.jpg", id));
 
-    if !thumbnail_path.exists() {
-        return Err("缩略图不存在".to_string());
-    }
+        if !thumbnail_path.exists() {
+            return Err("缩略图不存在".to_string());
+        }
 
-    let bytes = fs::read(thumbnail_path).map_err(|e| e.to_string())?;
-    let b64 = BASE64_ENGINE.encode(bytes);
-    Ok(format!("data:image/jpeg;base64,{}", b64))
+        let bytes = fs::read(thumbnail_path).map_err(|e| e.to_string())?;
+        let b64 = BASE64_ENGINE.encode(bytes);
+        Ok(format!("data:image/jpeg;base64,{}", b64))
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-pub fn get_photo_preview_base64(state: State<'_, DbState>, id: String) -> Result<String, String> {
-    let current_path_guard = state.current_path.lock().unwrap();
-    let workspace_root = current_path_guard.as_ref().ok_or("没有打开的工作空间")?;
+pub async fn get_photo_preview_base64(state: State<'_, DbState>, id: String) -> Result<String, String> {
+    let (workspace_root, relative_path, file_type) = {
+        let current_path_guard = state.current_path.lock().unwrap();
+        let workspace_root = current_path_guard.as_ref().ok_or("没有打开的工作空间")?.clone();
 
-    let conn_guard = state.conn.lock().unwrap();
-    let conn = conn_guard.as_ref().ok_or("数据库未连接")?;
+        let conn_guard = state.conn.lock().unwrap();
+        let conn = conn_guard.as_ref().ok_or("数据库未连接")?;
 
-    let mut stmt = conn
-        .prepare("SELECT path, file_type FROM photos WHERE id = ?1")
-        .map_err(|e| e.to_string())?;
-    
-    let (relative_path, file_type): (String, String) = stmt
-        .query_row([&id], |row| Ok((row.get(0)?, row.get(1)?)))
-        .map_err(|e| e.to_string())?;
-
-    let photo_physical_path = Path::new(workspace_root).join(&relative_path);
-    if !photo_physical_path.exists() {
-        return Err("照片原文件不存在".to_string());
-    }
-
-    let is_raw = matches!(file_type.to_lowercase().as_str(), "arw" | "cr2" | "nef");
-
-    let bytes = if is_raw {
-        // Extract embedded JPEG preview
-        crate::metadata::extract_raw_preview(&photo_physical_path)
-            .map_err(|e| format!("RAW预览图提取失败: {}", e))?
-    } else {
-        // Read JPG directly
-        fs::read(&photo_physical_path).map_err(|e| e.to_string())?
+        let mut stmt = conn
+            .prepare("SELECT path, file_type FROM photos WHERE id = ?1")
+            .map_err(|e| e.to_string())?;
+        
+        let (rel_path, f_type): (String, String) = stmt
+            .query_row([&id], |row| Ok((row.get(0)?, row.get(1)?)))
+            .map_err(|e| e.to_string())?;
+        (workspace_root, rel_path, f_type)
     };
 
-    // Decode image
-    let img = image::load_from_memory_with_format(&bytes, image::ImageFormat::Jpeg)
-        .map_err(|e| format!("图片解码失败: {}", e))?;
-    
-    // Rotate based on EXIF orientation
-    let orientation = crate::metadata::get_orientation(&photo_physical_path);
-    let mut img = if orientation != 1 {
-        crate::metadata::rotate_image(img, orientation)
-    } else {
-        img
-    };
+    tokio::task::spawn_blocking(move || {
+        let photo_physical_path = Path::new(&workspace_root).join(&relative_path);
+        if !photo_physical_path.exists() {
+            return Err("照片原文件不存在".to_string());
+        }
 
-    // Resize to max 1600px to keep base64 transfer fast and preview responsive
-    if img.width() > 1600 || img.height() > 1600 {
-        img = img.resize(1600, 1600, image::imageops::FilterType::Lanczos3);
-    }
+        let is_raw = matches!(file_type.to_lowercase().as_str(), "arw" | "cr2" | "nef");
 
-    let mut buffer = std::io::Cursor::new(Vec::new());
-    img.write_to(&mut buffer, image::ImageFormat::Jpeg)
-        .map_err(|e| format!("图片压缩失败: {}", e))?;
+        let bytes = if is_raw {
+            crate::metadata::extract_raw_preview(&photo_physical_path)
+                .map_err(|e| format!("RAW预览图提取失败: {}", e))?
+        } else {
+            fs::read(&photo_physical_path).map_err(|e| e.to_string())?
+        };
 
-    let b64 = BASE64_ENGINE.encode(buffer.into_inner());
-    Ok(format!("data:image/jpeg;base64,{}", b64))
+        let img = image::load_from_memory_with_format(&bytes, image::ImageFormat::Jpeg)
+            .map_err(|e| format!("图片解码失败: {}", e))?;
+        
+        let orientation = crate::metadata::get_orientation(&photo_physical_path);
+        let mut img = if orientation != 1 {
+            crate::metadata::rotate_image(img, orientation)
+        } else {
+            img
+        };
+
+        if img.width() > 1600 || img.height() > 1600 {
+            img = img.resize(1600, 1600, image::imageops::FilterType::Lanczos3);
+        }
+
+        let mut buffer = std::io::Cursor::new(Vec::new());
+        img.write_to(&mut buffer, image::ImageFormat::Jpeg)
+            .map_err(|e| format!("图片压缩失败: {}", e))?;
+
+        let b64 = BASE64_ENGINE.encode(buffer.into_inner());
+        Ok(format!("data:image/jpeg;base64,{}", b64))
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 // --- ALBUM COMMANDS ---

@@ -192,8 +192,8 @@ export default function ImportWizard({ onClose, onImportComplete }) {
   };
 
   return (
-    <div className="wizard-overlay">
-      <div className="wizard-card glass-panel">
+    <div className="wizard-overlay fullscreen">
+      <div className="wizard-card fullscreen glass-panel">
         {/* Header */}
         <div className="content-header">
           <div className="header-title-area">

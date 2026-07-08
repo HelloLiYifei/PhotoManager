@@ -467,3 +467,9 @@ pub async fn import_photos(
 ) -> Result<i32, String> {
     execute_import(&app_handle, &state, photo_paths, &folder_template, &name_template, &event_name, backup_path)
 }
+
+#[tauri::command]
+pub fn select_directory() -> Option<String> {
+    let dir = rfd::FileDialog::new().pick_folder();
+    dir.map(|p| p.to_string_lossy().to_string())
+}

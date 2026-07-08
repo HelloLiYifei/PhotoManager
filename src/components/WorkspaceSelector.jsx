@@ -79,6 +79,23 @@ export default function WorkspaceSelector({ onSelectWorkspace }) {
     }
   };
 
+  const handleSelectFolder = async () => {
+    try {
+      const selected = await invoke("select_directory");
+      if (selected) {
+        setNewWsPath(selected);
+        // Automatically extract folder name as warehouse name
+        const parts = selected.split(/[/\\]/);
+        const folderName = parts.pop() || parts.pop() || "本地相册";
+        if (!newWsName.trim()) {
+          setNewWsName(folderName);
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   return (
     <div className="welcome-screen">
       <div className="welcome-logo">
@@ -107,13 +124,24 @@ export default function WorkspaceSelector({ onSelectWorkspace }) {
         <form onSubmit={handleCreateWorkspace}>
           <div className="input-group">
             <span className="input-label">📁 本地物理文件夹路径</span>
-            <input
-              type="text"
-              className="text-input"
-              value={newWsPath}
-              onChange={(e) => setNewWsPath(e.target.value)}
-              placeholder="例如：E:\Photos\MyGallery"
-            />
+            <div style={{ display: "flex", gap: "8px" }}>
+              <input
+                type="text"
+                className="text-input"
+                value={newWsPath}
+                onChange={(e) => setNewWsPath(e.target.value)}
+                placeholder="选择或输入本地空文件夹/相册文件夹"
+                style={{ flexGrow: 1 }}
+              />
+              <button
+                type="button"
+                className="text-input"
+                onClick={handleSelectFolder}
+                style={{ width: "100px", cursor: "pointer", border: "1px solid var(--border-color)", background: "rgba(255,255,255,0.05)", padding: "10px", fontSize: "13px" }}
+              >
+                选择目录...
+              </button>
+            </div>
           </div>
 
           <div className="input-group">

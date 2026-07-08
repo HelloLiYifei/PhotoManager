@@ -473,3 +473,30 @@ pub fn select_directory() -> Option<String> {
     let dir = rfd::FileDialog::new().pick_folder();
     dir.map(|p| p.to_string_lossy().to_string())
 }
+
+#[tauri::command]
+pub fn get_image_thumbnail_by_path(path: String, is_raw: bool) -> Result<String, String> {
+    let p = Path::new(&path);
+    if !p.exists() {
+        return Err("文件不存在".to_string());
+    }
+
+    let bytes = if is_raw {
+        crate::metadata::extract_raw_preview(p)
+            .map_err(|e| format!("RAW预览图提取失败: {}", e))?
+    } else {
+        std::fs::read(p).map_err(|e| e.to_string())?
+    };
+
+    let img = image::load_from_memory_with_format(&bytes, image::ImageFormat::Jpeg)
+        .map_err(|e| format!("图片解码失败: {}", e))?;
+        
+    let thumb = img.resize(150, 150, image::imageops::FilterType::Lanczos3);
+    
+    let mut buffer = std::io::Cursor::new(Vec::new());
+    thumb.write_to(&mut buffer, image::ImageFormat::Jpeg)
+        .map_err(|e| format!("图片压缩失败: {}", e))?;
+        
+    let b64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, buffer.into_inner());
+    Ok(format!("data:image/jpeg;base64,{}", b64))
+}

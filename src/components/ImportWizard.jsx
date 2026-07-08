@@ -1,5 +1,64 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
+
+// Sub-component to lazy load card photo thumbnails
+function CardThumbnailImage({ path, isRaw }) {
+  const [src, setSrc] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const imgRef = useRef(null);
+
+  useEffect(() => {
+    let active = true;
+    
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          loadThumbnail();
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (imgRef.current) {
+      observer.observe(imgRef.current);
+    }
+
+    async function loadThumbnail() {
+      try {
+        const b64 = await invoke("get_image_thumbnail_by_path", { path, isRaw });
+        if (active) {
+          setSrc(b64);
+          setLoading(false);
+        }
+      } catch (err) {
+        if (active) setLoading(false);
+      }
+    }
+
+    return () => {
+      active = false;
+      observer.disconnect();
+    };
+  }, [path, isRaw]);
+
+  if (loading) {
+    return (
+      <div ref={imgRef} style={{ width: "100%", height: "100%", background: "#1F1F2E", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ width: "16px", height: "16px", borderRadius: "50%", border: "2px solid rgba(255,255,255,0.1)", borderTopColor: "var(--accent-color)", animation: "spin 1s linear infinite" }} />
+      </div>
+    );
+  }
+
+  return (
+    <img
+      ref={imgRef}
+      src={src || "/placeholder.svg"}
+      alt="Preview"
+      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+    />
+  );
+}
 
 export default function ImportWizard({ onClose, onImportComplete }) {
   const [cards, setCards] = useState([]);
@@ -264,20 +323,7 @@ export default function ImportWizard({ onClose, onImportComplete }) {
                       className={`wizard-grid-item ${isSel ? "selected" : ""}`}
                       onClick={() => handleTogglePhoto(photo.absolute_path)}
                     >
-                      {/* We display a standard placeholder or try to read thumbnail. Since card files are remote, we don't have thumbnails cache generated yet, so we just show an icon or a generic representation. But RAW vs JPG badge helps! */}
-                      <div style={{ width: "100%", height: "100%", background: "#1F1F2E", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", border: "1px solid rgba(255,255,255,0.05)" }}>
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="1.5">
-                          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                          <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                          <polyline points="21 15 16 10 5 21"></polyline>
-                        </svg>
-                        <span style={{ fontSize: "10px", color: "var(--text-dark)", marginTop: "8px", textOverflow: "ellipsis", width: "90%", overflow: "hidden", textAlign: "center", whiteSpace: "nowrap" }}>
-                          {photo.relative_path.split("\\").pop().split("/").pop()}
-                        </span>
-                        <span style={{ fontSize: "9px", color: "var(--text-dark)", marginTop: "2px" }}>
-                          {(photo.size / (1024 * 1024)).toFixed(1)} MB
-                        </span>
-                      </div>
+                      <CardThumbnailImage path={photo.absolute_path} isRaw={photo.is_raw} />
                       
                       <div className="checkbox-badge">✓</div>
                       {photo.is_raw && (

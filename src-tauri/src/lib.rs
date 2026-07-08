@@ -34,7 +34,8 @@ pub fn run() {
             commands::detect_cards,
             commands::scan_card,
             commands::import_photos,
-            commands::select_directory
+            commands::select_directory,
+            commands::get_image_thumbnail_by_path
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

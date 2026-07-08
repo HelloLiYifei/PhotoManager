@@ -314,3 +314,103 @@ pub fn generate_thumbnail<P: AsRef<Path>>(
 
     Ok((width, height))
 }
+
+// Extract a small embedded JPEG from a RAW file for thumbnail preview
+pub fn extract_raw_small_preview<P: AsRef<Path>>(raw_path: P) -> std::io::Result<Vec<u8>> {
+    let mut file = File::open(raw_path)?;
+    let mut parser = TiffParser::new(&mut file)?;
+    
+    let ifd0_offset = parser.ifd0_offset;
+    let previews = parser.find_jpeg_previews(ifd0_offset)?;
+    if previews.is_empty() {
+        return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "No embedded JPEGs found"));
+    }
+
+    // Return the preview with the smallest size (usually the EXIF thumbnail)
+    let smallest = previews.iter().min_by_key(|(_, len)| len).cloned().unwrap();
+    
+    std::mem::drop(parser);
+    
+    let mut jpeg_data = vec![0u8; smallest.1 as usize];
+    file.seek(SeekFrom::Start(smallest.0 as u64))?;
+    file.read_exact(&mut jpeg_data)?;
+    
+    Ok(jpeg_data)
+}
+
+// Extract the EXIF thumbnail directly from a JPEG file without decoding the full image
+pub fn extract_jpeg_exif_thumbnail<P: AsRef<Path>>(path: P) -> Option<Vec<u8>> {
+    let mut file = File::open(path).ok()?;
+    let mut buf = [0u8; 2];
+    
+    // Read SOI marker (should be FFD8)
+    file.read_exact(&mut buf).ok()?;
+    if buf != [0xFF, 0xD8] {
+        return None;
+    }
+    
+    let mut exif_tiff_start: Option<u64> = None;
+    
+    // Parse JPEG markers
+    loop {
+        let mut marker_prefix = [0u8; 1];
+        if file.read_exact(&mut marker_prefix).is_err() {
+            break;
+        }
+        if marker_prefix[0] != 0xFF {
+            continue;
+        }
+        
+        let mut marker_type = [0u8; 1];
+        if file.read_exact(&mut marker_type).is_err() {
+            break;
+        }
+        
+        let m = marker_type[0];
+        if m == 0xD9 || m == 0xDA { // EOI or Start of Scan
+            break;
+        }
+        
+        if m == 0x00 || m == 0xFF {
+            continue;
+        }
+        
+        let mut len_bytes = [0u8; 2];
+        if file.read_exact(&mut len_bytes).is_err() {
+            break;
+        }
+        let len = u16::from_be_bytes(len_bytes) as i64;
+        
+        if m == 0xE1 { // APP1
+            let mut header = [0u8; 6];
+            if file.read_exact(&mut header).is_ok() && &header == b"Exif\0\0" {
+                exif_tiff_start = file.stream_position().ok();
+                break;
+            }
+            let _ = file.seek(SeekFrom::Current(len - 2 - 6));
+        } else {
+            let _ = file.seek(SeekFrom::Current(len - 2));
+        }
+    }
+    
+    let tiff_start = exif_tiff_start?;
+    
+    let _ = file.seek(SeekFrom::Start(0));
+    let mut bufreader = BufReader::new(&file);
+    let exif = exif::Reader::new().read_from_container(&mut bufreader).ok()?;
+    
+    if let (Some(offset_field), Some(len_field)) = (
+        exif.get_field(exif::Tag::JPEGInterchangeFormat, exif::In::THUMBNAIL),
+        exif.get_field(exif::Tag::JPEGInterchangeFormatLength, exif::In::THUMBNAIL)
+    ) {
+        let offset = offset_field.value.get_uint(0)? as u64;
+        let length = len_field.value.get_uint(0)? as usize;
+        
+        let mut thumb_bytes = vec![0u8; length];
+        let _ = file.seek(SeekFrom::Start(tiff_start + offset));
+        file.read_exact(&mut thumb_bytes).ok()?;
+        return Some(thumb_bytes);
+    }
+    
+    None
+}

@@ -494,18 +494,35 @@ pub async fn get_image_thumbnail_by_path(path: String, is_raw: bool) -> Result<S
             return Err("文件不存在".to_string());
         }
 
-        let bytes = if is_raw {
-            crate::metadata::extract_raw_preview(p)
-                .map_err(|e| format!("RAW预览图提取失败: {}", e))?
+        // Try to read small/embedded EXIF thumbnails first to achieve maximum speed
+        let (bytes, is_exif_thumb) = if is_raw {
+            match crate::metadata::extract_raw_small_preview(p) {
+                Ok(b) => (b, true),
+                Err(_) => {
+                    let b = crate::metadata::extract_raw_preview(p)
+                        .map_err(|e| format!("RAW大预览图提取失败: {}", e))?;
+                    (b, false)
+                }
+            }
         } else {
-            std::fs::read(p).map_err(|e| e.to_string())?
+            match crate::metadata::extract_jpeg_exif_thumbnail(p) {
+                Some(b) => (b, true),
+                None => {
+                    let b = std::fs::read(p).map_err(|e| e.to_string())?;
+                    (b, false)
+                }
+            }
         };
 
         let img = image::load_from_memory_with_format(&bytes, image::ImageFormat::Jpeg)
             .map_err(|e| format!("图片解码失败: {}", e))?;
             
-        // Nearest neighbor scaling is 10x-50x faster than Lanczos3
-        let thumb = img.resize(120, 120, image::imageops::FilterType::Nearest);
+        // Skip resizing if the EXIF thumbnail is already within target display bounds
+        let thumb = if is_exif_thumb && img.width() <= 160 && img.height() <= 160 {
+            img
+        } else {
+            img.resize(120, 120, image::imageops::FilterType::Nearest)
+        };
         
         let mut buffer = std::io::Cursor::new(Vec::new());
         thumb.write_to(&mut buffer, image::ImageFormat::Jpeg)

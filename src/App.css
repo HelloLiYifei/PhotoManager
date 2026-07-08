@@ -865,33 +865,43 @@ body {
   overflow: hidden;
 }
 
-.wizard-grid {
-  flex-grow: 1;
-  overflow-y: auto;
+.wizard-photos-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  grid-auto-rows: 120px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-auto-rows: 150px;
   gap: 12px;
-  padding: 8px;
-  padding-bottom: 20px;
+  width: 100%;
+  padding-bottom: 30px;
 }
 
-.wizard-grid-item {
+.wizard-photo-card {
   position: relative;
   width: 100%;
   height: 100%;
-  border-radius: 6px;
+  border-radius: 8px;
   overflow: hidden;
   cursor: pointer;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  background: #1A1A24;
+  background: #1E1E2E;
+  border: 2px solid transparent;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.wizard-grid-item img {
+.wizard-photo-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(0,0,0,0.4);
+}
+
+.wizard-photo-card img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
+  border-radius: 6px;
+  transition: transform 0.3s ease;
+}
+
+.wizard-photo-card:hover img {
+  transform: scale(1.04);
 }
 
 .checkbox-badge {

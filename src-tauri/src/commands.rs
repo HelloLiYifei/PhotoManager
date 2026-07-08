@@ -523,41 +523,51 @@ pub async fn get_image_thumbnail_by_path(path: String, is_raw: bool) -> Result<S
         }
 
         // Try to read small/embedded EXIF thumbnails first to achieve maximum speed
-        let (bytes, is_exif_thumb) = if is_raw {
-            match crate::metadata::extract_raw_small_preview(p) {
-                Ok(b) => (b, true),
-                Err(_) => {
-                    let b = crate::metadata::extract_raw_preview(p)
-                        .map_err(|e| format!("RAW大预览图提取失败: {}", e))?;
-                    (b, false)
+        let (mut img, is_exif_thumb) = {
+            let (bytes, is_exif) = if is_raw {
+                match crate::metadata::extract_raw_small_preview(p) {
+                    Ok(b) => (b, true),
+                    Err(_) => {
+                        let b = crate::metadata::extract_raw_preview(p)
+                            .map_err(|e| format!("RAW大预览图提取失败: {}", e))?;
+                        (b, false)
+                    }
                 }
-            }
-        } else {
-            match crate::metadata::extract_jpeg_exif_thumbnail(p) {
-                Some(b) => (b, true),
-                None => {
-                    let b = std::fs::read(p).map_err(|e| e.to_string())?;
-                    (b, false)
+            } else {
+                match crate::metadata::extract_jpeg_exif_thumbnail(p) {
+                    Some(b) => (b, true),
+                    None => {
+                        let b = std::fs::read(p).map_err(|e| e.to_string())?;
+                        (b, false)
+                    }
                 }
+            };
+
+            let decoded = image::load_from_memory_with_format(&bytes, image::ImageFormat::Jpeg)
+                .map_err(|e| format!("图片解码失败: {}", e))?;
+
+            // If EXIF thumbnail is too small (e.g. under 320px), load the full image instead for crisp preview!
+            if is_exif && (decoded.width() < 320 || decoded.height() < 320) {
+                let full_bytes = std::fs::read(p).map_err(|e| e.to_string())?;
+                let full_decoded = image::load_from_memory_with_format(&full_bytes, image::ImageFormat::Jpeg)
+                    .map_err(|e| format!("原图解码失败: {}", e))?;
+                (full_decoded, false)
+            } else {
+                (decoded, is_exif)
             }
         };
-
-        let img = image::load_from_memory_with_format(&bytes, image::ImageFormat::Jpeg)
-            .map_err(|e| format!("图片解码失败: {}", e))?;
             
         // Rotate based on EXIF orientation
         let orientation = crate::metadata::get_orientation(p);
-        let img = if orientation != 1 {
-            crate::metadata::rotate_image(img, orientation)
-        } else {
-            img
-        };
+        if orientation != 1 {
+            img = crate::metadata::rotate_image(img, orientation);
+        }
 
-        // Skip resizing if the EXIF thumbnail is already within target display bounds (320px)
-        let thumb = if is_exif_thumb && img.width() <= 320 && img.height() <= 320 {
+        // Skip resizing if the EXIF thumbnail is already within target display bounds (400px)
+        let thumb = if is_exif_thumb && img.width() <= 400 && img.height() <= 400 {
             img
         } else {
-            img.resize(320, 320, image::imageops::FilterType::Triangle)
+            img.resize(400, 400, image::imageops::FilterType::Triangle)
         };
         
         let mut buffer = std::io::Cursor::new(Vec::new());

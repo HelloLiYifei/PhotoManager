@@ -300,10 +300,31 @@ pub fn get_photo_preview_base64(state: State<'_, DbState>, id: String) -> Result
             .map_err(|e| format!("RAW预览图提取失败: {}", e))?
     } else {
         // Read JPG directly
-        fs::read(photo_physical_path).map_err(|e| e.to_string())?
+        fs::read(&photo_physical_path).map_err(|e| e.to_string())?
     };
 
-    let b64 = BASE64_ENGINE.encode(bytes);
+    // Decode image
+    let img = image::load_from_memory_with_format(&bytes, image::ImageFormat::Jpeg)
+        .map_err(|e| format!("图片解码失败: {}", e))?;
+    
+    // Rotate based on EXIF orientation
+    let orientation = crate::metadata::get_orientation(&photo_physical_path);
+    let mut img = if orientation != 1 {
+        crate::metadata::rotate_image(img, orientation)
+    } else {
+        img
+    };
+
+    // Resize to max 1600px to keep base64 transfer fast and preview responsive
+    if img.width() > 1600 || img.height() > 1600 {
+        img = img.resize(1600, 1600, image::imageops::FilterType::Lanczos3);
+    }
+
+    let mut buffer = std::io::Cursor::new(Vec::new());
+    img.write_to(&mut buffer, image::ImageFormat::Jpeg)
+        .map_err(|e| format!("图片压缩失败: {}", e))?;
+
+    let b64 = BASE64_ENGINE.encode(buffer.into_inner());
     Ok(format!("data:image/jpeg;base64,{}", b64))
 }
 
@@ -524,11 +545,19 @@ pub async fn get_image_thumbnail_by_path(path: String, is_raw: bool) -> Result<S
         let img = image::load_from_memory_with_format(&bytes, image::ImageFormat::Jpeg)
             .map_err(|e| format!("图片解码失败: {}", e))?;
             
-        // Skip resizing if the EXIF thumbnail is already within target display bounds
-        let thumb = if is_exif_thumb && img.width() <= 160 && img.height() <= 160 {
+        // Rotate based on EXIF orientation
+        let orientation = crate::metadata::get_orientation(p);
+        let img = if orientation != 1 {
+            crate::metadata::rotate_image(img, orientation)
+        } else {
+            img
+        };
+
+        // Skip resizing if the EXIF thumbnail is already within target display bounds (320px)
+        let thumb = if is_exif_thumb && img.width() <= 320 && img.height() <= 320 {
             img
         } else {
-            img.resize(120, 120, image::imageops::FilterType::Nearest)
+            img.resize(320, 320, image::imageops::FilterType::Triangle)
         };
         
         let mut buffer = std::io::Cursor::new(Vec::new());

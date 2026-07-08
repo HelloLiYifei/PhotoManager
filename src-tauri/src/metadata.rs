@@ -273,14 +273,71 @@ pub fn read_exif_metadata<P: AsRef<Path>>(path: P) -> ImageMetadata {
     meta.longitude = get_gps(Tag::GPSLongitude, Tag::GPSLongitudeRef);
 
     // Attempt to get pixel dimensions from EXIF tags
+    let mut w = None;
+    let mut h = None;
     if let Some(field) = exif.get_field(Tag::PixelXDimension, In::PRIMARY) {
-        meta.width = field.display_value().to_string().parse::<i32>().ok();
+        w = field.display_value().to_string().parse::<i32>().ok();
     }
     if let Some(field) = exif.get_field(Tag::PixelYDimension, In::PRIMARY) {
-        meta.height = field.display_value().to_string().parse::<i32>().ok();
+        h = field.display_value().to_string().parse::<i32>().ok();
+    }
+
+    // Read orientation to swap width/height if rotated 90/270 degrees
+    let mut orientation = 1;
+    if let Some(field) = exif.get_field(Tag::Orientation, In::PRIMARY) {
+        orientation = match &field.value {
+            Value::Short(vec) => vec.first().copied().unwrap_or(1) as u32,
+            Value::Byte(vec) => vec.first().copied().unwrap_or(1) as u32,
+            _ => 1,
+        };
+    }
+
+    if orientation == 5 || orientation == 6 || orientation == 7 || orientation == 8 {
+        meta.width = h;
+        meta.height = w;
+    } else {
+        meta.width = w;
+        meta.height = h;
     }
 
     meta
+}
+
+// Helper to get orientation from EXIF
+pub fn get_orientation<P: AsRef<Path>>(path: P) -> u32 {
+    let file = match File::open(path) {
+        Ok(f) => f,
+        Err(_) => return 1,
+    };
+    let mut reader = BufReader::new(file);
+    let exif_reader = exif::Reader::new();
+    let exif = match exif_reader.read_from_container(&mut reader) {
+        Ok(e) => e,
+        Err(_) => return 1,
+    };
+    if let Some(field) = exif.get_field(Tag::Orientation, In::PRIMARY) {
+        match &field.value {
+            Value::Short(vec) => vec.first().copied().unwrap_or(1) as u32,
+            Value::Byte(vec) => vec.first().copied().unwrap_or(1) as u32,
+            _ => 1,
+        }
+    } else {
+        1
+    }
+}
+
+// Helper to rotate DynamicImage based on orientation value
+pub fn rotate_image(img: image::DynamicImage, orientation: u32) -> image::DynamicImage {
+    match orientation {
+        2 => img.fliph(),
+        3 => img.rotate180(),
+        4 => img.flipv(),
+        5 => img.fliph().rotate270(),
+        6 => img.rotate90(),
+        7 => img.fliph().rotate90(),
+        8 => img.rotate270(),
+        _ => img,
+    }
 }
 
 // Generate thumbnail and save to cache path
@@ -299,6 +356,14 @@ pub fn generate_thumbnail<P: AsRef<Path>>(
     // Load image from memory
     let img = image::load_from_memory_with_format(&img_bytes, ImageFormat::Jpeg)
         .map_err(|e| format!("图片解码失败: {}", e))?;
+
+    // Rotate based on EXIF orientation
+    let orientation = get_orientation(&image_path);
+    let img = if orientation != 1 {
+        rotate_image(img, orientation)
+    } else {
+        img
+    };
 
     let width = img.width() as i32;
     let height = img.height() as i32;

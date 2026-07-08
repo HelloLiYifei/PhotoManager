@@ -43,7 +43,7 @@ function CardThumbnailImage({ path, isRaw }) {
 
   if (loading) {
     return (
-      <div ref={imgRef} style={{ width: "100%", height: "100%", background: "#1F1F2E", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div ref={imgRef} style={{ width: "100%", minHeight: "120px", background: "#1F1F2E", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <div style={{ width: "16px", height: "16px", borderRadius: "50%", border: "2px solid rgba(255,255,255,0.1)", borderTopColor: "var(--accent-color)", animation: "spin 1s linear infinite" }} />
       </div>
     );
@@ -54,7 +54,7 @@ function CardThumbnailImage({ path, isRaw }) {
       ref={imgRef}
       src={src || "/placeholder.svg"}
       alt="Preview"
-      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+      style={{ width: "100%", height: "auto", display: "block", borderRadius: "6px" }}
     />
   );
 }
@@ -490,7 +490,7 @@ export default function ImportWizard({ onClose, onImportComplete }) {
                         background: hasColor ? `${albumColor}22` : "rgba(255,255,255,0.02)",
                       }}
                     >
-                      <div style={{ position: "relative", width: "100%", height: "100%" }}>
+                      <div style={{ position: "relative", width: "100%" }}>
                         <CardThumbnailImage path={photo.absolute_path} isRaw={photo.is_raw} />
                         
                         {/* Checkmarked top checkbox */}

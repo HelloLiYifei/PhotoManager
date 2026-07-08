@@ -9,7 +9,7 @@ use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64_ENGINE};
 use crate::db::{map_row_to_photo, Album, DbState, Photo};
 use crate::workspace::{load_workspaces, save_workspaces, open_workspace_db, Workspace};
 use crate::scan::scan_workspace_dir;
-use crate::import::{detect_removable_cards, scan_card_files, execute_import, CardInfo, CardPhoto};
+use crate::import::{detect_removable_cards, scan_card_files, execute_import, CardInfo, CardPhoto, PhotoImportInfo};
 
 // --- WORKSPACE COMMANDS ---
 
@@ -120,6 +120,7 @@ pub fn get_photos(
     deleted_only: bool,
     album_id: Option<String>,
     rating_filter: Option<i32>,
+    tag_filter: Option<String>,
 ) -> Result<Vec<Photo>, String> {
     let conn_guard = state.conn.lock().unwrap();
     let conn = match &*conn_guard {
@@ -152,6 +153,12 @@ pub fn get_photos(
 
     if let Some(ref alb_id) = album_id {
         query.push_str(&format!(" AND id IN (SELECT photo_id FROM album_photos WHERE album_id = '{}')", alb_id));
+    }
+
+    if let Some(ref tag) = tag_filter {
+        if !tag.trim().is_empty() {
+            query.push_str(&format!(" AND id IN (SELECT photo_id FROM photo_tags pt INNER JOIN tags t ON pt.tag_id = t.id WHERE t.name = '{}')", tag));
+        }
     }
 
     // Sort by date_taken descending (mobile timeline style)
@@ -451,21 +458,21 @@ pub fn detect_cards() -> Result<Vec<CardInfo>, String> {
 }
 
 #[tauri::command]
-pub fn scan_card(path: String) -> Result<Vec<CardPhoto>, String> {
-    Ok(scan_card_files(&path))
+pub fn scan_card(state: State<'_, DbState>, path: String) -> Result<Vec<CardPhoto>, String> {
+    let conn_guard = state.conn.lock().unwrap();
+    let conn = conn_guard.as_ref();
+    Ok(scan_card_files(&path, conn))
 }
 
 #[tauri::command]
 pub async fn import_photos(
     app_handle: AppHandle,
     state: State<'_, DbState>,
-    photo_paths: Vec<String>,
-    folder_template: String,
+    imports: Vec<PhotoImportInfo>,
     name_template: String,
-    event_name: String,
     backup_path: Option<String>,
 ) -> Result<i32, String> {
-    execute_import(&app_handle, &state, photo_paths, &folder_template, &name_template, &event_name, backup_path)
+    execute_import(&app_handle, &state, imports, &name_template, backup_path)
 }
 
 #[tauri::command]
@@ -533,4 +540,231 @@ pub async fn get_image_thumbnail_by_path(path: String, is_raw: bool) -> Result<S
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub fn move_photos_to_album(state: State<'_, DbState>, photo_ids: Vec<String>, target_album_id: String) -> Result<(), String> {
+    let current_path_guard = state.current_path.lock().unwrap();
+    let workspace_root_str = match &*current_path_guard {
+        Some(path) => path.clone(),
+        None => return Err("没有打开的工作空间".to_string()),
+    };
+    let workspace_root = Path::new(&workspace_root_str);
+
+    let conn_guard = state.conn.lock().unwrap();
+    let conn = conn_guard.as_ref().ok_or("数据库未连接")?;
+
+    // Get target album name
+    let mut stmt = conn.prepare("SELECT name FROM albums WHERE id = ?1").map_err(|e| e.to_string())?;
+    let target_album_name: String = stmt.query_row([&target_album_id], |row| row.get(0)).map_err(|e| e.to_string())?;
+
+    let dest_folder = workspace_root.join(&target_album_name);
+    fs::create_dir_all(&dest_folder).map_err(|e| e.to_string())?;
+
+    for id in photo_ids {
+        // Query current photo path
+        let mut stmt = conn.prepare("SELECT path, filename FROM photos WHERE id = ?1").map_err(|e| e.to_string())?;
+        let (rel_path, filename): (String, String) = stmt.query_row([&id], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        }).map_err(|e| e.to_string())?;
+
+        let src_path = workspace_root.join(&rel_path);
+        
+        let file_ext = Path::new(&filename).extension().and_then(|s| s.to_str()).unwrap_or("jpg").to_string();
+        let file_stem = Path::new(&filename).file_stem().and_then(|s| s.to_str()).unwrap_or("photo").to_string();
+
+        let mut dest_file = dest_folder.join(&filename);
+        let mut final_filename = filename.clone();
+        let mut idx = 1;
+        while dest_file.exists() {
+            final_filename = format!("{}_{}.{}", file_stem, idx, file_ext);
+            dest_file = dest_folder.join(&final_filename);
+            idx += 1;
+        }
+
+        // Physically move the file
+        if src_path.exists() {
+            fs::rename(&src_path, &dest_file).map_err(|e| format!("物理移动文件失败: {}", e))?;
+        }
+
+        // Update database photo path
+        let new_rel_path = format!("{}/{}", target_album_name, final_filename);
+        conn.execute("UPDATE photos SET path = ?1, filename = ?2 WHERE id = ?3", params![&new_rel_path, &final_filename, &id])
+            .map_err(|e| e.to_string())?;
+
+        // Update album_photos mapping
+        conn.execute("DELETE FROM album_photos WHERE photo_id = ?1", [&id]).map_err(|e| e.to_string())?;
+        conn.execute("INSERT INTO album_photos (album_id, photo_id) VALUES (?1, ?2)", params![&target_album_id, &id])
+            .map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn add_tag_to_photo(state: State<'_, DbState>, photo_id: String, tag_name: String) -> Result<(), String> {
+    let conn_guard = state.conn.lock().unwrap();
+    let conn = conn_guard.as_ref().ok_or("数据库未连接")?;
+
+    let tag_name = tag_name.trim().to_string();
+    if tag_name.is_empty() {
+        return Err("标签名称不能为空".to_string());
+    }
+
+    // Get or create tag
+    let tag_id = match conn.query_row(
+        "SELECT id FROM tags WHERE name = ?1",
+        [&tag_name],
+        |row| row.get::<_, String>(0)
+    ) {
+        Ok(id) => id,
+        Err(_) => {
+            let id = Uuid::new_v4().to_string();
+            conn.execute("INSERT INTO tags (id, name) VALUES (?1, ?2)", params![&id, &tag_name]).map_err(|e| e.to_string())?;
+            id
+        }
+    };
+
+    // Insert relationship
+    conn.execute("INSERT OR IGNORE INTO photo_tags (photo_id, tag_id) VALUES (?1, ?2)", params![&photo_id, &tag_id])
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn remove_tag_from_photo(state: State<'_, DbState>, photo_id: String, tag_name: String) -> Result<(), String> {
+    let conn_guard = state.conn.lock().unwrap();
+    let conn = conn_guard.as_ref().ok_or("数据库未连接")?;
+
+    let tag_name = tag_name.trim().to_string();
+    
+    // Find tag
+    let tag_id: Option<String> = conn.query_row(
+        "SELECT id FROM tags WHERE name = ?1",
+        [&tag_name],
+        |row| row.get(0)
+    ).ok();
+
+    if let Some(id) = tag_id {
+        conn.execute("DELETE FROM photo_tags WHERE photo_id = ?1 AND tag_id = ?2", params![&photo_id, &id])
+            .map_err(|e| e.to_string())?;
+            
+        // Check if tag is used elsewhere. If not, we can clean up the tag record
+        let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM photo_tags WHERE tag_id = ?1",
+            [&id],
+            |row| row.get(0)
+        ).unwrap_or(0);
+        
+        if count == 0 {
+            let _ = conn.execute("DELETE FROM tags WHERE id = ?1", [&id]);
+        }
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn get_photo_tags(state: State<'_, DbState>, photo_id: String) -> Result<Vec<String>, String> {
+    let conn_guard = state.conn.lock().unwrap();
+    let conn = conn_guard.as_ref().ok_or("数据库未连接")?;
+
+    let mut stmt = conn.prepare(
+        "SELECT t.name FROM tags t 
+         INNER JOIN photo_tags pt ON t.id = pt.tag_id 
+         WHERE pt.photo_id = ?1"
+    ).map_err(|e| e.to_string())?;
+
+    let tags = stmt.query_map([&photo_id], |row| row.get::<_, String>(0))
+        .map_err(|e| e.to_string())?
+        .flatten()
+        .collect();
+
+    Ok(tags)
+}
+
+#[tauri::command]
+pub fn get_all_tags(state: State<'_, DbState>) -> Result<Vec<String>, String> {
+    let conn_guard = state.conn.lock().unwrap();
+    let conn = conn_guard.as_ref().ok_or("数据库未连接")?;
+
+    let mut stmt = conn.prepare("SELECT name FROM tags").map_err(|e| e.to_string())?;
+    let tags = stmt.query_map([], |row| row.get::<_, String>(0))
+        .map_err(|e| e.to_string())?
+        .flatten()
+        .collect();
+
+    Ok(tags)
+}
+
+#[tauri::command]
+pub fn permanently_delete_photos(state: State<'_, DbState>, ids: Vec<String>) -> Result<(), String> {
+    let current_path_guard = state.current_path.lock().unwrap();
+    let workspace_root_str = match &*current_path_guard {
+        Some(path) => path.clone(),
+        None => return Err("没有打开的工作空间".to_string()),
+    };
+    let workspace_root = Path::new(&workspace_root_str);
+
+    let conn_guard = state.conn.lock().unwrap();
+    let conn = conn_guard.as_ref().ok_or("数据库未连接")?;
+
+    for id in ids {
+        // Query path
+        let mut stmt = conn.prepare("SELECT path FROM photos WHERE id = ?1").map_err(|e| e.to_string())?;
+        if let Ok(rel_path) = stmt.query_row([&id], |row| row.get::<_, String>(0)) {
+            let abs_path = workspace_root.join(&rel_path);
+            if abs_path.exists() {
+                let _ = trash::delete(&abs_path);
+            }
+        }
+        // Delete records
+        let _ = conn.execute("DELETE FROM photos WHERE id = ?1", [&id]);
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn restore_photos(state: State<'_, DbState>, ids: Vec<String>) -> Result<(), String> {
+    let conn_guard = state.conn.lock().unwrap();
+    let conn = conn_guard.as_ref().ok_or("数据库未连接")?;
+
+    for id in ids {
+        let _ = conn.execute("UPDATE photos SET is_deleted = 0, deleted_at = NULL WHERE id = ?1", [&id]);
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn empty_trash_to_recycle_bin(state: State<'_, DbState>) -> Result<(), String> {
+    let current_path_guard = state.current_path.lock().unwrap();
+    let workspace_root_str = match &*current_path_guard {
+        Some(path) => path.clone(),
+        None => return Err("没有打开的工作空间".to_string()),
+    };
+    let workspace_root = Path::new(&workspace_root_str);
+
+    let conn_guard = state.conn.lock().unwrap();
+    let conn = conn_guard.as_ref().ok_or("数据库未连接")?;
+
+    let mut stmt = conn.prepare("SELECT id, path FROM photos WHERE is_deleted = 1").map_err(|e| e.to_string())?;
+    let photos_iter = stmt.query_map([], |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+    }).map_err(|e| e.to_string())?;
+
+    for photo in photos_iter.flatten() {
+        let id = photo.0;
+        let rel_path = photo.1;
+        let abs_path = workspace_root.join(&rel_path);
+
+        if abs_path.exists() {
+            let _ = trash::delete(&abs_path);
+        }
+        let _ = conn.execute("DELETE FROM photos WHERE id = ?1", [&id]);
+    }
+
+    Ok(())
 }

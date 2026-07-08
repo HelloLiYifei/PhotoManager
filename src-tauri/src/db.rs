@@ -108,6 +108,30 @@ pub fn init_db(conn: &Connection) -> Result<()> {
     conn.execute("CREATE INDEX IF NOT EXISTS idx_album_photos_album ON album_photos(album_id)", [])?;
     conn.execute("CREATE INDEX IF NOT EXISTS idx_album_photos_photo ON album_photos(photo_id)", [])?;
 
+    // 4. Create tags table
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS tags (
+            id TEXT PRIMARY KEY,
+            name TEXT UNIQUE NOT NULL
+        )",
+        [],
+    )?;
+
+    // 5. Create photo_tags mapping table
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS photo_tags (
+            photo_id TEXT NOT NULL,
+            tag_id TEXT NOT NULL,
+            PRIMARY KEY (photo_id, tag_id),
+            FOREIGN KEY (photo_id) REFERENCES photos(id) ON DELETE CASCADE,
+            FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
+        )",
+        [],
+    )?;
+
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_photo_tags_photo ON photo_tags(photo_id)", [])?;
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_photo_tags_tag ON photo_tags(tag_id)", [])?;
+
     Ok(())
 }
 

@@ -37,6 +37,22 @@ pub fn scan_workspace_dir(
         return Err("工作空间不存在".to_string());
     }
 
+    // 0. Clean up deleted/moved files from database first
+    if let Ok(mut stmt) = conn.prepare("SELECT id, path FROM photos") {
+        if let Ok(photos_iter) = stmt.query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        }) {
+            for photo in photos_iter.flatten() {
+                let id = photo.0;
+                let rel_path = photo.1;
+                let abs_path = root_path.join(&rel_path);
+                if !abs_path.exists() {
+                    let _ = conn.execute("DELETE FROM photos WHERE id = ?1", [&id]);
+                }
+            }
+        }
+    }
+
     // 1. Collect all files to scan to show progress
     let mut files_to_scan = Vec::new();
     for entry in WalkDir::new(root_path)
@@ -150,6 +166,38 @@ pub fn scan_workspace_dir(
 
         let date_added = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
+        // Extract album name from relative path (first directory component)
+        let path_obj = Path::new(&relative_path);
+        let mut components = path_obj.components();
+        let album_name = if let Some(first) = components.next() {
+            let name = first.as_os_str().to_string_lossy().to_string();
+            if components.next().is_none() {
+                "默认相册".to_string()
+            } else {
+                name
+            }
+        } else {
+            "默认相册".to_string()
+        };
+
+        // Get or create album_id
+        let album_id = match conn.query_row(
+            "SELECT id FROM albums WHERE name = ?1",
+            [&album_name],
+            |row| row.get::<_, String>(0)
+        ) {
+            Ok(id) => id,
+            Err(_) => {
+                let id = Uuid::new_v4().to_string();
+                let created_at = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+                let _ = conn.execute(
+                    "INSERT INTO albums (id, name, created_at) VALUES (?1, ?2, ?3)",
+                    rusqlite::params![&id, &album_name, &created_at]
+                );
+                id
+            }
+        };
+
         // Insert photo into database
         let result = conn.execute(
             "INSERT INTO photos (
@@ -182,6 +230,10 @@ pub fn scan_workspace_dir(
 
         if result.is_ok() {
             added_count += 1;
+            let _ = conn.execute(
+                "INSERT OR IGNORE INTO album_photos (album_id, photo_id) VALUES (?1, ?2)",
+                rusqlite::params![&album_id, &photo_id]
+            );
         }
     }
 

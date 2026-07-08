@@ -7,6 +7,7 @@ use chrono::Utc;
 use tauri::Emitter;
 
 use crate::db::{DbState, Photo};
+use rusqlite::Connection;
 use crate::metadata::{generate_thumbnail, read_exif_metadata};
 use crate::scan::is_supported_image;
 
@@ -31,6 +32,7 @@ pub struct CardPhoto {
     pub size: i64,
     pub date_taken: String,
     pub is_raw: bool,
+    pub already_imported: bool,
 }
 
 // Windows FFI to check drive types
@@ -137,7 +139,7 @@ pub fn detect_removable_cards() -> Vec<CardInfo> {
 }
 
 // Scan files on the detected card
-pub fn scan_card_files(card_path: &str) -> Vec<CardPhoto> {
+pub fn scan_card_files(card_path: &str, conn: Option<&Connection>) -> Vec<CardPhoto> {
     let root = Path::new(card_path);
     let dcim_path = root.join("DCIM");
     let scan_root = if dcim_path.exists() { &dcim_path } else { root };
@@ -174,12 +176,28 @@ pub fn scan_card_files(card_path: &str) -> Vec<CardPhoto> {
                         datetime.format("%Y-%m-%d %H:%M:%S").to_string()
                     });
 
+                    let filename = entry.path()
+                        .file_name()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("unknown")
+                        .to_string();
+
+                    let mut already_imported = false;
+                    if let Some(c) = conn {
+                        let mut stmt = c.prepare("SELECT COUNT(*) FROM photos WHERE filename = ?1 AND file_size = ?2").ok();
+                        if let Some(mut s) = stmt {
+                            let count: i64 = s.query_row([&filename, &size.to_string()], |r| r.get(0)).unwrap_or(0);
+                            already_imported = count > 0;
+                        }
+                    }
+
                     photos.push(CardPhoto {
                         relative_path,
                         absolute_path,
                         size,
                         date_taken,
                         is_raw,
+                        already_imported,
                     });
                 }
             }
@@ -191,14 +209,18 @@ pub fn scan_card_files(card_path: &str) -> Vec<CardPhoto> {
     photos
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct PhotoImportInfo {
+    pub absolute_path: String,
+    pub album_name: String,
+}
+
 // Perform import task
 pub fn execute_import(
     app_handle: &tauri::AppHandle,
     state: &tauri::State<'_, DbState>,
-    photo_paths: Vec<String>,
-    folder_template: &str, // e.g. "{year}/{date}_{event}"
-    name_template: &str,   // e.g. "{time}_{original}"
-    event_name: &str,
+    imports: Vec<PhotoImportInfo>,
+    name_template: &str,
     backup_path: Option<String>,
 ) -> Result<i32, String> {
     let current_path_guard = state.current_path.lock().unwrap();
@@ -214,17 +236,45 @@ pub fn execute_import(
         None => return Err("数据库未连接".to_string()),
     };
 
-    let total = photo_paths.len() as i32;
+    let total = imports.len() as i32;
     let mut copied = 0;
     
     let thumb_dir = workspace_root.join(".photomanager").join("thumbnails");
     let _ = fs::create_dir_all(&thumb_dir);
 
-    for photo_path_str in photo_paths {
-        let src_path = Path::new(&photo_path_str);
+    for import in imports {
+        let src_path = Path::new(&import.absolute_path);
         if !src_path.exists() {
             continue;
         }
+
+        // Get target album name and folder path
+        let album_name = if import.album_name.trim().is_empty() {
+            "默认相册".to_string()
+        } else {
+            import.album_name.trim().to_string()
+        };
+
+        let dest_folder_path = workspace_root.join(&album_name);
+        let _ = fs::create_dir_all(&dest_folder_path);
+
+        // Get album_id (or create if not exists)
+        let album_id = match conn.query_row(
+            "SELECT id FROM albums WHERE name = ?1",
+            [&album_name],
+            |row| row.get::<_, String>(0)
+        ) {
+            Ok(id) => id,
+            Err(_) => {
+                let id = Uuid::new_v4().to_string();
+                let created_at = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+                let _ = conn.execute(
+                    "INSERT INTO albums (id, name, created_at) VALUES (?1, ?2, ?3)",
+                    rusqlite::params![&id, &album_name, &created_at]
+                );
+                id
+            }
+        };
 
         // Get file properties
         let metadata = match fs::metadata(src_path) {
@@ -249,26 +299,10 @@ pub fn execute_import(
         let dt_parsed = chrono::NaiveDateTime::parse_from_str(&date_taken_str, "%Y-%m-%d %H:%M:%S")
             .unwrap_or_else(|_| chrono::NaiveDateTime::from_timestamp_opt(0, 0).unwrap());
         
-        let year_str = dt_parsed.format("%Y").to_string();
-        let month_str = dt_parsed.format("%m").to_string();
-        let day_str = dt_parsed.format("%d").to_string();
         let date_str = dt_parsed.format("%Y-%m-%d").to_string();
         let time_str = dt_parsed.format("%H%M%S").to_string();
 
-        // 1. Resolve folder path
-        let mut resolved_folder = folder_template.to_string();
-        resolved_folder = resolved_folder.replace("{year}", &year_str);
-        resolved_folder = resolved_folder.replace("{month}", &month_str);
-        resolved_folder = resolved_folder.replace("{day}", &day_str);
-        resolved_folder = resolved_folder.replace("{date}", &date_str);
-        resolved_folder = resolved_folder.replace("{event}", event_name);
-        
-        // Remove leading/trailing slashes and make it safe
-        let resolved_folder = resolved_folder.trim_start_matches('/').trim_end_matches('/');
-        let dest_folder_path = workspace_root.join(resolved_folder);
-        let _ = fs::create_dir_all(&dest_folder_path);
-
-        // 2. Resolve destination file name
+        // Resolve destination file name
         let mut resolved_filename = name_template.to_string();
         let base_name = src_path.file_stem().and_then(|s| s.to_str()).unwrap_or(&filename);
         resolved_filename = resolved_filename.replace("{time}", &time_str);
@@ -283,28 +317,28 @@ pub fn execute_import(
         let mut final_dest_path = dest_file_path.clone();
         let mut idx = 1;
         while final_dest_path.exists() {
-            let index_filename = format!("{}_{}.{}", resolved_filename, idx, file_ext);
+            let index_filename = format!("{}_{}.{}", resolved_filename, idx, &file_ext);
             final_dest_path = dest_folder_path.join(index_filename);
             idx += 1;
         }
 
         // 3. Copy to workspace destination
-        if let Err(e) = fs::copy(src_path, &final_dest_path) {
-            continue; // Skip failed copies
+        if let Err(_) = fs::copy(src_path, &final_dest_path) {
+            continue;
         }
 
         // 4. (Optional) Copy to backup destination
         if let Some(ref backup_root_str) = backup_path {
             let backup_root = Path::new(backup_root_str);
             if backup_root.exists() {
-                let backup_folder = backup_root.join(resolved_folder);
+                let backup_folder = backup_root.join(&album_name);
                 let _ = fs::create_dir_all(&backup_folder);
                 let backup_file_path = backup_folder.join(final_dest_path.file_name().unwrap());
                 let _ = fs::copy(src_path, backup_file_path);
             }
         }
 
-        // 5. Generate cache thumbnail in background
+        // 5. Generate cache thumbnail
         let photo_id = Uuid::new_v4().to_string();
         let cache_file_name = format!("{}.jpg", photo_id);
         let cache_file_path = thumb_dir.join(&cache_file_name);
@@ -314,7 +348,7 @@ pub fn execute_import(
             Err(_) => (exif.width.unwrap_or(0), exif.height.unwrap_or(0))
         };
 
-        // Get relative path for database
+        // Get relative path for database: "album_name/filename"
         let relative_dest_path = final_dest_path
             .strip_prefix(workspace_root)
             .unwrap_or(&final_dest_path)
@@ -358,6 +392,12 @@ pub fn execute_import(
                 exif.longitude,
                 &file_hash,
             ],
+        );
+
+        // 7. Insert mapping in album_photos
+        let _ = conn.execute(
+            "INSERT OR IGNORE INTO album_photos (album_id, photo_id) VALUES (?1, ?2)",
+            rusqlite::params![&album_id, &photo_id]
         );
 
         copied += 1;

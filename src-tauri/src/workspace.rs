@@ -84,6 +84,30 @@ pub fn open_workspace_db(workspace_path: &str, state: &tauri::State<'_, DbState>
     // Initialize database tables
     init_db(&conn).map_err(|e| format!("数据库初始化失败: {}", e))?;
 
+    // Automatically create a "默认相册" if there are 0 albums in the database
+    let album_count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM albums", [], |row| row.get(0))
+        .map_err(|e| format!("查询相册数量失败: {}", e))?;
+
+    if album_count == 0 {
+        let album_id = Uuid::new_v4().to_string();
+        let album_name = "默认相册".to_string();
+        let album_desc = Some("默认初始相册".to_string());
+        let created_at = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+
+        // Physically create the folder
+        let album_folder = path.join(&album_name);
+        if let Err(e) = fs::create_dir_all(&album_folder) {
+            return Err(format!("无法创建默认相册文件夹: {}", e));
+        }
+
+        conn.execute(
+            "INSERT INTO albums (id, name, description, created_at) VALUES (?1, ?2, ?3, ?4)",
+            rusqlite::params![&album_id, &album_name, &album_desc, &created_at],
+        )
+        .map_err(|e| format!("写入默认相册记录失败: {}", e))?;
+    }
+
     // Update active connection in state
     let mut conn_guard = state.conn.lock().unwrap();
     let mut path_guard = state.current_path.lock().unwrap();

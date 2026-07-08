@@ -35,7 +35,15 @@ pub fn run() {
             commands::scan_card,
             commands::import_photos,
             commands::select_directory,
-            commands::get_image_thumbnail_by_path
+            commands::get_image_thumbnail_by_path,
+            commands::move_photos_to_album,
+            commands::add_tag_to_photo,
+            commands::remove_tag_from_photo,
+            commands::get_photo_tags,
+            commands::get_all_tags,
+            commands::permanently_delete_photos,
+            commands::restore_photos,
+            commands::empty_trash_to_recycle_bin
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

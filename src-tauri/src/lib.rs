@@ -4,10 +4,15 @@ pub mod metadata;
 pub mod scan;
 pub mod import;
 pub mod commands;
+pub mod media;
+pub mod shell_thumbnail;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .register_uri_scheme_protocol("photomanager-media", |context, request| {
+            media::serve_media_request(context.app_handle(), request)
+        })
         .manage(db::DbState {
             conn: std::sync::Mutex::new(None),
             current_path: std::sync::Mutex::new(None),
@@ -23,7 +28,7 @@ pub fn run() {
             commands::update_rating,
             commands::delete_photo,
             commands::permanently_delete_photo,
-            commands::get_photo_thumbnail_base64,
+            commands::get_photo_thumbnail_url,
             commands::get_photo_preview_base64,
             commands::get_albums,
             commands::create_album,
@@ -35,7 +40,7 @@ pub fn run() {
             commands::scan_card,
             commands::import_photos,
             commands::select_directory,
-            commands::get_image_thumbnail_by_path,
+            commands::get_image_thumbnail_url,
             commands::move_photos_to_album,
             commands::add_tag_to_photo,
             commands::remove_tag_from_photo,

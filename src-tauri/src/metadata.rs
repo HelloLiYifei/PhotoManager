@@ -1,8 +1,35 @@
 use std::fs::File;
 use std::io::{BufReader, Read, Seek, SeekFrom};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use exif::{In, Tag, Value};
-use image::ImageFormat;
+use image::codecs::jpeg::JpegEncoder;
+
+pub const THUMBNAIL_MAX_DIMENSION: u32 = 512;
+const THUMBNAIL_JPEG_QUALITY: u8 = 88;
+
+/// Cache filenames include a version so existing low-resolution caches can be
+/// upgraded lazily without making the first app launch do a full rescan.
+pub fn thumbnail_cache_path(workspace_root: &Path, photo_id: &str) -> PathBuf {
+    workspace_root
+        .join(".photomanager")
+        .join("thumbnails")
+        .join(format!("{}.v2.jpg", photo_id))
+}
+
+pub fn import_preview_cache_path(workspace_root: &Path, cache_key: &str) -> PathBuf {
+    workspace_root
+        .join(".photomanager")
+        .join("import-previews")
+        .join(format!("{}.jpg", cache_key))
+}
+
+pub fn encode_thumbnail_jpeg(image: &image::DynamicImage) -> Result<Vec<u8>, String> {
+    let mut bytes = Vec::new();
+    JpegEncoder::new_with_quality(&mut bytes, THUMBNAIL_JPEG_QUALITY)
+        .encode_image(image)
+        .map_err(|e| format!("缩略图编码失败: {}", e))?;
+    Ok(bytes)
+}
 
 #[derive(Debug, Default, Clone)]
 pub struct ImageMetadata {
@@ -353,8 +380,9 @@ pub fn generate_thumbnail<P: AsRef<Path>>(
         std::fs::read(&image_path).map_err(|e| format!("图片读取失败: {}", e))?
     };
 
-    // Load image from memory
-    let img = image::load_from_memory_with_format(&img_bytes, ImageFormat::Jpeg)
+    // Detect the input format instead of assuming JPEG so PNG files use the
+    // same cache and preview pipeline as camera images.
+    let img = image::load_from_memory(&img_bytes)
         .map_err(|e| format!("图片解码失败: {}", e))?;
 
     // Rotate based on EXIF orientation
@@ -368,13 +396,14 @@ pub fn generate_thumbnail<P: AsRef<Path>>(
     let width = img.width() as i32;
     let height = img.height() as i32;
 
-    // Resize to max 300px on either side, maintaining aspect ratio using fast box thumbnail
-    let thumb = img.thumbnail(300, 300);
+    // 512px is sharp on high-density photo cards while thumbnail() keeps the
+    // fast box-sampled resize path used for responsive scrolling.
+    let thumb = img.thumbnail(THUMBNAIL_MAX_DIMENSION, THUMBNAIL_MAX_DIMENSION);
 
-    // Save as JPEG to cache path
-    let mut out_file = File::create(cache_path).map_err(|e| format!("无法创建缩略图缓存文件: {}", e))?;
-    thumb
-        .write_to(&mut out_file, ImageFormat::Jpeg)
+    // Explicitly keep a higher JPEG quality than DynamicImage::write_to's
+    // default so fine detail is not lost before the browser renders the card.
+    let bytes = encode_thumbnail_jpeg(&thumb)?;
+    std::fs::write(cache_path, bytes)
         .map_err(|e| format!("缩略图保存失败: {}", e))?;
 
     Ok((width, height))

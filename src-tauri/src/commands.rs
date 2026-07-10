@@ -1,6 +1,6 @@
 use rusqlite::params;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use tauri::{AppHandle, State};
 use uuid::Uuid;
 use chrono::Utc;
@@ -10,6 +10,49 @@ use crate::db::{map_row_to_photo, Album, DbState, Photo};
 use crate::workspace::{load_workspaces, save_workspaces, open_workspace_db, Workspace};
 use crate::scan::scan_workspace_dir;
 use crate::import::{detect_removable_cards, scan_card_files, execute_import, CardInfo, CardPhoto, PhotoImportInfo};
+
+fn remove_thumbnail_cache(workspace_root: &Path, photo_id: &str) {
+    let thumbnail_paths = [
+        crate::metadata::thumbnail_cache_path(workspace_root, photo_id),
+        workspace_root
+            .join(".photomanager")
+            .join("thumbnails")
+            .join(format!("{}.jpg", photo_id)),
+    ];
+
+    for thumbnail_path in thumbnail_paths {
+        if thumbnail_path.exists() {
+            let _ = fs::remove_file(thumbnail_path);
+        }
+    }
+}
+
+fn import_preview_cache_key(path: &str, metadata: &fs::Metadata) -> String {
+    // FNV-1a is enough here: this only creates a stable, filesystem-safe
+    // cache filename from the source identity and invalidates when it changes.
+    let mut hash = 0xcbf29ce484222325_u64;
+    let mut mix = |bytes: &[u8]| {
+        for byte in bytes {
+            hash ^= u64::from(*byte);
+            hash = hash.wrapping_mul(0x100000001b3);
+        }
+    };
+
+    mix(path.as_bytes());
+    mix(&metadata.len().to_le_bytes());
+    let modified = metadata
+        .modified()
+        .ok()
+        .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok());
+    let modified_seconds = modified.map(|duration| duration.as_secs()).unwrap_or(0);
+    let modified_nanos = modified
+        .map(|duration| duration.subsec_nanos())
+        .unwrap_or(0);
+    mix(&modified_seconds.to_le_bytes());
+    mix(&modified_nanos.to_le_bytes());
+
+    format!("{hash:016x}")
+}
 
 // --- WORKSPACE COMMANDS ---
 
@@ -236,13 +279,7 @@ pub fn permanently_delete_photo(state: State<'_, DbState>, id: String) -> Result
     }
 
     // 2. Delete cache thumbnail
-    let thumbnail_path = Path::new(workspace_root)
-        .join(".photomanager")
-        .join("thumbnails")
-        .join(format!("{}.jpg", id));
-    if thumbnail_path.exists() {
-        let _ = fs::remove_file(thumbnail_path);
-    }
+    remove_thumbnail_cache(Path::new(workspace_root), &id);
 
     // 3. Delete from DB
     conn.execute("DELETE FROM photos WHERE id = ?1", [&id]).map_err(|e| e.to_string())?;
@@ -250,28 +287,58 @@ pub fn permanently_delete_photo(state: State<'_, DbState>, id: String) -> Result
     Ok(())
 }
 
-// --- PHOTO LOADING COMMANDS (BASE64) ---
+// --- PHOTO LOADING COMMANDS ---
 
 #[tauri::command]
-pub async fn get_photo_thumbnail_base64(state: State<'_, DbState>, id: String) -> Result<String, String> {
-    let workspace_root = {
+pub async fn get_photo_thumbnail_url(state: State<'_, DbState>, id: String) -> Result<String, String> {
+    let (workspace_root, relative_path, file_type) = {
         let current_path_guard = state.current_path.lock().unwrap();
-        current_path_guard.as_ref().ok_or("没有打开的工作空间")?.clone()
+        let workspace_root = current_path_guard.as_ref().ok_or("没有打开的工作空间")?.clone();
+
+        let conn_guard = state.conn.lock().unwrap();
+        let conn = conn_guard.as_ref().ok_or("数据库未连接")?;
+        let mut stmt = conn
+            .prepare("SELECT path, file_type FROM photos WHERE id = ?1")
+            .map_err(|e| e.to_string())?;
+        let (relative_path, file_type): (String, String) = stmt
+            .query_row([&id], |row| Ok((row.get(0)?, row.get(1)?)))
+            .map_err(|e| e.to_string())?;
+        (workspace_root, relative_path, file_type)
     };
 
+    let _permit = get_thumb_semaphore()
+        .acquire()
+        .await
+        .map_err(|e| e.to_string())?;
+
     tokio::task::spawn_blocking(move || {
-        let thumbnail_path = Path::new(&workspace_root)
-            .join(".photomanager")
-            .join("thumbnails")
-            .join(format!("{}.jpg", id));
+        let workspace_path = Path::new(&workspace_root);
+        let thumbnail_path = crate::metadata::thumbnail_cache_path(workspace_path, &id);
 
         if !thumbnail_path.exists() {
-            return Err("缩略图不存在".to_string());
+            let photo_path = workspace_path.join(&relative_path);
+            let is_raw = matches!(file_type.to_lowercase().as_str(), "arw" | "cr2" | "nef");
+            let _ = fs::create_dir_all(
+                thumbnail_path
+                    .parent()
+                    .ok_or("无法确定缩略图缓存目录")?,
+            );
+
+            if let Err(error) = crate::metadata::generate_thumbnail(&photo_path, &thumbnail_path, is_raw) {
+                // Preserve access to a pre-upgrade cache if a damaged or
+                // unsupported original cannot be regenerated.
+                let legacy_path = workspace_path
+                    .join(".photomanager")
+                    .join("thumbnails")
+                    .join(format!("{}.jpg", id));
+                if legacy_path.exists() {
+                    return Ok(crate::media::photo_thumbnail_url(&id));
+                }
+                return Err(error);
+            }
         }
 
-        let bytes = fs::read(thumbnail_path).map_err(|e| e.to_string())?;
-        let b64 = BASE64_ENGINE.encode(bytes);
-        Ok(format!("data:image/jpeg;base64,{}", b64))
+        Ok(crate::media::photo_thumbnail_url(&id))
     })
     .await
     .map_err(|e| e.to_string())?
@@ -311,7 +378,7 @@ pub async fn get_photo_preview_base64(state: State<'_, DbState>, id: String) -> 
             fs::read(&photo_physical_path).map_err(|e| e.to_string())?
         };
 
-        let img = image::load_from_memory_with_format(&bytes, image::ImageFormat::Jpeg)
+        let img = image::load_from_memory(&bytes)
             .map_err(|e| format!("图片解码失败: {}", e))?;
         
         let orientation = crate::metadata::get_orientation(&photo_physical_path);
@@ -520,13 +587,26 @@ fn get_thumb_semaphore() -> &'static Semaphore {
         let cores = std::thread::available_parallelism()
             .map(|n| n.get())
             .unwrap_or(4);
-        // Size semaphore to CPU threads to run many decodes concurrently
-        Semaphore::new(cores * 2)
+        // Match the reference app's bounded thumbnail worker pool. More
+        // parallel decodes make removable-media reads slower, not faster.
+        Semaphore::new((cores / 2).clamp(2, 4))
     })
 }
 
 #[tauri::command]
-pub async fn get_image_thumbnail_by_path(path: String, is_raw: bool) -> Result<String, String> {
+pub async fn get_image_thumbnail_url(
+    state: State<'_, DbState>,
+    path: String,
+    is_raw: bool,
+) -> Result<String, String> {
+    let workspace_root = {
+        let current_path_guard = state.current_path.lock().unwrap();
+        current_path_guard
+            .as_ref()
+            .ok_or("没有打开的工作空间")?
+            .clone()
+    };
+
     let sem = get_thumb_semaphore();
     let _permit = sem.acquire().await.map_err(|e| e.to_string())?;
 
@@ -536,7 +616,42 @@ pub async fn get_image_thumbnail_by_path(path: String, is_raw: bool) -> Result<S
             return Err("文件不存在".to_string());
         }
 
-        // Try to read small/embedded EXIF thumbnails first to achieve maximum speed
+        let source_metadata = fs::metadata(p).map_err(|e| e.to_string())?;
+        let cache_key = import_preview_cache_key(&path, &source_metadata);
+        let workspace_path = Path::new(&workspace_root);
+        let cache_path = crate::metadata::import_preview_cache_path(workspace_path, &cache_key);
+
+        if cache_path.exists() {
+            if image::image_dimensions(&cache_path).is_ok() {
+                return Ok(crate::media::import_preview_url(&cache_key));
+            }
+            let _ = fs::remove_file(&cache_path);
+        }
+
+        fs::create_dir_all(
+            cache_path
+                .parent()
+                .ok_or("无法确定导入预览缓存目录")?,
+        )
+        .map_err(|e| e.to_string())?;
+
+        // On Windows, ask the exact Shell thumbnail cache used by Explorer
+        // before reading the removable-media source.  A cache hit avoids both
+        // image decoding and the SD-card I/O that previously dominated first
+        // paint. The Shell result is already orientation-correct.
+        if let Some(shell_image) = crate::shell_thumbnail::load(p, 384) {
+            let thumb = shell_image.thumbnail(
+                crate::metadata::THUMBNAIL_MAX_DIMENSION,
+                crate::metadata::THUMBNAIL_MAX_DIMENSION,
+            );
+            let bytes = crate::metadata::encode_thumbnail_jpeg(&thumb)?;
+            fs::write(&cache_path, bytes).map_err(|e| e.to_string())?;
+            return Ok(crate::media::import_preview_url(&cache_key));
+        }
+
+        // The first request reads the card once and leaves a local cache in
+        // the workspace; returning to a folder or scrolling back never reads
+        // the removable drive again.
         let (mut img, is_exif_thumb) = {
             let (bytes, is_exif) = if is_raw {
                 match crate::metadata::extract_raw_small_preview(p) {
@@ -557,13 +672,14 @@ pub async fn get_image_thumbnail_by_path(path: String, is_raw: bool) -> Result<S
                 }
             };
 
-            let decoded = image::load_from_memory_with_format(&bytes, image::ImageFormat::Jpeg)
+            let decoded = image::load_from_memory(&bytes)
                 .map_err(|e| format!("图片解码失败: {}", e))?;
 
-            // If EXIF thumbnail is too small (e.g. under 320px), load the full image instead for crisp preview!
-            if is_exif && (decoded.width() < 320 || decoded.height() < 320) {
+            // Very small embedded previews are quick but visibly soft on a
+            // high-density card, so fall back to the original when needed.
+            if is_exif && (decoded.width() < 384 || decoded.height() < 384) {
                 let full_bytes = std::fs::read(p).map_err(|e| e.to_string())?;
-                let full_decoded = image::load_from_memory_with_format(&full_bytes, image::ImageFormat::Jpeg)
+                let full_decoded = image::load_from_memory(&full_bytes)
                     .map_err(|e| format!("原图解码失败: {}", e))?;
                 (full_decoded, false)
             } else {
@@ -577,19 +693,21 @@ pub async fn get_image_thumbnail_by_path(path: String, is_raw: bool) -> Result<S
             img = crate::metadata::rotate_image(img, orientation);
         }
 
-        // Skip resizing if the EXIF thumbnail is already within target display bounds (400px)
-        let thumb = if is_exif_thumb && img.width() <= 400 && img.height() <= 400 {
+        // Skip a second resize when an embedded preview already fits the
+        // display target; otherwise create a sharper 512px thumbnail.
+        let thumb = if is_exif_thumb && img.width() <= crate::metadata::THUMBNAIL_MAX_DIMENSION && img.height() <= crate::metadata::THUMBNAIL_MAX_DIMENSION {
             img
         } else {
-            img.thumbnail(400, 400)
+            img.thumbnail(
+                crate::metadata::THUMBNAIL_MAX_DIMENSION,
+                crate::metadata::THUMBNAIL_MAX_DIMENSION,
+            )
         };
         
-        let mut buffer = std::io::Cursor::new(Vec::new());
-        thumb.write_to(&mut buffer, image::ImageFormat::Jpeg)
-            .map_err(|e| format!("图片压缩失败: {}", e))?;
-            
-        let b64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, buffer.into_inner());
-        Ok(format!("data:image/jpeg;base64,{}", b64))
+        let bytes = crate::metadata::encode_thumbnail_jpeg(&thumb)?;
+        fs::write(cache_path, bytes).map_err(|e| e.to_string())?;
+
+        Ok(crate::media::import_preview_url(&cache_key))
     })
     .await
     .map_err(|e| e.to_string())?
@@ -772,6 +890,7 @@ pub fn permanently_delete_photos(state: State<'_, DbState>, ids: Vec<String>) ->
                 let _ = trash::delete(&abs_path);
             }
         }
+        remove_thumbnail_cache(workspace_root, &id);
         // Delete records
         let _ = conn.execute("DELETE FROM photos WHERE id = ?1", [&id]);
     }
@@ -816,6 +935,7 @@ pub fn empty_trash_to_recycle_bin(state: State<'_, DbState>) -> Result<(), Strin
         if abs_path.exists() {
             let _ = trash::delete(&abs_path);
         }
+        remove_thumbnail_cache(workspace_root, &id);
         let _ = conn.execute("DELETE FROM photos WHERE id = ?1", [&id]);
     }
 

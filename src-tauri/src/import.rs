@@ -1,14 +1,15 @@
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 use walkdir::WalkDir;
 use uuid::Uuid;
 use chrono::Utc;
 use tauri::Emitter;
 
-use crate::db::{DbState, Photo};
+use crate::db::DbState;
 use rusqlite::Connection;
-use crate::metadata::{generate_thumbnail, read_exif_metadata};
+use crate::metadata::{generate_thumbnail, read_exif_metadata, thumbnail_cache_path};
 use crate::scan::is_supported_image;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -144,6 +145,23 @@ pub fn scan_card_files(card_path: &str, conn: Option<&Connection>) -> Vec<CardPh
     let dcim_path = root.join("DCIM");
     let scan_root = if dcim_path.exists() { &dcim_path } else { root };
 
+    // A single indexed read replaces one SQL statement per source file. This
+    // matters on storage cards where directory traversal is already I/O bound.
+    let existing_files: HashSet<(String, i64)> = conn
+        .and_then(|connection| {
+            let mut stmt = connection
+                .prepare("SELECT filename, file_size FROM photos")
+                .ok()?;
+            let rows = stmt
+                .query_map([], |row| {
+                    Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+                })
+                .ok()?;
+            let entries = rows.flatten().collect();
+            Some(entries)
+        })
+        .unwrap_or_default();
+
     let mut photos = Vec::new();
     for entry in WalkDir::new(scan_root)
         .into_iter()
@@ -168,13 +186,12 @@ pub fn scan_card_files(card_path: &str, conn: Option<&Connection>) -> Vec<CardPh
                     let file_ext = ext.to_lowercase();
                     let is_raw = matches!(file_ext.as_str(), "arw" | "cr2" | "nef");
 
-                    // Fast EXIF parse for date taken
-                    let exif_meta = read_exif_metadata(entry.path());
-                    let date_taken = exif_meta.date_taken.unwrap_or_else(|| {
-                        let mod_time = metadata.modified().unwrap_or(std::time::SystemTime::now());
-                        let datetime: chrono::DateTime<Utc> = mod_time.into();
-                        datetime.format("%Y-%m-%d %H:%M:%S").to_string()
-                    });
+                    // Do not parse EXIF during card discovery. It forces a
+                    // second read of every file on slow removable media; the
+                    // full EXIF is still extracted once, during import.
+                    let mod_time = metadata.modified().unwrap_or(std::time::SystemTime::now());
+                    let datetime: chrono::DateTime<Utc> = mod_time.into();
+                    let date_taken = datetime.format("%Y-%m-%d %H:%M:%S").to_string();
 
                     let filename = entry.path()
                         .file_name()
@@ -182,14 +199,7 @@ pub fn scan_card_files(card_path: &str, conn: Option<&Connection>) -> Vec<CardPh
                         .unwrap_or("unknown")
                         .to_string();
 
-                    let mut already_imported = false;
-                    if let Some(c) = conn {
-                        let mut stmt = c.prepare("SELECT COUNT(*) FROM photos WHERE filename = ?1 AND file_size = ?2").ok();
-                        if let Some(mut s) = stmt {
-                            let count: i64 = s.query_row([&filename, &size.to_string()], |r| r.get(0)).unwrap_or(0);
-                            already_imported = count > 0;
-                        }
-                    }
+                    let already_imported = existing_files.contains(&(filename.clone(), size));
 
                     photos.push(CardPhoto {
                         relative_path,
@@ -239,8 +249,7 @@ pub fn execute_import(
     let total = imports.len() as i32;
     let mut copied = 0;
     
-    let thumb_dir = workspace_root.join(".photomanager").join("thumbnails");
-    let _ = fs::create_dir_all(&thumb_dir);
+    let _ = fs::create_dir_all(workspace_root.join(".photomanager").join("thumbnails"));
 
     for import in imports {
         let src_path = Path::new(&import.absolute_path);
@@ -340,8 +349,7 @@ pub fn execute_import(
 
         // 5. Generate cache thumbnail
         let photo_id = Uuid::new_v4().to_string();
-        let cache_file_name = format!("{}.jpg", photo_id);
-        let cache_file_path = thumb_dir.join(&cache_file_name);
+        let cache_file_path = thumbnail_cache_path(workspace_root, &photo_id);
 
         let (width, height) = match generate_thumbnail(&final_dest_path, &cache_file_path, is_raw) {
             Ok(dims) => dims,

@@ -3714,6 +3714,7 @@ dependencies = [
  "trash",
  "uuid",
  "walkdir",
+ "windows 0.56.0",
 ]
 
 [[package]]

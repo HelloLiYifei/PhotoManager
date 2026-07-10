@@ -7,8 +7,7 @@ use chrono::Utc;
 use serde::Serialize;
 use tauri::Emitter; // Tauri v2 Emitter trait for emitting events
 
-use crate::db::{map_row_to_photo, Photo};
-use crate::metadata::{generate_thumbnail, read_exif_metadata};
+use crate::metadata::{generate_thumbnail, read_exif_metadata, thumbnail_cache_path};
 
 #[derive(Debug, Serialize, Clone)]
 pub struct ScanProgress {
@@ -77,9 +76,6 @@ pub fn scan_workspace_dir(
     let mut scanned_count = 0;
     let mut added_count = 0;
 
-    let meta_dir = root_path.join(".photomanager");
-    let thumb_dir = meta_dir.join("thumbnails");
-
     // 2. Iterate through files and process them
     for file_path in files_to_scan {
         scanned_count += 1;
@@ -143,8 +139,7 @@ pub fn scan_workspace_dir(
         });
 
         let photo_id = Uuid::new_v4().to_string();
-        let cache_file_name = format!("{}.jpg", photo_id);
-        let cache_path = thumb_dir.join(&cache_file_name);
+        let cache_path = thumbnail_cache_path(root_path, &photo_id);
 
         // Generate thumbnail and get original dimensions
         let (width, height) = match generate_thumbnail(&file_path, &cache_path, is_raw) {

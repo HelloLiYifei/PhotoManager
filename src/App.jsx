@@ -7,6 +7,7 @@ import TimelineGrid from "./components/TimelineGrid";
 import ImportWizard from "./components/ImportWizard";
 import LightboxViewer from "./components/LightboxViewer";
 import MapView from "./components/MapView";
+import { loadPhotoThumbnail } from "./lib/thumbnailLoader";
 
 function App() {
   const [activeWorkspace, setActiveWorkspace] = useState(null);
@@ -508,7 +509,7 @@ function AlbumCover({ photoId }) {
 
   useEffect(() => {
     if (!photoId) return;
-    invoke("get_photo_thumbnail_base64", { id: photoId })
+    loadPhotoThumbnail(photoId)
       .then((b64) => setSrc(b64))
       .catch((e) => console.error(e));
   }, [photoId]);

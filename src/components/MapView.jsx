@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { loadPhotoThumbnail } from "../lib/thumbnailLoader";
 
 export default function MapView({ onShowPhoto }) {
   const mapRef = useRef(null);
@@ -103,7 +104,7 @@ export default function MapView({ onShowPhoto }) {
         // When popup opens, load the thumbnail
         marker.on("popupopen", async () => {
           try {
-            const base64 = await invoke("get_photo_thumbnail_base64", { id: photo.id });
+            const base64 = await loadPhotoThumbnail(photo.id);
             
             const img = document.createElement("img");
             img.src = base64;
@@ -190,7 +191,7 @@ function GpsOfflineCard({ photo, onShowPhoto }) {
   const [thumb, setThumb] = useState(null);
 
   useEffect(() => {
-    invoke("get_photo_thumbnail_base64", { id: photo.id })
+    loadPhotoThumbnail(photo.id)
       .then((b64) => setThumb(b64))
       .catch((e) => console.error(e));
   }, [photo.id]);

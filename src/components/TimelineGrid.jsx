@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { loadPhotoThumbnail } from "../lib/thumbnailLoader";
 
-// Sub-component to lazy load base64 thumbnails
-function ThumbnailImage({ id, alt }) {
+// Sub-component to lazy load thumbnail URLs through the local media protocol
+function ThumbnailImage({ id, alt, scrollRoot }) {
   const [src, setSrc] = useState(null);
   const [loading, setLoading] = useState(true);
   const imgRef = useRef(null);
@@ -13,23 +14,28 @@ function ThumbnailImage({ id, alt }) {
     // Intersection Observer to lazy load only when visible!
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting) {
-          loadThumbnail();
+        const entry = entries[0];
+        if (entry.isIntersecting) {
+          const rootCenter = entry.rootBounds
+            ? (entry.rootBounds.top + entry.rootBounds.bottom) / 2
+            : window.innerHeight / 2;
+          const cardCenter = (entry.boundingClientRect.top + entry.boundingClientRect.bottom) / 2;
+          loadThumbnail(10000 - Math.abs(cardCenter - rootCenter));
           observer.disconnect();
         }
       },
-      { threshold: 0.1 }
+      { root: scrollRoot?.current || null, rootMargin: "450px 0px", threshold: 0.01 }
     );
 
     if (imgRef.current) {
       observer.observe(imgRef.current);
     }
 
-    async function loadThumbnail() {
+    async function loadThumbnail(priority) {
       try {
-        const b64 = await invoke("get_photo_thumbnail_base64", { id });
+        const imageUrl = await loadPhotoThumbnail(id, priority);
         if (active) {
-          setSrc(b64);
+          setSrc(imageUrl);
           setLoading(false);
         }
       } catch (err) {
@@ -54,6 +60,7 @@ function ThumbnailImage({ id, alt }) {
       alt={alt}
       style={{ width: "100%", height: "auto", display: "block", borderRadius: "6px" }}
       loading="lazy"
+      decoding="async"
     />
   );
 }
@@ -104,6 +111,7 @@ export default function TimelineGrid({
   const [primaryPhoto, setPrimaryPhoto] = useState(null); // Photo currently shown in right details drawer
   const [primaryTags, setPrimaryTags] = useState([]);
   const [newTagInput, setNewTagInput] = useState("");
+  const gridScrollRef = useRef(null);
 
   // Compare mode states
   const [compareMode, setCompareMode] = useState(false);
@@ -394,7 +402,7 @@ export default function TimelineGrid({
                 border: isCompareBase ? "2px solid #EF4444" : isSelected ? "2px solid var(--primary-start)" : "2px solid transparent",
               }}
             >
-              <ThumbnailImage id={photo.id} alt={photo.filename} />
+              <ThumbnailImage id={photo.id} alt={photo.filename} scrollRoot={gridScrollRef} />
               
               {/* Badges overlay */}
               {photo.file_type !== "JPG" && photo.file_type !== "JPEG" && (
@@ -479,7 +487,7 @@ export default function TimelineGrid({
       <div style={{ display: "flex", flexGrow: 1, overflow: "hidden", position: "relative", width: "100%" }}>
         
         {/* Core photo grid (with splits if in compare mode) */}
-        <div style={{ flexGrow: 1, overflowY: "auto", paddingRight: "8px", height: "100%" }}>
+        <div ref={gridScrollRef} style={{ flexGrow: 1, overflowY: "auto", paddingRight: "8px", height: "100%" }}>
           {photos.length === 0 ? (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "100px 0", color: "var(--text-muted)", gap: "12px" }}>
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">

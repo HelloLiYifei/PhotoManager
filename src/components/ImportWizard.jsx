@@ -1,33 +1,42 @@
 import React, { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { loadPathThumbnail } from "../lib/thumbnailLoader";
 
-// Sub-component to lazy load base64 thumbnails from storage path
-function CardThumbnailImage({ path, isRaw }) {
+// Sub-component to lazy load locally cached preview URLs from a storage path
+function CardThumbnailImage({ path, isRaw, scrollRoot }) {
   const [src, setSrc] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [aspectRatio, setAspectRatio] = useState("4 / 3");
   const imgRef = useRef(null);
 
   useEffect(() => {
     let active = true;
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting) {
-          loadThumbnail();
+        const entry = entries[0];
+        if (entry.isIntersecting) {
+          const rootCenter = entry.rootBounds
+            ? (entry.rootBounds.top + entry.rootBounds.bottom) / 2
+            : window.innerHeight / 2;
+          const cardCenter = (entry.boundingClientRect.top + entry.boundingClientRect.bottom) / 2;
+          loadThumbnail(10000 - Math.abs(cardCenter - rootCenter));
           observer.disconnect();
         }
       },
-      { threshold: 0.1 }
+      // Explorer starts decoding the next screen before it is visible.  Keep
+      // that look-ahead bounded by the shared request queue.
+      { root: scrollRoot?.current || null, rootMargin: "450px 0px", threshold: 0.01 }
     );
 
     if (imgRef.current) {
       observer.observe(imgRef.current);
     }
 
-    async function loadThumbnail() {
+    async function loadThumbnail(priority) {
       try {
-        const b64 = await invoke("get_image_thumbnail_by_path", { path, isRaw });
+        const imageUrl = await loadPathThumbnail(path, isRaw, priority);
         if (active) {
-          setSrc(b64);
+          setSrc(imageUrl);
           setLoading(false);
         }
       } catch (err) {
@@ -41,21 +50,28 @@ function CardThumbnailImage({ path, isRaw }) {
     };
   }, [path, isRaw]);
 
-  if (loading) {
-    return (
-      <div ref={imgRef} style={{ width: "100%", height: "100%", background: "#1F1F2E", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ width: "16px", height: "16px", borderRadius: "50%", border: "2px solid rgba(255,255,255,0.1)", borderTopColor: "var(--accent-color)", animation: "spin 1s linear infinite" }} />
-      </div>
-    );
-  }
-
   return (
-    <img
+    <div
       ref={imgRef}
-      src={src || "/placeholder.svg"}
-      alt="Preview"
-      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", borderRadius: "6px" }}
-    />
+      className="import-thumbnail-frame"
+      style={{ aspectRatio }}
+    >
+      {loading ? (
+        <div style={{ width: "16px", height: "16px", borderRadius: "50%", border: "2px solid rgba(255,255,255,0.1)", borderTopColor: "var(--accent-color)", animation: "spin 1s linear infinite" }} />
+      ) : (
+        <img
+          src={src || "/placeholder.svg"}
+          alt="Preview"
+          decoding="async"
+          onLoad={(event) => {
+            const { naturalWidth, naturalHeight } = event.currentTarget;
+            if (naturalWidth > 0 && naturalHeight > 0) {
+              setAspectRatio(`${naturalWidth} / ${naturalHeight}`);
+            }
+          }}
+        />
+      )}
+    </div>
   );
 }
 
@@ -88,8 +104,9 @@ export default function ImportWizard({ onClose, onImportComplete }) {
   const [importProgress, setImportProgress] = useState(null);
   const [scanning, setScanning] = useState(false);
   
-  const [visibleLimit, setVisibleLimit] = useState(48);
+  const gridContainerRef = useRef(null);
   const sentinelRef = useRef(null);
+  const [visibleLimit, setVisibleLimit] = useState(64);
 
   // New Album Dialog inside Wizard
   const [showCreateAlbum, setShowCreateAlbum] = useState(false);
@@ -98,20 +115,24 @@ export default function ImportWizard({ onClose, onImportComplete }) {
 
   const isMouseDownRef = useRef(false);
 
-  // Auto load more when scroll reaches bottom
+  // Keep the four-column masonry layout responsive with large storage cards:
+  // render an initial batch, then extend it while the user approaches the end.
   useEffect(() => {
-    if (!sentinelRef.current) return;
+    const container = gridContainerRef.current;
+    const sentinel = sentinelRef.current;
+    if (!container || !sentinel || visibleLimit >= photos.length) return undefined;
+
     const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) {
-          setVisibleLimit((prev) => Math.min(photos.length, prev + 48));
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisibleLimit((previous) => Math.min(photos.length, previous + 64));
         }
       },
-      { threshold: 0.1 }
+      { root: container, rootMargin: "600px 0px" }
     );
-    observer.observe(sentinelRef.current);
+    observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [visibleLimit, photos.length]);
+  }, [photos.length, visibleLimit]);
 
   // Load drives and albums on mount
   useEffect(() => {
@@ -144,7 +165,7 @@ export default function ImportWizard({ onClose, onImportComplete }) {
     setSourcePath(path);
     setScanning(true);
     setPhotos([]);
-    setVisibleLimit(48);
+    setVisibleLimit(64);
     setSelectedPaths([]);
     setPhotoAlbums({});
     try {
@@ -291,6 +312,14 @@ export default function ImportWizard({ onClose, onImportComplete }) {
       setImportProgress(null);
     }
   };
+
+  // CSS multi-columns rebalance every time a preview settles or another batch
+  // is appended, which makes cards jump while scrolling. Keep four explicit
+  // columns so an already-rendered card always stays in the same column.
+  const previewColumns = [[], [], [], []];
+  photos.slice(0, visibleLimit).forEach((photo, index) => {
+    previewColumns[index % previewColumns.length].push(photo);
+  });
 
   return (
     <div className="wizard-overlay fullscreen">
@@ -441,6 +470,7 @@ export default function ImportWizard({ onClose, onImportComplete }) {
 
           {/* Photo Display Grid */}
           <div
+            ref={gridContainerRef}
             className="wizard-grid-container"
             style={{ flexGrow: 1, padding: "20px", overflowY: "auto", position: "relative" }}
             onMouseDown={() => { isMouseDownRef.current = true; }}
@@ -459,116 +489,123 @@ export default function ImportWizard({ onClose, onImportComplete }) {
               </div>
             ) : (
               <div className="wizard-photos-grid">
-                {photos.slice(0, visibleLimit).map((photo) => {
-                  const isChecked = selectedPaths.includes(photo.absolute_path);
-                  const targetAlbum = photoAlbums[photo.absolute_path];
-                  const hasColor = !!targetAlbum;
-                  const albumColor = hasColor ? getAlbumColor(targetAlbum) : "transparent";
+                {previewColumns.map((column, columnIndex) => (
+                  <div className="wizard-photo-column" key={columnIndex}>
+                    {column.map((photo) => {
+                      const isChecked = selectedPaths.includes(photo.absolute_path);
+                      const targetAlbum = photoAlbums[photo.absolute_path];
+                      const hasColor = !!targetAlbum;
+                      const albumColor = hasColor ? getAlbumColor(targetAlbum) : "transparent";
 
-                  return (
-                    <div
-                      key={photo.absolute_path}
-                      className={`wizard-photo-card ${photo.already_imported ? "already-imported" : ""}`}
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        if (photo.already_imported) return; // Prevent tagging already imported photos
-                        applyBrushColor(photo.absolute_path);
-                      }}
-                      onMouseEnter={() => {
-                        if (isMouseDownRef.current && !photo.already_imported) {
-                          applyBrushColor(photo.absolute_path);
-                        }
-                      }}
-                      style={{
-                        border: photo.already_imported
-                          ? "2px solid #10B981"
-                          : hasColor
-                          ? `3px solid ${albumColor}`
-                          : isChecked
-                          ? "2px solid var(--primary-start)"
-                          : "2px solid transparent",
-                        background: hasColor ? `${albumColor}22` : "rgba(255,255,255,0.02)",
-                      }}
-                    >
-                      <div style={{ position: "relative", width: "100%", height: "100%" }}>
-                        <CardThumbnailImage path={photo.absolute_path} isRaw={photo.is_raw} />
-                        
-                        {/* Checkmarked top checkbox */}
-                        {!photo.already_imported && (
-                          <div
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleSelectPhoto(photo.absolute_path);
-                            }}
-                            style={{
-                              position: "absolute",
-                              top: "8px",
-                              right: "8px",
-                              width: "20px",
-                              height: "20px",
-                              borderRadius: "4px",
-                              background: isChecked ? "var(--primary-start)" : "rgba(0,0,0,0.6)",
-                              border: "1px solid rgba(255,255,255,0.4)",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              color: "white",
-                              fontWeight: "bold",
-                              fontSize: "11px",
-                              cursor: "pointer",
-                              zIndex: 10,
-                            }}
-                          >
-                            {isChecked && "✓"}
+                      return (
+                        <div
+                          key={photo.absolute_path}
+                          className={`wizard-photo-card ${photo.already_imported ? "already-imported" : ""}`}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            if (photo.already_imported) return; // Prevent tagging already imported photos
+                            applyBrushColor(photo.absolute_path);
+                          }}
+                          onMouseEnter={() => {
+                            if (isMouseDownRef.current && !photo.already_imported) {
+                              applyBrushColor(photo.absolute_path);
+                            }
+                          }}
+                          style={{
+                            border: photo.already_imported
+                              ? "2px solid #10B981"
+                              : hasColor
+                              ? `3px solid ${albumColor}`
+                              : isChecked
+                              ? "2px solid var(--primary-start)"
+                              : "2px solid transparent",
+                            background: hasColor ? `${albumColor}22` : "rgba(255,255,255,0.02)",
+                          }}
+                        >
+                          <div style={{ position: "relative", width: "100%" }}>
+                            <CardThumbnailImage
+                              path={photo.absolute_path}
+                              isRaw={photo.is_raw}
+                              scrollRoot={gridContainerRef}
+                            />
+
+                            {/* Checkmarked top checkbox */}
+                            {!photo.already_imported && (
+                              <div
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleSelectPhoto(photo.absolute_path);
+                                }}
+                                style={{
+                                  position: "absolute",
+                                  top: "8px",
+                                  right: "8px",
+                                  width: "20px",
+                                  height: "20px",
+                                  borderRadius: "4px",
+                                  background: isChecked ? "var(--primary-start)" : "rgba(0,0,0,0.6)",
+                                  border: "1px solid rgba(255,255,255,0.4)",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  color: "white",
+                                  fontWeight: "bold",
+                                  fontSize: "11px",
+                                  cursor: "pointer",
+                                  zIndex: 10,
+                                }}
+                              >
+                                {isChecked && "✓"}
+                              </div>
+                            )}
+
+                            {/* Duplication green badge */}
+                            {photo.already_imported && (
+                              <div className="already-imported-badge">
+                                已存在
+                              </div>
+                            )}
+
+                            {/* Targeted Album Tag overlay at bottom */}
+                            {hasColor && (
+                              <div style={{
+                                position: "absolute",
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+                                background: albumColor,
+                                color: "white",
+                                fontSize: "10px",
+                                padding: "4px 8px",
+                                fontWeight: "600",
+                                textAlign: "center",
+                                textOverflow: "ellipsis",
+                                overflow: "hidden",
+                                whiteSpace: "nowrap",
+                                zIndex: 10,
+                              }}>
+                                📂 {targetAlbum}
+                              </div>
+                            )}
+
+                            {/* Raw badge */}
+                            {photo.is_raw && (
+                              <div className="photo-card-badge" style={{ zIndex: 5 }}>RAW</div>
+                            )}
                           </div>
-                        )}
-
-                        {/* Duplication green badge */}
-                        {photo.already_imported && (
-                          <div className="already-imported-badge">
-                            已存在
-                          </div>
-                        )}
-
-                        {/* Targeted Album Tag overlay at bottom */}
-                        {hasColor && (
-                          <div style={{
-                            position: "absolute",
-                            bottom: 0,
-                            left: 0,
-                            right: 0,
-                            background: albumColor,
-                            color: "white",
-                            fontSize: "10px",
-                            padding: "4px 8px",
-                            fontWeight: "600",
-                            textAlign: "center",
-                            textOverflow: "ellipsis",
-                            overflow: "hidden",
-                            whiteSpace: "nowrap",
-                            zIndex: 10,
-                          }}>
-                            📂 {targetAlbum}
-                          </div>
-                        )}
-
-                        {/* Raw badge */}
-                        {photo.is_raw && (
-                          <div className="photo-card-badge" style={{ zIndex: 5 }}>RAW</div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+                {visibleLimit < photos.length && (
+                  <div ref={sentinelRef} className="wizard-preview-sentinel">
+                    正在准备更多预览…
+                  </div>
+                )}
               </div>
             )}
 
-            {/* Scroll sentinel */}
-            {photos.length > visibleLimit && (
-              <div ref={sentinelRef} style={{ height: "40px", margin: "10px 0", display: "flex", justifyContent: "center", alignItems: "center", color: "var(--text-muted)", fontSize: "12px" }}>
-                <span>正在滑动加载更多预览...</span>
-              </div>
-            )}
           </div>
         </div>
 

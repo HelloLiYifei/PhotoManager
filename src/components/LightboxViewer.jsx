@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { loadPhotoThumbnail } from "../lib/thumbnailLoader";
 import { loadPhotoPreview, prefetchPhotoPreview } from "../lib/previewLoader";
@@ -14,6 +14,14 @@ export default function LightboxViewer({
   const [previewSrc, setPreviewSrc] = useState(null);
   const [thumbnailSrc, setThumbnailSrc] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [photoTags, setPhotoTags] = useState([]);
+  const [tagInput, setTagInput] = useState("");
+  const [showTagEditor, setShowTagEditor] = useState(false);
+  const dragStateRef = useRef(null);
   
   const currentPhoto = photosList[currentIndex];
 
@@ -22,6 +30,9 @@ export default function LightboxViewer({
     setLoading(true);
     setPreviewSrc(null);
     setThumbnailSrc(null);
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+    setIsDragging(false);
 
     loadPhotoThumbnail(currentPhoto.id)
       .then((url) => {
@@ -48,20 +59,51 @@ export default function LightboxViewer({
     };
   }, [currentIndex, currentPhoto?.id, photosList]);
 
+  useEffect(() => {
+    let active = true;
+    setPhotoTags([]);
+    setTagInput("");
+    setShowTagEditor(false);
+    invoke("get_photo_tags", { photoId: currentPhoto.id })
+      .then((tags) => {
+        if (active) setPhotoTags(tags);
+      })
+      .catch(console.error);
+    return () => { active = false; };
+  }, [currentPhoto?.id]);
+
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e) => {
+      const isTyping = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+      if (isTyping) {
+        if (e.key === "Escape") {
+          setShowTagEditor(false);
+          e.target.blur();
+        }
+        return;
+      }
       if (e.key === "ArrowLeft") {
         handlePrev();
       } else if (e.key === "ArrowRight") {
         handleNext();
       } else if (e.key === "Escape") {
-        onClose();
+        if (showTagEditor) setShowTagEditor(false);
+        else onClose();
+      } else if (e.key === "+" || e.key === "=") {
+        e.preventDefault();
+        changeZoom(0.25);
+      } else if (e.key === "-") {
+        e.preventDefault();
+        changeZoom(-0.25);
+      } else if (e.key === "0") {
+        e.preventDefault();
+        resetTransform();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentIndex, photosList.length]);
+  }, [currentIndex, photosList.length, showTagEditor]);
 
   const handlePrev = () => {
     if (currentIndex > 0) {
@@ -74,6 +116,71 @@ export default function LightboxViewer({
       setCurrentIndex(currentIndex + 1);
     }
   };
+
+  const clampZoom = (value) => Math.min(8, Math.max(0.25, value));
+
+  const setZoomLevel = (nextValue) => {
+    setZoom((current) => {
+      const next = clampZoom(typeof nextValue === "function" ? nextValue(current) : nextValue);
+      if (next <= 1) setPan({ x: 0, y: 0 });
+      return next;
+    });
+  };
+
+  const changeZoom = (delta) => {
+    setZoomLevel((current) => Math.round((current + delta) * 100) / 100);
+  };
+
+  const resetTransform = () => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+    setIsDragging(false);
+    dragStateRef.current = null;
+  };
+
+  const handleWheel = (event) => {
+    event.preventDefault();
+    const factor = event.deltaY < 0 ? 1.15 : 1 / 1.15;
+    setZoomLevel((current) => current * factor);
+  };
+
+  const handlePointerDown = (event) => {
+    if (event.button !== 0 || zoom <= 1) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragStateRef.current = {
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: pan.x,
+      originY: pan.y,
+    };
+    setIsDragging(true);
+  };
+
+  const handlePointerMove = (event) => {
+    if (!dragStateRef.current) return;
+    setPan({
+      x: dragStateRef.current.originX + event.clientX - dragStateRef.current.startX,
+      y: dragStateRef.current.originY + event.clientY - dragStateRef.current.startY,
+    });
+  };
+
+  const handlePointerUp = (event) => {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    dragStateRef.current = null;
+    setIsDragging(false);
+  };
+
+  const handleDoubleClick = () => {
+    if (zoom === 1) {
+      setZoomLevel(2);
+    } else {
+      resetTransform();
+    }
+  };
+
+  const imageTransform = `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`;
 
   const handleToggleFav = async () => {
     if (!currentPhoto) return;
@@ -98,6 +205,31 @@ export default function LightboxViewer({
       if (onPhotosUpdated) onPhotosUpdated();
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const handleAddTag = async (event) => {
+    event.preventDefault();
+    const tagName = tagInput.trim();
+    if (!tagName || !currentPhoto || photoTags.includes(tagName)) return;
+    try {
+      await invoke("add_tag_to_photo", { photoId: currentPhoto.id, tagName });
+      setPhotoTags((current) => [...current, tagName]);
+      setTagInput("");
+      if (onPhotosUpdated) onPhotosUpdated();
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleRemoveTag = async (tagName) => {
+    if (!currentPhoto) return;
+    try {
+      await invoke("remove_tag_from_photo", { photoId: currentPhoto.id, tagName });
+      setPhotoTags((current) => current.filter((tag) => tag !== tagName));
+      if (onPhotosUpdated) onPhotosUpdated();
+    } catch (error) {
+      console.error(error);
     }
   };
 
@@ -155,6 +287,17 @@ export default function LightboxViewer({
           </svg>
         </button>
 
+        <button
+          type="button"
+          className="lightbox-sidebar-toggle"
+          onClick={() => setSidebarCollapsed((current) => !current)}
+          title={sidebarCollapsed ? "展开信息栏" : "折叠信息栏"}
+          aria-label={sidebarCollapsed ? "展开信息栏" : "折叠信息栏"}
+          aria-expanded={!sidebarCollapsed}
+        >
+          {sidebarCollapsed ? "‹" : "›"}
+        </button>
+
         {currentIndex > 0 && (
           <button className="lightbox-nav prev" onClick={handlePrev}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -163,13 +306,23 @@ export default function LightboxViewer({
           </button>
         )}
 
-        <div className="lightbox-image-container">
+        <div
+          className={`lightbox-image-container ${zoom > 1 ? "is-zoomed" : ""} ${isDragging ? "is-dragging" : ""}`}
+          onWheel={handleWheel}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+          onDoubleClick={handleDoubleClick}
+        >
           {thumbnailSrc && (
             <img
               key={`thumbnail-${currentPhoto.id}`}
               src={thumbnailSrc}
               alt=""
               className={`lightbox-image lightbox-thumbnail ${loading ? "visible" : ""}`}
+              style={{ transform: imageTransform }}
+              draggable={false}
             />
           )}
           {loading && !thumbnailSrc && (
@@ -185,10 +338,98 @@ export default function LightboxViewer({
               src={previewSrc}
               alt={currentPhoto.filename}
               className={`lightbox-image lightbox-full-image ${loading ? "loading" : "loaded"}`}
+              style={{ transform: imageTransform }}
+              draggable={false}
               decoding="async"
               onLoad={() => setLoading(false)}
               onError={() => setLoading(false)}
             />
+          )}
+        </div>
+
+        <div className="lightbox-zoom-toolbar" role="toolbar" aria-label="图片浏览快捷操作">
+          <button type="button" onClick={() => changeZoom(-0.25)} disabled={zoom <= 0.25} title="缩小 (-)">−</button>
+          <button type="button" className="zoom-value" onClick={resetTransform} title="恢复适合窗口 (0)">
+            {Math.round(zoom * 100)}%
+          </button>
+          <button type="button" onClick={() => changeZoom(0.25)} disabled={zoom >= 8} title="放大 (+)">＋</button>
+          <span className="zoom-divider" />
+          <button type="button" onClick={resetTransform} disabled={zoom === 1 && pan.x === 0 && pan.y === 0} title="复位图片">
+            适合窗口
+          </button>
+          <span className="zoom-divider" />
+          <div className="lightbox-bottom-rating" role="group" aria-label="标记星级">
+            {[1, 2, 3, 4, 5].map((star) => (
+              <button
+                type="button"
+                key={star}
+                className={star <= currentPhoto.rating ? "active" : ""}
+                onClick={() => handleRatingChange(star)}
+                title={`${star} 星`}
+                aria-label={`${star} 星`}
+              >
+                ★
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            className={`lightbox-bottom-action ${showTagEditor ? "is-active" : ""}`}
+            onClick={() => setShowTagEditor((current) => !current)}
+            title="编辑标签"
+          >
+            ⌑ 标签{photoTags.length > 0 ? ` (${photoTags.length})` : ""}
+          </button>
+          <button
+            type="button"
+            onClick={handleToggleFav}
+            className={`lightbox-bottom-action ${currentPhoto.is_favorite ? "is-favorite" : ""}`}
+            title={currentPhoto.is_favorite ? "取消喜欢" : "标记喜欢"}
+          >
+            {currentPhoto.is_favorite ? "♥ 已喜欢" : "♡ 喜欢"}
+          </button>
+          <button
+            type="button"
+            onClick={handleDelete}
+            className={`lightbox-bottom-action ${currentPhoto.is_deleted ? "is-restore" : "is-danger"}`}
+            title={currentPhoto.is_deleted ? "恢复照片" : "移入回收站"}
+          >
+            {currentPhoto.is_deleted ? "↩ 恢复" : "⌫ 回收站"}
+          </button>
+          {currentPhoto.is_deleted && (
+            <button
+              type="button"
+              onClick={handlePermanentDelete}
+              className="lightbox-bottom-action is-danger is-permanent"
+              title="永久删除照片"
+            >
+              永久删除
+            </button>
+          )}
+          {showTagEditor && (
+            <div className="lightbox-tag-editor">
+              <strong>照片标签</strong>
+              <div className="lightbox-tag-list">
+                {photoTags.length === 0 ? (
+                  <span className="lightbox-tag-empty">暂无标签</span>
+                ) : photoTags.map((tag) => (
+                  <span className="lightbox-tag-chip" key={tag}>
+                    {tag}
+                    <button type="button" onClick={() => handleRemoveTag(tag)} aria-label={`移除标签 ${tag}`}>×</button>
+                  </span>
+                ))}
+              </div>
+              <form onSubmit={handleAddTag}>
+                <input
+                  type="text"
+                  value={tagInput}
+                  onChange={(event) => setTagInput(event.target.value)}
+                  placeholder="输入新标签"
+                  autoFocus
+                />
+                <button type="submit" disabled={!tagInput.trim()}>添加</button>
+              </form>
+            </div>
           )}
         </div>
 
@@ -202,84 +443,7 @@ export default function LightboxViewer({
       </div>
 
       {/* Info Sidebar */}
-      <div className="lightbox-sidebar">
-        {/* Actions Section */}
-        <div className="sidebar-section">
-          <span className="section-hdr">快捷操作</span>
-          <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-            {/* Fav */}
-            <button
-              onClick={handleToggleFav}
-              className="gradient-btn"
-              style={{
-                background: currentPhoto.is_favorite ? "#EF4444" : "rgba(255,255,255,0.05)",
-                border: currentPhoto.is_favorite ? "none" : "1px solid var(--border-color)",
-                padding: "8px 12px",
-                borderRadius: "8px",
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-                fontSize: "13px",
-                cursor: "pointer"
-              }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill={currentPhoto.is_favorite ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2">
-                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-              </svg>
-              {currentPhoto.is_favorite ? "已喜欢" : "标记喜欢"}
-            </button>
-
-            {/* Trash/Delete */}
-            <button
-              onClick={handleDelete}
-              className="text-input"
-              style={{
-                width: "auto",
-                borderColor: currentPhoto.is_deleted ? "var(--success-color)" : "var(--danger-color)",
-                color: currentPhoto.is_deleted ? "var(--success-color)" : "var(--danger-color)",
-                background: "rgba(0,0,0,0.2)",
-                padding: "8px 12px",
-                borderRadius: "8px",
-                cursor: "pointer"
-              }}
-            >
-              {currentPhoto.is_deleted ? "恢复照片" : "移入回收站"}
-            </button>
-          </div>
-
-          {currentPhoto.is_deleted && (
-            <button
-              onClick={handlePermanentDelete}
-              className="gradient-btn"
-              style={{ background: "linear-gradient(135deg, #EF4444, #991B1B)", padding: "10px", borderRadius: "8px", fontSize: "13px" }}
-            >
-              💥 彻底永久删除 (不可恢复)
-            </button>
-          )}
-        </div>
-
-        {/* Rating */}
-        <div className="sidebar-section">
-          <span className="section-hdr">标记星级</span>
-          <div className="star-rating">
-            {[1, 2, 3, 4, 5].map((star) => (
-              <svg
-                key={star}
-                className={`star-icon ${star <= currentPhoto.rating ? "active" : ""}`}
-                onClick={() => handleRatingChange(star)}
-                width="22"
-                height="22"
-                viewBox="0 0 24 24"
-                fill={star <= currentPhoto.rating ? "currentColor" : "none"}
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-              </svg>
-            ))}
-          </div>
-        </div>
-
+      {!sidebarCollapsed && <div className="lightbox-sidebar">
         {/* EXIF Information */}
         <div className="sidebar-section">
           <span className="section-hdr">拍摄信息 (EXIF)</span>
@@ -363,7 +527,7 @@ export default function LightboxViewer({
             </div>
           </div>
         </div>
-      </div>
+      </div>}
     </div>
   );
 }

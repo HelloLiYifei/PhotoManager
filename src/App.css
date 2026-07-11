@@ -1283,3 +1283,329 @@ body {
   margin-bottom: 2px;
 }
 
+.import-location-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.import-location-heading .section-hdr {
+  margin: 0;
+}
+
+.import-location-switch {
+  position: relative;
+  display: inline-flex;
+  cursor: pointer;
+}
+
+.import-location-switch input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.import-location-switch span {
+  position: relative;
+  width: 34px;
+  height: 18px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.14);
+  transition: background 0.2s ease;
+}
+
+.import-location-switch span::after {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  content: "";
+  transition: transform 0.2s ease;
+}
+
+.import-location-switch input:checked + span {
+  background: var(--primary-start);
+}
+
+.import-location-switch input:checked + span::after {
+  transform: translateX(16px);
+}
+
+.import-location-switch input:focus-visible + span {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+.import-location-description {
+  margin: 8px 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.import-location-status {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.import-location-status > div {
+  min-width: 0;
+}
+
+.import-location-status strong,
+.import-location-status small {
+  display: block;
+}
+
+.import-location-status strong {
+  font-size: 11px;
+}
+
+.import-location-status small {
+  margin-top: 2px;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 9px;
+  text-overflow: ellipsis;
+}
+
+.import-location-status.is-ready {
+  border-color: rgba(16, 185, 129, 0.35);
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.import-location-status.is-error {
+  border-color: rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.import-location-status button {
+  flex: 0 0 auto;
+  padding: 5px 7px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-main);
+  cursor: pointer;
+  font-size: 10px;
+}
+
+.import-location-status button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.map-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.map-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.map-header p {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.photo-map-marker-shell {
+  background: transparent;
+  border: 0;
+}
+
+.photo-map-marker {
+  position: relative;
+  display: flex;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid #fff;
+  border-radius: 50% 50% 50% 0;
+  background: linear-gradient(135deg, #60a5fa, #7c3aed);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  transform: rotate(-45deg);
+}
+
+.photo-map-marker.is-focused {
+  background: linear-gradient(135deg, #f59e0b, #ef4444);
+  box-shadow: 0 0 0 5px rgba(245, 158, 11, 0.25), 0 4px 14px rgba(0, 0, 0, 0.45);
+}
+
+.photo-map-marker-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #fff;
+}
+
+.photo-map-marker-count {
+  position: absolute;
+  top: -10px;
+  right: -12px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border: 2px solid #fff;
+  border-radius: 10px;
+  background: #111827;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 14px;
+  text-align: center;
+  transform: rotate(45deg);
+}
+
+.map-popup-coordinates {
+  margin-bottom: 7px;
+  color: #6b7280;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+}
+
+.map-popup-gallery {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  max-height: 290px;
+  overflow-y: auto;
+}
+
+.map-popup-gallery:has(.map-popup-photo:only-child) {
+  grid-template-columns: 1fr;
+}
+
+.map-popup-photo {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 7px;
+  background: #eceff3;
+  color: #111827;
+  cursor: pointer;
+  text-align: left;
+}
+
+.map-popup-placeholder,
+.map-popup-img {
+  display: flex;
+  width: 140px;
+  max-width: 100%;
+  height: 96px;
+  margin: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0;
+  object-fit: cover;
+  color: #6b7280;
+  font-size: 11px;
+  box-shadow: none;
+}
+
+.map-popup-img:hover {
+  transform: none;
+}
+
+.map-popup-filename {
+  display: block;
+  padding: 5px 7px;
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.map-network-warning {
+  padding: 10px 12px;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 8px;
+  background: rgba(245, 158, 11, 0.12);
+  color: #fcd34d;
+  font-size: 13px;
+}
+
+.map-empty-icon {
+  margin-bottom: 14px;
+  color: var(--accent-color);
+  font-size: 46px;
+}
+
+.map-empty-title {
+  color: var(--text-main);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.map-empty-description {
+  max-width: 420px;
+  margin-top: 8px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.photo-location-button {
+  display: grid;
+  width: 100%;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid rgba(96, 165, 250, 0.3);
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(96, 165, 250, 0.12), rgba(124, 58, 237, 0.12));
+  color: var(--text-main);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.photo-location-button:hover {
+  border-color: var(--accent-color);
+  transform: translateY(-1px);
+}
+
+.photo-location-button strong,
+.photo-location-button small {
+  display: block;
+}
+
+.photo-location-button strong {
+  font-size: 13px;
+}
+
+.photo-location-button small {
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+}
+
+.photo-location-pin {
+  color: #60a5fa;
+  font-size: 25px;
+}
+
+.photo-location-arrow {
+  color: var(--text-muted);
+  font-size: 18px;
+}
+

@@ -225,6 +225,39 @@ pub struct PhotoImportInfo {
     pub album_name: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+pub struct ImportLocation {
+    pub latitude: f64,
+    pub longitude: f64,
+}
+
+fn valid_coordinates(latitude: f64, longitude: f64) -> bool {
+    latitude.is_finite()
+        && longitude.is_finite()
+        && (-90.0..=90.0).contains(&latitude)
+        && (-180.0..=180.0).contains(&longitude)
+}
+
+fn resolve_import_coordinates(
+    exif_latitude: Option<f64>,
+    exif_longitude: Option<f64>,
+    import_location: Option<ImportLocation>,
+) -> (Option<f64>, Option<f64>) {
+    if let (Some(latitude), Some(longitude)) = (exif_latitude, exif_longitude) {
+        if valid_coordinates(latitude, longitude) {
+            return (Some(latitude), Some(longitude));
+        }
+    }
+
+    if let Some(location) = import_location {
+        if valid_coordinates(location.latitude, location.longitude) {
+            return (Some(location.latitude), Some(location.longitude));
+        }
+    }
+
+    (None, None)
+}
+
 // Perform import task
 pub fn execute_import(
     app_handle: &tauri::AppHandle,
@@ -232,6 +265,7 @@ pub fn execute_import(
     imports: Vec<PhotoImportInfo>,
     name_template: &str,
     backup_path: Option<String>,
+    import_location: Option<ImportLocation>,
 ) -> Result<i32, String> {
     let current_path_guard = state.current_path.lock().unwrap();
     let workspace_root_str = match &*current_path_guard {
@@ -371,6 +405,11 @@ pub fn execute_import(
             .unwrap_or(0);
         let file_hash = format!("{}_{}", file_size, mod_time);
         let date_added = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+        let (latitude, longitude) = resolve_import_coordinates(
+            exif.latitude,
+            exif.longitude,
+            import_location,
+        );
 
         // 6. Write record to database
         let _ = conn.execute(
@@ -396,8 +435,8 @@ pub fn execute_import(
                 exif.f_number,
                 exif.iso,
                 exif.focal_length,
-                exif.latitude,
-                exif.longitude,
+                latitude,
+                longitude,
                 &file_hash,
             ],
         );
@@ -422,4 +461,33 @@ pub fn execute_import(
     }
 
     Ok(copied)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{resolve_import_coordinates, ImportLocation};
+
+    #[test]
+    fn keeps_valid_exif_coordinates() {
+        let current = ImportLocation { latitude: 30.0, longitude: 120.0 };
+        assert_eq!(
+            resolve_import_coordinates(Some(39.9), Some(116.4), Some(current)),
+            (Some(39.9), Some(116.4))
+        );
+    }
+
+    #[test]
+    fn fills_missing_coordinates_from_current_location() {
+        let current = ImportLocation { latitude: 30.0, longitude: 120.0 };
+        assert_eq!(
+            resolve_import_coordinates(None, None, Some(current)),
+            (Some(30.0), Some(120.0))
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_current_location() {
+        let current = ImportLocation { latitude: 91.0, longitude: 120.0 };
+        assert_eq!(resolve_import_coordinates(None, None, Some(current)), (None, None));
+    }
 }

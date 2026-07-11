@@ -22,6 +22,7 @@ function App() {
   // Modals
   const [showImportWizard, setShowImportWizard] = useState(false);
   const [lightboxData, setLightboxData] = useState(null); // { photosList, index }
+  const [mapFocusedPhotoId, setMapFocusedPhotoId] = useState(null);
   
   // Triggers
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -240,6 +241,7 @@ function App() {
             onClick={() => {
               setCurrentView("map");
               setActiveAlbumId(null);
+              setMapFocusedPhotoId(null);
             }}
             title="地图"
           >
@@ -384,7 +386,11 @@ function App() {
         </div>
 
         {currentView === "map" ? (
-          <MapView onShowPhoto={(photo) => setLightboxData({ photosList: [photo], index: 0 })} />
+          <MapView
+            key={`map-${refreshTrigger}`}
+            focusedPhotoId={mapFocusedPhotoId}
+            onShowPhoto={(photo) => setLightboxData({ photosList: [photo], index: 0 })}
+          />
         ) : currentView === "albums" ? (
           <div className="albums-grid animate-fade-in" style={{ overflowY: "auto", flexGrow: 1, paddingRight: "8px" }}>
             {/* Create Album Card */}
@@ -496,6 +502,11 @@ function App() {
           photosList={lightboxData.photosList}
           initialIndex={lightboxData.index}
           onClose={() => setLightboxData(null)}
+          onShowOnMap={(photo) => {
+            setMapFocusedPhotoId(photo.id);
+            setLightboxData(null);
+            setCurrentView("map");
+          }}
           onPhotosUpdated={triggerRefresh}
         />
       )}

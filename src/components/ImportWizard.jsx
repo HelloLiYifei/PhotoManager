@@ -99,6 +99,10 @@ export default function ImportWizard({ onClose, onImportComplete }) {
   
   const [nameTemplate, setNameTemplate] = useState("{time}_{original}");
   const [backupPath, setBackupPath] = useState("");
+  const [attachCurrentLocation, setAttachCurrentLocation] = useState(true);
+  const [currentLocation, setCurrentLocation] = useState(null);
+  const [locationStatus, setLocationStatus] = useState("idle");
+  const [locationError, setLocationError] = useState("");
   
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(null);
@@ -221,6 +225,49 @@ export default function ImportWizard({ onClose, onImportComplete }) {
     }
   };
 
+  const requestCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      const message = "当前系统不支持位置服务";
+      setLocationStatus("error");
+      setLocationError(message);
+      return Promise.reject(new Error(message));
+    }
+
+    setLocationStatus("locating");
+    setLocationError("");
+
+    return new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const location = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          };
+          setCurrentLocation(location);
+          setLocationStatus("ready");
+          resolve(location);
+        },
+        (error) => {
+          const messages = {
+            1: "位置权限被拒绝，请在系统设置中允许 PhotoManager 访问位置",
+            2: "暂时无法确定当前位置",
+            3: "获取当前位置超时",
+          };
+          const message = messages[error.code] || error.message || "获取当前位置失败";
+          setCurrentLocation(null);
+          setLocationStatus("error");
+          setLocationError(message);
+          reject(new Error(message));
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 60000,
+        }
+      );
+    });
+  };
+
   // Toggle checkmark selection
   const toggleSelectPhoto = (path) => {
     if (selectedPaths.includes(path)) {
@@ -281,6 +328,18 @@ export default function ImportWizard({ onClose, onImportComplete }) {
       if (!confirmImport) return;
     }
 
+    let importLocation = null;
+    if (attachCurrentLocation) {
+      try {
+        importLocation = await requestCurrentLocation();
+      } catch (error) {
+        const continueWithoutLocation = confirm(
+          `${error.message}\n\n是否继续导入，但不为缺少 GPS 的照片添加位置？`
+        );
+        if (!continueWithoutLocation) return;
+      }
+    }
+
     const startConfirm = confirm(
       "【导入提示】\n在导入期间，请保持电脑开机，挂载的设备接触稳定。确定开始导入吗？"
     );
@@ -300,6 +359,7 @@ export default function ImportWizard({ onClose, onImportComplete }) {
         imports: importsList,
         nameTemplate,
         backupPath: backupPath.trim() || null,
+        currentLocation: attachCurrentLocation ? importLocation : null,
       });
 
       alert(`导入成功！共复制并注册了 ${count} 张照片。`);
@@ -423,6 +483,55 @@ export default function ImportWizard({ onClose, onImportComplete }) {
                   );
                 })}
               </div>
+            </div>
+
+            <div className="sidebar-section import-location-section">
+              <div className="import-location-heading">
+                <span className="section-hdr">导入位置</span>
+                <label className="import-location-switch">
+                  <input
+                    type="checkbox"
+                    checked={attachCurrentLocation}
+                    onChange={(event) => {
+                      setAttachCurrentLocation(event.target.checked);
+                      if (!event.target.checked) {
+                        setCurrentLocation(null);
+                        setLocationStatus("idle");
+                        setLocationError("");
+                      }
+                    }}
+                  />
+                  <span aria-hidden="true" />
+                </label>
+              </div>
+              <p className="import-location-description">
+                为缺少 GPS 的照片自动加入导入时的当前位置；照片原有坐标不会被覆盖。
+              </p>
+              {attachCurrentLocation && (
+                <div className={`import-location-status is-${locationStatus}`}>
+                  <div>
+                    <strong>
+                      {locationStatus === "locating" && "正在获取位置…"}
+                      {locationStatus === "ready" && "已获取当前位置"}
+                      {locationStatus === "error" && "位置不可用"}
+                      {locationStatus === "idle" && "将在导入时获取"}
+                    </strong>
+                    {currentLocation && (
+                      <small>
+                        {currentLocation.latitude.toFixed(5)}, {currentLocation.longitude.toFixed(5)}
+                      </small>
+                    )}
+                    {locationError && <small>{locationError}</small>}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => requestCurrentLocation().catch(() => {})}
+                    disabled={locationStatus === "locating"}
+                  >
+                    {locationStatus === "ready" ? "刷新" : "立即获取"}
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Reorganize Options */}

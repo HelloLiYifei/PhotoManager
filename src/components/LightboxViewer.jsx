@@ -8,6 +8,7 @@ export default function LightboxViewer({
   initialIndex,
   onClose,
   onPhotosUpdated,
+  onShowOnMap,
 }) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [previewSrc, setPreviewSrc] = useState(null);
@@ -313,6 +314,24 @@ export default function LightboxViewer({
             </div>
           </div>
         </div>
+
+        {Number.isFinite(currentPhoto.latitude) && Number.isFinite(currentPhoto.longitude) && (
+          <div className="sidebar-section">
+            <span className="section-hdr">拍摄位置</span>
+            <button
+              type="button"
+              className="photo-location-button"
+              onClick={() => onShowOnMap?.(currentPhoto)}
+            >
+              <span className="photo-location-pin" aria-hidden="true">⌖</span>
+              <span>
+                <strong>在地图中查看</strong>
+                <small>{currentPhoto.latitude.toFixed(5)}, {currentPhoto.longitude.toFixed(5)}</small>
+              </span>
+              <span className="photo-location-arrow" aria-hidden="true">→</span>
+            </button>
+          </div>
+        )}
 
         {/* File Information */}
         <div className="sidebar-section">

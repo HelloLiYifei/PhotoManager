@@ -8,7 +8,7 @@ use chrono::Utc;
 use crate::db::{map_row_to_photo, Album, DbState, Photo};
 use crate::workspace::{load_workspaces, save_workspaces, open_workspace_db, Workspace};
 use crate::scan::scan_workspace_dir;
-use crate::import::{detect_removable_cards, scan_card_files, execute_import, CardInfo, CardPhoto, PhotoImportInfo};
+use crate::import::{detect_removable_cards, scan_card_files, execute_import, CardInfo, CardPhoto, ImportLocation, PhotoImportInfo};
 
 fn remove_thumbnail_cache(workspace_root: &Path, photo_id: &str) {
     let thumbnail_paths = [
@@ -528,8 +528,16 @@ pub async fn import_photos(
     imports: Vec<PhotoImportInfo>,
     name_template: String,
     backup_path: Option<String>,
+    current_location: Option<ImportLocation>,
 ) -> Result<i32, String> {
-    execute_import(&app_handle, &state, imports, &name_template, backup_path)
+    execute_import(
+        &app_handle,
+        &state,
+        imports,
+        &name_template,
+        backup_path,
+        current_location,
+    )
 }
 
 #[tauri::command]

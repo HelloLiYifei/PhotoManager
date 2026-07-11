@@ -51,6 +51,7 @@ pub fn init_db(conn: &Connection) -> Result<()> {
             id TEXT PRIMARY KEY,
             path TEXT UNIQUE NOT NULL,
             filename TEXT NOT NULL,
+            source_filename TEXT,
             file_size INTEGER NOT NULL,
             file_type TEXT NOT NULL,
             width INTEGER,
@@ -75,11 +76,19 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         [],
     )?;
 
+    // Existing workspaces predate source_filename. Keeping the original card
+    // name lets duplicate detection continue to work when imports are renamed.
+    let _ = conn.execute("ALTER TABLE photos ADD COLUMN source_filename TEXT", []);
+
     // Create indexes for fast queries
     conn.execute("CREATE INDEX IF NOT EXISTS idx_photos_date_taken ON photos(date_taken)", [])?;
     conn.execute("CREATE INDEX IF NOT EXISTS idx_photos_is_deleted ON photos(is_deleted)", [])?;
     conn.execute("CREATE INDEX IF NOT EXISTS idx_photos_is_favorite ON photos(is_favorite)", [])?;
     conn.execute("CREATE INDEX IF NOT EXISTS idx_photos_hash ON photos(hash)", [])?;
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_photos_import_identity ON photos(source_filename, file_size)",
+        [],
+    )?;
 
     // 2. Create albums table
     conn.execute(

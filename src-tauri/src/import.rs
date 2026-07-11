@@ -36,6 +36,62 @@ pub struct CardPhoto {
     pub already_imported: bool,
 }
 
+fn normalized_import_identity(filename: &str, size: i64) -> (String, i64) {
+    (filename.to_lowercase(), size)
+}
+
+fn metadata_fingerprint(metadata: &fs::Metadata) -> String {
+    let modified = metadata
+        .modified()
+        .ok()
+        .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|duration| duration.as_secs())
+        .unwrap_or(0);
+    format!("{}_{}", metadata.len(), modified)
+}
+
+#[derive(Default)]
+struct ImportedFileIndex {
+    identities: HashSet<(String, i64)>,
+    fingerprints: HashSet<String>,
+}
+
+impl ImportedFileIndex {
+    fn contains(&self, filename: &str, size: i64, fingerprint: &str) -> bool {
+        self.identities
+            .contains(&normalized_import_identity(filename, size))
+            || self.fingerprints.contains(fingerprint)
+    }
+}
+
+fn load_imported_file_index(conn: &Connection) -> ImportedFileIndex {
+    let mut stmt = match conn
+        .prepare("SELECT COALESCE(source_filename, filename), file_size, hash FROM photos")
+    {
+        Ok(stmt) => stmt,
+        Err(_) => return ImportedFileIndex::default(),
+    };
+
+    let rows = match stmt.query_map([], |row| {
+        let filename = row.get::<_, String>(0)?;
+        let size = row.get::<_, i64>(1)?;
+        let fingerprint = row.get::<_, Option<String>>(2)?;
+        Ok((normalized_import_identity(&filename, size), fingerprint))
+    }) {
+        Ok(rows) => rows,
+        Err(_) => return ImportedFileIndex::default(),
+    };
+
+    let mut index = ImportedFileIndex::default();
+    for (identity, fingerprint) in rows.flatten() {
+        index.identities.insert(identity);
+        if let Some(fingerprint) = fingerprint {
+            index.fingerprints.insert(fingerprint);
+        }
+    }
+    index
+}
+
 // Windows FFI to check drive types
 #[cfg(target_os = "windows")]
 extern "system" {
@@ -147,20 +203,7 @@ pub fn scan_card_files(card_path: &str, conn: Option<&Connection>) -> Vec<CardPh
 
     // A single indexed read replaces one SQL statement per source file. This
     // matters on storage cards where directory traversal is already I/O bound.
-    let existing_files: HashSet<(String, i64)> = conn
-        .and_then(|connection| {
-            let mut stmt = connection
-                .prepare("SELECT filename, file_size FROM photos")
-                .ok()?;
-            let rows = stmt
-                .query_map([], |row| {
-                    Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
-                })
-                .ok()?;
-            let entries = rows.flatten().collect();
-            Some(entries)
-        })
-        .unwrap_or_default();
+    let existing_files = conn.map(load_imported_file_index).unwrap_or_default();
 
     let mut photos = Vec::new();
     for entry in WalkDir::new(scan_root)
@@ -199,7 +242,8 @@ pub fn scan_card_files(card_path: &str, conn: Option<&Connection>) -> Vec<CardPh
                         .unwrap_or("unknown")
                         .to_string();
 
-                    let already_imported = existing_files.contains(&(filename.clone(), size));
+                    let fingerprint = metadata_fingerprint(&metadata);
+                    let already_imported = existing_files.contains(&filename, size, &fingerprint);
 
                     photos.push(CardPhoto {
                         relative_path,
@@ -282,6 +326,7 @@ pub fn execute_import(
 
     let total = imports.len() as i32;
     let mut copied = 0;
+    let mut imported_files = load_imported_file_index(conn);
     
     let _ = fs::create_dir_all(workspace_root.join(".photomanager").join("thumbnails"));
 
@@ -329,6 +374,14 @@ pub fn execute_import(
         let file_ext = src_path.extension().and_then(|s| s.to_str()).unwrap_or("").to_string();
         let filename = src_path.file_name().and_then(|s| s.to_str()).unwrap_or("unknown").to_string();
         let is_raw = matches!(file_ext.to_lowercase().as_str(), "arw" | "cr2" | "nef");
+
+        // Re-check at execution time as the import list may be stale or may
+        // come from a caller other than the wizard.
+        let source_identity = normalized_import_identity(&filename, file_size);
+        let source_fingerprint = metadata_fingerprint(&metadata);
+        if imported_files.contains(&filename, file_size, &source_fingerprint) {
+            continue;
+        }
 
         // Parse EXIF
         let exif = read_exif_metadata(src_path);
@@ -397,13 +450,6 @@ pub fn execute_import(
             .to_string_lossy()
             .to_string();
 
-        let mod_time = metadata
-            .modified()
-            .ok()
-            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
-        let file_hash = format!("{}_{}", file_size, mod_time);
         let date_added = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
         let (latitude, longitude) = resolve_import_coordinates(
             exif.latitude,
@@ -414,14 +460,15 @@ pub fn execute_import(
         // 6. Write record to database
         let _ = conn.execute(
             "INSERT INTO photos (
-                id, path, filename, file_size, file_type, width, height, 
+                id, path, filename, source_filename, file_size, file_type, width, height,
                 date_taken, date_added, camera_make, camera_model, lens_model, 
                 exposure_time, f_number, iso, focal_length, latitude, longitude, hash
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)",
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)",
             rusqlite::params![
                 &photo_id,
                 &relative_dest_path,
                 &final_dest_path.file_name().unwrap().to_string_lossy().to_string(),
+                &filename,
                 file_size,
                 &file_ext.to_uppercase(),
                 width,
@@ -437,7 +484,7 @@ pub fn execute_import(
                 exif.focal_length,
                 latitude,
                 longitude,
-                &file_hash,
+                &source_fingerprint,
             ],
         );
 
@@ -448,6 +495,8 @@ pub fn execute_import(
         );
 
         copied += 1;
+        imported_files.identities.insert(source_identity);
+        imported_files.fingerprints.insert(source_fingerprint);
 
         // Emit import progress
         let _ = app_handle.emit(
@@ -465,7 +514,69 @@ pub fn execute_import(
 
 #[cfg(test)]
 mod tests {
-    use super::{resolve_import_coordinates, ImportLocation};
+    use super::{
+        load_imported_file_index, normalized_import_identity, resolve_import_coordinates,
+        ImportLocation,
+    };
+    use rusqlite::Connection;
+
+    #[test]
+    fn detects_an_import_after_the_destination_was_renamed() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute(
+            "CREATE TABLE photos (filename TEXT, source_filename TEXT, file_size INTEGER, hash TEXT)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO photos (filename, source_filename, file_size, hash) VALUES (?1, ?2, ?3, NULL)",
+            rusqlite::params!["2026-07-11_IMG_0001.JPG", "IMG_0001.JPG", 42_i64],
+        )
+        .unwrap();
+
+        let index = load_imported_file_index(&conn);
+        assert!(index
+            .identities
+            .contains(&normalized_import_identity("img_0001.jpg", 42)));
+    }
+
+    #[test]
+    fn falls_back_to_destination_name_for_legacy_imports() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute(
+            "CREATE TABLE photos (filename TEXT, source_filename TEXT, file_size INTEGER, hash TEXT)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO photos (filename, source_filename, file_size, hash) VALUES (?1, NULL, ?2, NULL)",
+            rusqlite::params!["IMG_0002.JPG", 84_i64],
+        )
+        .unwrap();
+
+        let index = load_imported_file_index(&conn);
+        assert!(index
+            .identities
+            .contains(&normalized_import_identity("IMG_0002.JPG", 84)));
+    }
+
+    #[test]
+    fn detects_a_renamed_legacy_import_by_fingerprint() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute(
+            "CREATE TABLE photos (filename TEXT, source_filename TEXT, file_size INTEGER, hash TEXT)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO photos (filename, source_filename, file_size, hash) VALUES (?1, NULL, ?2, ?3)",
+            rusqlite::params!["120000_IMG_0003.JPG", 126_i64, "126_1720670400"],
+        )
+        .unwrap();
+
+        let index = load_imported_file_index(&conn);
+        assert!(index.contains("IMG_0003.JPG", 126, "126_1720670400"));
+    }
 
     #[test]
     fn keeps_valid_exif_coordinates() {

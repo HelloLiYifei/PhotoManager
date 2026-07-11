@@ -111,6 +111,11 @@ export default function ImportWizard({ onClose, onImportComplete }) {
   const gridContainerRef = useRef(null);
   const sentinelRef = useRef(null);
   const [visibleLimit, setVisibleLimit] = useState(64);
+  const importedCount = photos.filter((photo) => photo.already_imported).length;
+  const alreadyImportedPaths = new Set(
+    photos.filter((photo) => photo.already_imported).map((photo) => photo.absolute_path)
+  );
+  const selectedImportPaths = selectedPaths.filter((path) => !alreadyImportedPaths.has(path));
 
   // New Album Dialog inside Wizard
   const [showCreateAlbum, setShowCreateAlbum] = useState(false);
@@ -270,6 +275,8 @@ export default function ImportWizard({ onClose, onImportComplete }) {
 
   // Toggle checkmark selection
   const toggleSelectPhoto = (path) => {
+    if (alreadyImportedPaths.has(path)) return;
+
     if (selectedPaths.includes(path)) {
       setSelectedPaths(selectedPaths.filter(p => p !== path));
     } else {
@@ -314,13 +321,13 @@ export default function ImportWizard({ onClose, onImportComplete }) {
   }, []);
 
   const handleStartImport = async () => {
-    if (selectedPaths.length === 0) {
+    if (selectedImportPaths.length === 0) {
       alert("请至少选择一张照片进行导入！");
       return;
     }
 
     // Check if there are uncolored pictures
-    const uncoloredSelected = selectedPaths.filter(path => !photoAlbums[path]);
+    const uncoloredSelected = selectedImportPaths.filter(path => !photoAlbums[path]);
     if (uncoloredSelected.length > 0) {
       const confirmImport = confirm(
         `有 ${uncoloredSelected.length} 张已选中的图片未指定相册，它们在导入时将自动归入“默认相册”。确定要继续吗？`
@@ -346,11 +353,11 @@ export default function ImportWizard({ onClose, onImportComplete }) {
     if (!startConfirm) return;
 
     setImporting(true);
-    setImportProgress({ copied: 0, total: selectedPaths.length, current_file: "准备导入中..." });
+    setImportProgress({ copied: 0, total: selectedImportPaths.length, current_file: "准备导入中..." });
 
     try {
       // Build PhotoImportInfo list
-      const importsList = selectedPaths.map(path => ({
+      const importsList = selectedImportPaths.map(path => ({
         absolute_path: path,
         album_name: photoAlbums[path] || "默认相册",
       }));
@@ -573,7 +580,7 @@ export default function ImportWizard({ onClose, onImportComplete }) {
               style={{ width: "100%", padding: "12px", borderRadius: "8px", fontSize: "14px", fontWeight: "600" }}
               disabled={importing || scanning}
             >
-              📥 开始拷贝并导入 ({selectedPaths.length} 张)
+              📥 开始拷贝并导入 ({selectedImportPaths.length} 张)
             </button>
           </div>
 
@@ -597,7 +604,13 @@ export default function ImportWizard({ onClose, onImportComplete }) {
                 <div style={{ marginTop: "12px", color: "var(--text-muted)" }}>请选择有效的导入源路径</div>
               </div>
             ) : (
-              <div className="wizard-photos-grid">
+              <>
+                {importedCount > 0 && (
+                  <div className="already-imported-summary" role="status">
+                    已检测到 {importedCount} 张照片曾导入当前仓库，已用绿色标记并取消选择。
+                  </div>
+                )}
+                <div className="wizard-photos-grid">
                 {previewColumns.map((column, columnIndex) => (
                   <div className="wizard-photo-column" key={columnIndex}>
                     {column.map((photo) => {
@@ -712,7 +725,8 @@ export default function ImportWizard({ onClose, onImportComplete }) {
                     正在准备更多预览…
                   </div>
                 )}
-              </div>
+                </div>
+              </>
             )}
 
           </div>

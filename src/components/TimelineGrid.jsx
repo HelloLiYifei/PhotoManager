@@ -343,6 +343,20 @@ export default function TimelineGrid({
     }
   };
 
+  const handleEmptyTrash = async () => {
+    if (!confirm("确定要将垃圾桶内的所有照片全部移入系统回收站吗？物理文件将被移动到系统回收站，数据库记录将被删除。")) return;
+    try {
+      await invoke("empty_trash_to_recycle_bin");
+      setSelectedIds([]);
+      setPrimaryPhoto(null);
+      await fetchPhotosList();
+      if (onPhotosUpdated) onPhotosUpdated();
+      alert("垃圾桶已清空，文件已移入系统回收站！");
+    } catch (error) {
+      alert("清空失败: " + error);
+    }
+  };
+
   const handleBatchMoveSubmit = async (targetAlbId) => {
     try {
       await invoke("move_photos_to_album", {
@@ -535,6 +549,7 @@ export default function TimelineGrid({
     </div>
   );
 
+  const showBottomToolbar = selectedIds.length > 0 || (currentView === "trash" && photos.length > 0);
   const galleryPhoto = primaryPhoto || photos[0];
   const galleryIndex = galleryPhoto ? photos.findIndex((photo) => photo.id === galleryPhoto.id) : -1;
 
@@ -578,7 +593,7 @@ export default function TimelineGrid({
   const renderGalleryView = () => galleryPhoto && (
     <div
       ref={galleryContainerRef}
-      className={`finder-gallery ${selectedIds.length > 0 ? "has-action-toolbar" : ""}`}
+      className={`finder-gallery ${showBottomToolbar ? "has-action-toolbar" : ""}`}
       tabIndex={0}
       onKeyDown={handleGalleryKeyDown}
     >
@@ -799,7 +814,7 @@ export default function TimelineGrid({
       </div>
 
       {/* Floating Bottom Toolbar (slides up when photos are selected) */}
-      {selectedIds.length > 0 && (
+      {showBottomToolbar && (
         <div className="glass-panel animate-fade-in" style={{
           position: "absolute",
           bottom: "24px",
@@ -816,58 +831,40 @@ export default function TimelineGrid({
           background: "rgba(10, 10, 15, 0.95)",
         }}>
           <span style={{ fontSize: "12px", color: "var(--text-muted)", marginRight: "8px", fontWeight: "600" }}>
-            已选中 {selectedIds.length} 项
+            {selectedIds.length > 0 ? `已选中 ${selectedIds.length} 项` : `垃圾桶共 ${photos.length} 项`}
           </span>
-
-          <button onClick={handleBatchFavorite} className="text-input" style={{ width: "auto", padding: "6px 12px", fontSize: "12px", cursor: "pointer" }} title="喜欢">
-            💖 喜欢
-          </button>
-
-          <button onClick={handleToggleCompare} className="text-input" style={{ width: "auto", padding: "6px 12px", fontSize: "12px", cursor: "pointer", background: compareMode ? "var(--primary-start)" : "none" }} title="对比">
-            ⚖️ 对比
-          </button>
-
-          <button onClick={loadAlbumsListForMove} className="text-input" style={{ width: "auto", padding: "6px 12px", fontSize: "12px", cursor: "pointer" }} title="移动到其他相册">
-            📁 移动
-          </button>
-
-          <button onClick={handleBatchAddTag} className="text-input" style={{ width: "auto", padding: "6px 12px", fontSize: "12px", cursor: "pointer" }} title="批量打标签">
-            🏷️ 贴标
-          </button>
-
-          {/* Export Action */}
-          <button onClick={async () => {
-            try {
-              const destPath = await invoke("select_directory");
-              if (!destPath) return;
-
-              // To avoid files lock and perform copy in backend, we can write a simple copy logic.
-              // Wait, since we don't have an export command, let's write it in commands.rs!
-              // Ah! We can easily call standard rust fs::copy through commands. Let's create a quick rust command `export_photos`
-              // so that it copies files directly!
-              // Yes, let's call the command:
-              await invoke("export_photos", { photoIds: selectedIds, destDir: destPath });
-              alert("导出成功！");
-            } catch (err) {
-              alert("导出失败: " + err);
-            }
-          }} className="text-input" style={{ width: "auto", padding: "6px 12px", fontSize: "12px", cursor: "pointer" }} title="导出到外部路径">
-            📤 导出
-          </button>
 
           {currentView === "trash" ? (
             <>
-              <button onClick={handleBatchRestore} className="gradient-btn" style={{ padding: "6px 12px", fontSize: "12px", cursor: "pointer", background: "linear-gradient(135deg, #10B981 0%, #059669 100%)" }} title="撤销删除">
-                ↩️ 还原
+              <button disabled={selectedIds.length === 0} onClick={handleBatchRestore} className="gradient-btn" style={{ padding: "7px 14px", fontSize: "12px", cursor: selectedIds.length === 0 ? "not-allowed" : "pointer", opacity: selectedIds.length === 0 ? 0.42 : 1, background: "linear-gradient(135deg, #10B981 0%, #059669 100%)" }} title="将所选照片还原到图库">
+                ↩️ 还原所选
               </button>
-              <button onClick={handleBatchDelete} className="gradient-btn" style={{ padding: "6px 12px", fontSize: "12px", cursor: "pointer", background: "linear-gradient(135deg, #EF4444 0%, #DC2626 100%)" }} title="移入系统回收站">
-                🗑️ 彻底删除
+              <button disabled={selectedIds.length === 0} onClick={handleBatchDelete} className="gradient-btn" style={{ padding: "7px 14px", fontSize: "12px", cursor: selectedIds.length === 0 ? "not-allowed" : "pointer", opacity: selectedIds.length === 0 ? 0.42 : 1, background: "linear-gradient(135deg, #EF4444 0%, #991B1B 100%)" }} title="将所选文件转移到操作系统回收站">
+                🗑️ 移至系统回收站
+              </button>
+              <span style={{ width: "1px", height: "24px", background: "var(--border-color)" }} />
+              <button onClick={handleEmptyTrash} className="gradient-btn" style={{ padding: "7px 14px", fontSize: "12px", cursor: "pointer", background: "linear-gradient(135deg, #7F1D1D 0%, #450A0A 100%)" }} title="将垃圾桶内全部文件移至系统回收站">
+                🧹 清空垃圾桶
               </button>
             </>
           ) : (
-            <button onClick={handleBatchDelete} className="gradient-btn" style={{ padding: "6px 12px", fontSize: "12px", cursor: "pointer", background: "linear-gradient(135deg, #EF4444 0%, #DC2626 100%)" }} title="移入垃圾桶">
-              🗑️ 删除
-            </button>
+            <>
+              <button onClick={handleBatchFavorite} className="text-input" style={{ width: "auto", padding: "6px 12px", fontSize: "12px", cursor: "pointer" }} title="喜欢">💖 喜欢</button>
+              <button onClick={handleToggleCompare} className="text-input" style={{ width: "auto", padding: "6px 12px", fontSize: "12px", cursor: "pointer", background: compareMode ? "var(--primary-start)" : "none" }} title="对比">⚖️ 对比</button>
+              <button onClick={loadAlbumsListForMove} className="text-input" style={{ width: "auto", padding: "6px 12px", fontSize: "12px", cursor: "pointer" }} title="移动到其他相册">📁 移动</button>
+              <button onClick={handleBatchAddTag} className="text-input" style={{ width: "auto", padding: "6px 12px", fontSize: "12px", cursor: "pointer" }} title="批量打标签">🏷️ 贴标</button>
+              <button onClick={async () => {
+                try {
+                  const destPath = await invoke("select_directory");
+                  if (!destPath) return;
+                  await invoke("export_photos", { photoIds: selectedIds, destDir: destPath });
+                  alert("导出成功！");
+                } catch (err) {
+                  alert("导出失败: " + err);
+                }
+              }} className="text-input" style={{ width: "auto", padding: "6px 12px", fontSize: "12px", cursor: "pointer" }} title="导出到外部路径">📤 导出</button>
+              <button onClick={handleBatchDelete} className="gradient-btn" style={{ padding: "6px 12px", fontSize: "12px", cursor: "pointer", background: "linear-gradient(135deg, #EF4444 0%, #DC2626 100%)" }} title="移入垃圾桶">🗑️ 删除</button>
+            </>
           )}
         </div>
       )}

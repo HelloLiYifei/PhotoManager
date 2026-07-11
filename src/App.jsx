@@ -204,6 +204,11 @@ function App() {
           )}
         </div>
 
+        <div className="sidebar-context sidebar-text">
+          <strong>{getHeaderTitle()}</strong>
+          <span title={activeWorkspace.path}>🏢 {activeWorkspace.name}</span>
+        </div>
+
         {/* Navigation */}
         <nav className="sidebar-nav">
           <div
@@ -314,8 +319,20 @@ function App() {
           ))}
         </div>
 
+        <div className="sidebar-primary-actions sidebar-bottom-import">
+          <button
+            type="button"
+            onClick={() => setShowImportWizard(true)}
+            className={`sidebar-import-button ${detectedCard ? "card-detected" : ""}`}
+            title={detectedCard ? `检测到存储卡 ${detectedCard.label || detectedCard.drive_letter}，点击导入` : "导入新照片"}
+          >
+            <span className="sidebar-import-icon" aria-hidden="true">{detectedCard ? "💾" : "📥"}</span>
+            <span className="sidebar-text">{detectedCard ? "检测到存储卡 · 导入" : "导入新照片"}</span>
+          </button>
+        </div>
+
         {/* Settings button at bottom */}
-        <div style={{ padding: "8px", borderTop: "1px solid var(--border-color)", marginTop: "auto" }}>
+        <div style={{ padding: "8px", borderTop: "1px solid var(--border-color)", marginTop: 0 }}>
           <button
             onClick={() => alert(`⚙️ 设置\n工作空间路径:\n${activeWorkspace.path}\n相册存储格式: 物理目录直接映射`)}
             className="nav-item"
@@ -326,65 +343,10 @@ function App() {
           </button>
         </div>
 
-        {/* SD Card Detection Banner */}
-        {detectedCard && !isSidebarCollapsed && (
-          <div className="sdcard-banner" style={{ margin: "10px" }}>
-            <div className="sdcard-info">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ animation: "pulse-green 1.5s infinite" }}>
-                <rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect>
-                <line x1="12" y1="14" x2="12" y2="14"></line>
-                <polyline points="8 6 12 6 16 6"></polyline>
-              </svg>
-              <span>检测到卡!</span>
-            </div>
-            <button
-              onClick={() => setShowImportWizard(true)}
-              className="gradient-btn"
-              style={{ padding: "6px 12px", borderRadius: "6px", fontSize: "11px", marginTop: "4px", width: "100%" }}
-            >
-              导入照片
-            </button>
-          </div>
-        )}
       </aside>
 
       {/* Main Content Area */}
       <main className="content-wrapper">
-        <div className="content-header">
-          <div className="header-title-area">
-            <span className="header-title">{getHeaderTitle()}</span>
-            <span className="header-path">🏢 仓库: {activeWorkspace.name}</span>
-          </div>
-          <div className="header-actions" style={{ display: "flex", gap: "10px" }}>
-            {currentView === "trash" && (
-              <button
-                onClick={async () => {
-                  if (confirm("确定要将垃圾桶内的所有照片全部移入系统回收站吗？物理文件将被移动到系统回收站，数据库记录将被删除。")) {
-                    try {
-                      await invoke("empty_trash_to_recycle_bin");
-                      triggerRefresh();
-                      alert("已全部移入系统回收站！");
-                    } catch (e) {
-                      alert("清空失败: " + e);
-                    }
-                  }
-                }}
-                className="text-input"
-                style={{ width: "auto", padding: "8px 16px", borderRadius: "8px", fontSize: "13px", background: "rgba(239, 68, 68, 0.15)", color: "#FCA5A5", border: "1px solid rgba(239, 68, 68, 0.3)" }}
-              >
-                🗑️ 全部转移至回收站
-              </button>
-            )}
-            <button
-              onClick={() => setShowImportWizard(true)}
-              className="text-input gradient-btn"
-              style={{ width: "auto", padding: "8px 16px", borderRadius: "8px", fontSize: "13px" }}
-            >
-              📥 导入新照片
-            </button>
-          </div>
-        </div>
-
         {currentView === "map" ? (
           <MapView
             key={`map-${refreshTrigger}`}

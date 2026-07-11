@@ -232,19 +232,114 @@ body {
 /* App Main Interface Layout */
 .main-sidebar {
   width: 260px;
+  flex: 0 0 260px;
+  box-sizing: border-box;
   background: var(--bg-sidebar);
   border-right: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
   padding: 20px;
   z-index: 10;
+  transition: width 0.22s ease, flex-basis 0.22s ease, padding 0.22s ease;
 }
 
 .sidebar-header {
-  margin-bottom: 28px;
+  margin-bottom: 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.sidebar-context {
+  display: flex;
+  min-width: 0;
+  margin-bottom: 12px;
+  padding: 0 6px;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.sidebar-context strong,
+.sidebar-context span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-context strong {
+  color: var(--text-main);
+  font-size: 13px;
+}
+
+.sidebar-context span {
+  color: var(--text-dark);
+  font-size: 10px;
+}
+
+.sidebar-primary-actions {
+  display: flex;
+  margin-bottom: 18px;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.sidebar-bottom-import {
+  margin: 0;
+  padding: 8px;
+  border-top: 1px solid var(--border-color);
+}
+
+.sidebar-import-button {
+  display: flex;
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 12px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 9px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.sidebar-import-button {
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--text-muted);
+  box-shadow: none;
+  transition: filter 0.16s ease, border-color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+}
+
+.sidebar-import-button:hover {
+  border-color: rgba(96, 165, 250, 0.38);
+  background: rgba(96, 165, 250, 0.1);
+  filter: brightness(1.08);
+}
+
+.sidebar-import-button.card-detected {
+  border-color: rgba(52, 211, 153, 0.72);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.94), rgba(37, 99, 235, 0.9));
+  color: #fff;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12), 0 8px 24px rgba(16, 185, 129, 0.3);
+  animation: card-import-glow 1.8s ease-in-out infinite;
+}
+
+.sidebar-import-button.card-detected:hover {
+  transform: translateY(-1px);
+}
+
+.sidebar-import-icon {
+  font-size: 15px;
+}
+
+@keyframes card-import-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1), 0 8px 22px rgba(16, 185, 129, 0.24);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(16, 185, 129, 0.2), 0 10px 30px rgba(37, 99, 235, 0.36);
+  }
 }
 
 .sidebar-logo {
@@ -1177,19 +1272,41 @@ body {
    ========================================================================== */
 
 /* Foldable Sidebar styling */
-.sidebar.collapsed {
+.main-sidebar.collapsed {
   width: 72px;
+  flex-basis: 72px;
+  padding: 14px;
 }
 
-.sidebar.collapsed .sidebar-text,
-.sidebar.collapsed .album-name,
-.sidebar.collapsed .album-desc,
-.sidebar.collapsed .nav-text,
-.sidebar.collapsed .nav-header {
+.main-sidebar.collapsed .sidebar-text,
+.main-sidebar.collapsed .album-name,
+.main-sidebar.collapsed .album-desc,
+.main-sidebar.collapsed .nav-text,
+.main-sidebar.collapsed .nav-header {
   display: none !important;
 }
 
-.sidebar.collapsed .nav-item {
+.main-sidebar.collapsed .sidebar-header {
+  justify-content: center;
+}
+
+.main-sidebar.collapsed .sidebar-logo {
+  gap: 0;
+}
+
+.main-sidebar.collapsed .sidebar-primary-actions {
+  align-items: center;
+}
+
+.main-sidebar.collapsed .sidebar-import-button {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 50%;
+}
+
+.main-sidebar.collapsed .nav-item {
   justify-content: center;
   padding: 12px;
   border-radius: 50%;
@@ -1198,12 +1315,16 @@ body {
   margin: 8px auto;
 }
 
-.sidebar.collapsed .album-item {
+.main-sidebar.collapsed .album-item {
   justify-content: center;
 }
 
-.sidebar.collapsed .album-icon-circle {
+.main-sidebar.collapsed .album-icon-circle {
   margin-right: 0 !important;
+}
+
+.main-sidebar.collapsed .albums-list {
+  display: none;
 }
 
 /* Masonry Pinterest-style Grid */

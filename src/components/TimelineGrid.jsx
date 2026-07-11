@@ -4,7 +4,7 @@ import { loadPhotoThumbnail } from "../lib/thumbnailLoader";
 import { loadPhotoPreview } from "../lib/previewLoader";
 
 // Sub-component to lazy load thumbnail URLs through the local media protocol
-function ThumbnailImage({ id, alt, scrollRoot }) {
+function ThumbnailImage({ id, alt, scrollRoot, fit = "natural" }) {
   const [src, setSrc] = useState(null);
   const [loading, setLoading] = useState(true);
   const imgRef = useRef(null);
@@ -51,7 +51,7 @@ function ThumbnailImage({ id, alt, scrollRoot }) {
   }, [id]);
 
   if (loading) {
-    return <div ref={imgRef} className="photo-card-img" style={{ minHeight: "120px", background: "#1A1A24", display: "flex", alignItems: "center", justifyItems: "center" }} />;
+    return <div ref={imgRef} className={`photo-card-img thumbnail-${fit}`} />;
   }
 
   return (
@@ -59,11 +59,30 @@ function ThumbnailImage({ id, alt, scrollRoot }) {
       ref={imgRef}
       src={src || "/placeholder.svg"}
       alt={alt}
-      style={{ width: "100%", height: "auto", display: "block", borderRadius: "6px" }}
+      className={`photo-thumbnail thumbnail-${fit}`}
       loading="lazy"
       decoding="async"
     />
   );
+}
+
+function GalleryPreviewImage({ id, alt }) {
+  const [src, setSrc] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    setSrc("");
+    loadPhotoPreview(id)
+      .then((url) => {
+        if (active) setSrc(url);
+      })
+      .catch(console.error);
+    return () => { active = false; };
+  }, [id]);
+
+  return src
+    ? <img src={src} className="gallery-preview-image" alt={alt} decoding="async" />
+    : <div className="gallery-preview-loading"><div className="spinner" /></div>;
 }
 
 // Sub-component to load medium-res preview in Compare mode
@@ -106,6 +125,10 @@ export default function TimelineGrid({
   const [ratingFilter, setRatingFilter] = useState(0);
   const [tagFilter, setTagFilter] = useState("");
   const [allTags, setAllTags] = useState([]);
+  const [viewMode, setViewMode] = useState(() => {
+    const saved = localStorage.getItem("photomanager-photo-view");
+    return ["list", "icons", "gallery", "masonry"].includes(saved) ? saved : "masonry";
+  });
 
   // Selection states
   const [selectedIds, setSelectedIds] = useState([]);
@@ -193,7 +216,7 @@ export default function TimelineGrid({
     }
 
     let updated = [];
-    if (e.ctrlKey) {
+    if (e.ctrlKey || e.metaKey) {
       // Toggle selection
       if (selectedIds.includes(photo.id)) {
         updated = selectedIds.filter(id => id !== photo.id);
@@ -370,6 +393,25 @@ export default function TimelineGrid({
     }
   };
 
+  const handleGallerySelect = (photo, e) => {
+    e.stopPropagation();
+    if (e.ctrlKey || e.metaKey) {
+      handlePhotoSelect(photo, e);
+      return;
+    }
+    setSelectedIds([photo.id]);
+    setPrimaryPhoto(photo);
+  };
+
+  const handleViewModeChange = (mode) => {
+    setViewMode(mode);
+    localStorage.setItem("photomanager-photo-view", mode);
+    if (compareMode && mode !== "masonry") {
+      setCompareMode(false);
+      setCompareLockedId(null);
+    }
+  };
+
   // Custom Tagging dialog
   const handleBatchAddTag = async () => {
     const tagName = prompt("请输入要为选中照片批量添加的标签名称：");
@@ -431,6 +473,97 @@ export default function TimelineGrid({
     );
   };
 
+  const renderIconGrid = () => (
+    <div className="finder-icon-grid">
+      {photos.map((photo) => {
+        const isSelected = selectedIds.includes(photo.id);
+        return (
+          <div
+            key={photo.id}
+            className={`finder-icon-item ${isSelected ? "selected" : ""}`}
+            onClick={(e) => handlePhotoSelect(photo, e)}
+          >
+            <div className="finder-icon-thumbnail">
+              <ThumbnailImage id={photo.id} alt={photo.filename} scrollRoot={gridScrollRef} fit="cover" />
+              {photo.is_favorite && <span className="finder-favorite-badge">♥</span>}
+              {photo.file_type !== "JPG" && photo.file_type !== "JPEG" && (
+                <span className="finder-type-badge">{photo.file_type}</span>
+              )}
+            </div>
+            <div className="finder-icon-name" title={photo.filename}>{photo.filename}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  const renderListView = () => (
+    <div className="finder-list" role="table" aria-label="照片列表">
+      <div className="finder-list-header" role="row">
+        <span>名称</span><span>拍摄日期</span><span>类型</span><span>大小</span><span>尺寸</span>
+      </div>
+      {photos.map((photo) => {
+        const isSelected = selectedIds.includes(photo.id);
+        return (
+          <div
+            key={photo.id}
+            className={`finder-list-row ${isSelected ? "selected" : ""}`}
+            role="row"
+            onClick={(e) => handlePhotoSelect(photo, e)}
+          >
+            <span className="finder-list-name">
+              <span className="finder-list-thumb">
+                <ThumbnailImage id={photo.id} alt="" scrollRoot={gridScrollRef} fit="cover" />
+              </span>
+              <span title={photo.filename}>{photo.is_favorite ? "♥ " : ""}{photo.filename}</span>
+            </span>
+            <span>{photo.date_taken || "—"}</span>
+            <span>{photo.file_type}</span>
+            <span>{(photo.file_size / (1024 * 1024)).toFixed(2)} MB</span>
+            <span>{photo.width && photo.height ? `${photo.width} × ${photo.height}` : "—"}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  const galleryPhoto = primaryPhoto || photos[0];
+  const renderGalleryView = () => galleryPhoto && (
+    <div className="finder-gallery">
+      <div
+        className="finder-gallery-stage"
+        onDoubleClick={() => onPhotoClick(photos, photos.findIndex((photo) => photo.id === galleryPhoto.id))}
+      >
+        <GalleryPreviewImage id={galleryPhoto.id} alt={galleryPhoto.filename} />
+        <div className="finder-gallery-caption">
+          <strong>{galleryPhoto.filename}</strong>
+          <span>{galleryPhoto.date_taken || "日期未知"} · {(galleryPhoto.file_size / (1024 * 1024)).toFixed(2)} MB</span>
+        </div>
+      </div>
+      <div className="finder-gallery-filmstrip" aria-label="照片胶片带">
+        {photos.map((photo) => (
+          <button
+            type="button"
+            key={photo.id}
+            className={`finder-gallery-film ${galleryPhoto.id === photo.id ? "active" : ""}`}
+            onClick={(e) => handleGallerySelect(photo, e)}
+            onDoubleClick={() => onPhotoClick(photos, photos.findIndex((item) => item.id === photo.id))}
+            title={photo.filename}
+          >
+            <ThumbnailImage id={photo.id} alt={photo.filename} scrollRoot={gridScrollRef} fit="cover" />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
+  const renderCurrentView = () => {
+    if (viewMode === "list") return renderListView();
+    if (viewMode === "icons") return renderIconGrid();
+    if (viewMode === "gallery") return renderGalleryView();
+    return renderMasonryGrid();
+  };
+
   return (
     <div className="timeline-viewport animate-fade-in" style={{ display: "flex", flexDirection: "column", height: "100%", width: "100%", overflow: "hidden" }}>
       
@@ -482,6 +615,27 @@ export default function TimelineGrid({
             <option value="5">5星专属</option>
           </select>
         </div>
+
+        <div className="finder-view-switcher" role="group" aria-label="预览方式">
+          {[
+            ["list", "☷", "列表"],
+            ["icons", "▦", "图标"],
+            ["gallery", "▣", "画廊"],
+            ["masonry", "▥", "瀑布流"],
+          ].map(([mode, icon, label]) => (
+            <button
+              type="button"
+              key={mode}
+              className={viewMode === mode ? "active" : ""}
+              onClick={() => handleViewModeChange(mode)}
+              title={`${label}视图`}
+              aria-label={`${label}视图`}
+              aria-pressed={viewMode === mode}
+            >
+              <span aria-hidden="true">{icon}</span><small>{label}</small>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Main Grid display area */}
@@ -512,10 +666,7 @@ export default function TimelineGrid({
                 </div>
               </div>
             </div>
-          ) : (
-            /* Standard Masonry view */
-            renderMasonryGrid()
-          )}
+          ) : renderCurrentView()}
         </div>
 
         {/* Right drawer properties panel */}

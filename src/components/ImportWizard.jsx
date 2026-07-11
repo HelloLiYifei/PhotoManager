@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { loadPathThumbnail } from "../lib/thumbnailLoader";
 
 // Sub-component to lazy load locally cached preview URLs from a storage path
-function CardThumbnailImage({ path, isRaw, scrollRoot }) {
+function CardThumbnailImage({ path, isRaw, scrollRoot, fit = "natural" }) {
   const [src, setSrc] = useState(null);
   const [loading, setLoading] = useState(true);
   const [aspectRatio, setAspectRatio] = useState("4 / 3");
@@ -53,8 +53,8 @@ function CardThumbnailImage({ path, isRaw, scrollRoot }) {
   return (
     <div
       ref={imgRef}
-      className="import-thumbnail-frame"
-      style={{ aspectRatio }}
+      className={`import-thumbnail-frame is-${fit}`}
+      style={{ aspectRatio: fit === "natural" ? aspectRatio : undefined }}
     >
       {loading ? (
         <div style={{ width: "16px", height: "16px", borderRadius: "50%", border: "2px solid rgba(255,255,255,0.1)", borderTopColor: "var(--accent-color)", animation: "spin 1s linear infinite" }} />
@@ -65,7 +65,7 @@ function CardThumbnailImage({ path, isRaw, scrollRoot }) {
           decoding="async"
           onLoad={(event) => {
             const { naturalWidth, naturalHeight } = event.currentTarget;
-            if (naturalWidth > 0 && naturalHeight > 0) {
+            if (fit === "natural" && naturalWidth > 0 && naturalHeight > 0) {
               setAspectRatio(`${naturalWidth} / ${naturalHeight}`);
             }
           }}
@@ -111,6 +111,11 @@ export default function ImportWizard({ onClose, onImportComplete }) {
   const gridContainerRef = useRef(null);
   const sentinelRef = useRef(null);
   const [visibleLimit, setVisibleLimit] = useState(64);
+  const [viewMode, setViewMode] = useState(() => {
+    const saved = localStorage.getItem("photomanager-import-view");
+    return ["list", "icons", "gallery", "masonry"].includes(saved) ? saved : "masonry";
+  });
+  const [galleryPath, setGalleryPath] = useState(null);
   const importedCount = photos.filter((photo) => photo.already_imported).length;
   const alreadyImportedPaths = new Set(
     photos.filter((photo) => photo.already_imported).map((photo) => photo.absolute_path)
@@ -177,10 +182,12 @@ export default function ImportWizard({ onClose, onImportComplete }) {
     setVisibleLimit(64);
     setSelectedPaths([]);
     setPhotoAlbums({});
+    setGalleryPath(null);
     try {
       // scan_card takes (state, path)
       const list = await invoke("scan_card", { path });
       setPhotos(list);
+      setGalleryPath(list[0]?.absolute_path || null);
       // Auto-checkmark files that are NOT already imported
       const freshPaths = list.filter(p => !p.already_imported).map(p => p.absolute_path);
       setSelectedPaths(freshPaths);
@@ -276,29 +283,24 @@ export default function ImportWizard({ onClose, onImportComplete }) {
   // Toggle checkmark selection
   const toggleSelectPhoto = (path) => {
     if (alreadyImportedPaths.has(path)) return;
-
-    if (selectedPaths.includes(path)) {
-      setSelectedPaths(selectedPaths.filter(p => p !== path));
-    } else {
-      setSelectedPaths([...selectedPaths, path]);
-    }
+    setSelectedPaths((current) => current.includes(path)
+      ? current.filter((selectedPath) => selectedPath !== path)
+      : [...current, path]
+    );
   };
 
   // Apply brush coloring (either click or drag)
-  const applyBrushColor = (path) => {
+  const applyBrushColor = (path, toggleExisting = true) => {
     if (brushAlbum) {
-      if (photoAlbums[path] === brushAlbum) {
-        // Deselect colored album, reverts to default
-        const updated = { ...photoAlbums };
-        delete updated[path];
-        setPhotoAlbums(updated);
-      } else {
-        // Color it with brush album
-        setPhotoAlbums({
-          ...photoAlbums,
-          [path]: brushAlbum,
-        });
-      }
+      setPhotoAlbums((current) => {
+        const updated = { ...current };
+        if (current[path] === brushAlbum) {
+          if (toggleExisting) delete updated[path];
+        } else {
+          updated[path] = brushAlbum;
+        }
+        return updated;
+      });
     } else {
       toggleSelectPhoto(path);
     }
@@ -387,6 +389,199 @@ export default function ImportWizard({ onClose, onImportComplete }) {
   photos.slice(0, visibleLimit).forEach((photo, index) => {
     previewColumns[index % previewColumns.length].push(photo);
   });
+  const visiblePhotos = photos.slice(0, visibleLimit);
+  const galleryPhoto = photos.find((photo) => photo.absolute_path === galleryPath) || photos[0];
+
+  const handleViewModeChange = (mode) => {
+    setViewMode(mode);
+    localStorage.setItem("photomanager-import-view", mode);
+  };
+
+  const photoVisualState = (photo) => {
+    const targetAlbum = photoAlbums[photo.absolute_path];
+    return {
+      isChecked: selectedPaths.includes(photo.absolute_path),
+      targetAlbum,
+      albumColor: targetAlbum ? getAlbumColor(targetAlbum) : "transparent",
+    };
+  };
+
+  const handlePhotoPointerDown = (photo, event) => {
+    event.preventDefault();
+    if (photo.already_imported) return;
+    applyBrushColor(photo.absolute_path);
+  };
+
+  const handlePhotoPointerEnter = (photo) => {
+    if (isMouseDownRef.current && !photo.already_imported) {
+      applyBrushColor(photo.absolute_path, false);
+    }
+  };
+
+  const handleGalleryPointerDown = (photo, event) => {
+    event.preventDefault();
+    setGalleryPath(photo.absolute_path);
+    if (brushAlbum && !photo.already_imported) {
+      applyBrushColor(photo.absolute_path);
+    }
+  };
+
+  const renderImportMarkers = (photo) => {
+    const { isChecked, targetAlbum, albumColor } = photoVisualState(photo);
+    return (
+      <>
+        {!photo.already_imported && (
+          <button
+            type="button"
+            className={`import-checkmark ${isChecked ? "checked" : ""}`}
+            onMouseDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              toggleSelectPhoto(photo.absolute_path);
+            }}
+            aria-label={isChecked ? "取消选择" : "选择导入"}
+          >
+            {isChecked && "✓"}
+          </button>
+        )}
+        {photo.already_imported && <div className="already-imported-badge">已存在</div>}
+        {targetAlbum && (
+          <div className="import-album-overlay" style={{ background: albumColor }}>
+            📂 {targetAlbum}
+          </div>
+        )}
+        {photo.is_raw && <div className="photo-card-badge import-raw-badge">RAW</div>}
+      </>
+    );
+  };
+
+  const renderImportIconView = () => (
+    <div className="import-icon-grid">
+      {visiblePhotos.map((photo) => {
+        const { isChecked, targetAlbum, albumColor } = photoVisualState(photo);
+        return (
+          <div
+            key={photo.absolute_path}
+            className={`import-icon-item ${isChecked ? "selected" : ""} ${photo.already_imported ? "already-imported" : ""}`}
+            style={{ "--album-color": albumColor, borderColor: photo.already_imported ? "#10b981" : targetAlbum ? albumColor : undefined }}
+            onMouseDown={(event) => handlePhotoPointerDown(photo, event)}
+            onMouseEnter={() => handlePhotoPointerEnter(photo)}
+          >
+            <div className="import-icon-thumbnail">
+              <CardThumbnailImage path={photo.absolute_path} isRaw={photo.is_raw} scrollRoot={gridContainerRef} fit="cover" />
+              {renderImportMarkers(photo)}
+            </div>
+            <div className="import-icon-name" title={photo.relative_path}>{photo.relative_path}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  const renderImportListView = () => (
+    <div className="import-list-view" role="table" aria-label="存储卡照片列表">
+      <div className="import-list-header" role="row">
+        <span>名称</span><span>拍摄日期</span><span>类型</span><span>大小</span><span>导入状态 / 相册</span>
+      </div>
+      {visiblePhotos.map((photo) => {
+        const { isChecked, targetAlbum, albumColor } = photoVisualState(photo);
+        return (
+          <div
+            key={photo.absolute_path}
+            className={`import-list-row ${isChecked ? "selected" : ""} ${photo.already_imported ? "already-imported" : ""}`}
+            style={{ "--album-color": albumColor }}
+            role="row"
+            onMouseDown={(event) => handlePhotoPointerDown(photo, event)}
+            onMouseEnter={() => handlePhotoPointerEnter(photo)}
+          >
+            <span className="import-list-name">
+              <span className="import-list-thumb">
+                <CardThumbnailImage path={photo.absolute_path} isRaw={photo.is_raw} scrollRoot={gridContainerRef} fit="cover" />
+              </span>
+              <span title={photo.relative_path}>{photo.relative_path}</span>
+            </span>
+            <span>{photo.date_taken || "—"}</span>
+            <span>{photo.is_raw ? "RAW" : photo.relative_path.split(".").pop()?.toUpperCase()}</span>
+            <span>{(photo.size / (1024 * 1024)).toFixed(2)} MB</span>
+            <span className="import-list-status">
+              {photo.already_imported ? (
+                <strong className="is-imported">✓ 已导入</strong>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className={`import-list-check ${isChecked ? "checked" : ""}`}
+                    onMouseDown={(event) => event.stopPropagation()}
+                    onClick={(event) => { event.stopPropagation(); toggleSelectPhoto(photo.absolute_path); }}
+                  >{isChecked ? "✓ 已选择" : "未选择"}</button>
+                  {targetAlbum && <strong style={{ color: albumColor }}>● {targetAlbum}</strong>}
+                </>
+              )}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  const renderImportGalleryView = () => galleryPhoto && (
+    <div className="import-gallery-view">
+      <div
+        className={`import-gallery-stage ${galleryPhoto.already_imported ? "already-imported" : ""}`}
+        style={{
+          "--album-color": photoVisualState(galleryPhoto).albumColor,
+          borderColor: galleryPhoto.already_imported
+            ? "#10b981"
+            : photoVisualState(galleryPhoto).targetAlbum
+            ? photoVisualState(galleryPhoto).albumColor
+            : photoVisualState(galleryPhoto).isChecked
+            ? "var(--primary-start)"
+            : undefined,
+        }}
+        onMouseDown={(event) => {
+          if (brushAlbum) handlePhotoPointerDown(galleryPhoto, event);
+        }}
+      >
+        <CardThumbnailImage path={galleryPhoto.absolute_path} isRaw={galleryPhoto.is_raw} scrollRoot={gridContainerRef} fit="contain" />
+        {renderImportMarkers(galleryPhoto)}
+        <div className="import-gallery-caption">
+          <strong>{galleryPhoto.relative_path}</strong>
+          <span>{galleryPhoto.date_taken} · {(galleryPhoto.size / (1024 * 1024)).toFixed(2)} MB</span>
+        </div>
+      </div>
+      <div className="import-gallery-filmstrip" aria-label="存储卡照片胶片带">
+        {photos.map((photo) => {
+          const { isChecked, targetAlbum, albumColor } = photoVisualState(photo);
+          return (
+            <button
+              type="button"
+              key={photo.absolute_path}
+              className={`import-gallery-film ${galleryPhoto.absolute_path === photo.absolute_path ? "active" : ""} ${isChecked ? "selected" : ""} ${photo.already_imported ? "already-imported" : ""}`}
+              style={{
+                "--album-color": albumColor,
+                borderColor: photo.already_imported
+                  ? "#10b981"
+                  : targetAlbum
+                  ? albumColor
+                  : isChecked
+                  ? "var(--primary-start)"
+                  : undefined,
+              }}
+              onMouseDown={(event) => handleGalleryPointerDown(photo, event)}
+              onMouseEnter={() => {
+                if (brushAlbum) handlePhotoPointerEnter(photo);
+              }}
+              title={photo.relative_path}
+            >
+              <CardThumbnailImage path={photo.absolute_path} isRaw={photo.is_raw} scrollRoot={gridContainerRef} fit="cover" />
+              {photo.already_imported && <span className="import-film-status imported">已导入</span>}
+              {!photo.already_imported && targetAlbum && <span className="import-film-status" style={{ background: albumColor }}>{targetAlbum}</span>}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 
   return (
     <div className="wizard-overlay fullscreen">
@@ -605,12 +800,41 @@ export default function ImportWizard({ onClose, onImportComplete }) {
               </div>
             ) : (
               <>
+                <div className="import-browser-toolbar">
+                  <div>
+                    <strong>{photos.length} 张照片</strong>
+                    <span>已选择 {selectedImportPaths.length} 张</span>
+                  </div>
+                  <div className="finder-view-switcher" role="group" aria-label="导入图片预览方式">
+                    {[
+                      ["list", "☷", "列表"],
+                      ["icons", "▦", "图标"],
+                      ["gallery", "▣", "画廊"],
+                      ["masonry", "▥", "瀑布流"],
+                    ].map(([mode, icon, label]) => (
+                      <button
+                        type="button"
+                        key={mode}
+                        className={viewMode === mode ? "active" : ""}
+                        onClick={() => handleViewModeChange(mode)}
+                        aria-label={`${label}视图`}
+                        aria-pressed={viewMode === mode}
+                        title={`${label}视图`}
+                      >
+                        <span aria-hidden="true">{icon}</span><small>{label}</small>
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 {importedCount > 0 && (
                   <div className="already-imported-summary" role="status">
                     已检测到 {importedCount} 张照片曾导入当前仓库，已用绿色标记并取消选择。
                   </div>
                 )}
-                <div className="wizard-photos-grid">
+                {viewMode === "list" ? renderImportListView() :
+                  viewMode === "icons" ? renderImportIconView() :
+                  viewMode === "gallery" ? renderImportGalleryView() : (
+                  <div className="wizard-photos-grid">
                 {previewColumns.map((column, columnIndex) => (
                   <div className="wizard-photo-column" key={columnIndex}>
                     {column.map((photo) => {
@@ -623,16 +847,8 @@ export default function ImportWizard({ onClose, onImportComplete }) {
                         <div
                           key={photo.absolute_path}
                           className={`wizard-photo-card ${photo.already_imported ? "already-imported" : ""}`}
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            if (photo.already_imported) return; // Prevent tagging already imported photos
-                            applyBrushColor(photo.absolute_path);
-                          }}
-                          onMouseEnter={() => {
-                            if (isMouseDownRef.current && !photo.already_imported) {
-                              applyBrushColor(photo.absolute_path);
-                            }
-                          }}
+                          onMouseDown={(event) => handlePhotoPointerDown(photo, event)}
+                          onMouseEnter={() => handlePhotoPointerEnter(photo)}
                           style={{
                             border: photo.already_imported
                               ? "2px solid #10B981"
@@ -654,6 +870,7 @@ export default function ImportWizard({ onClose, onImportComplete }) {
                             {/* Checkmarked top checkbox */}
                             {!photo.already_imported && (
                               <div
+                                onMouseDown={(e) => e.stopPropagation()}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   toggleSelectPhoto(photo.absolute_path);
@@ -720,12 +937,13 @@ export default function ImportWizard({ onClose, onImportComplete }) {
                     })}
                   </div>
                 ))}
-                {visibleLimit < photos.length && (
+                </div>
+                )}
+                {viewMode !== "gallery" && visibleLimit < photos.length && (
                   <div ref={sentinelRef} className="wizard-preview-sentinel">
                     正在准备更多预览…
                   </div>
                 )}
-                </div>
               </>
             )}
 

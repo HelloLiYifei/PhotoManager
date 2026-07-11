@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { loadPhotoThumbnail } from "../lib/thumbnailLoader";
+import { loadPhotoPreview } from "../lib/previewLoader";
 
 // Sub-component to lazy load thumbnail URLs through the local media protocol
 function ThumbnailImage({ id, alt, scrollRoot }) {
@@ -72,10 +73,10 @@ function ComparePreviewImage({ id }) {
 
   useEffect(() => {
     let active = true;
-    invoke("get_photo_preview_base64", { id })
-      .then((b64) => {
+    loadPhotoPreview(id)
+      .then((url) => {
         if (active) {
-          setSrc(b64);
+          setSrc(url);
           setLoading(false);
         }
       })
@@ -90,7 +91,7 @@ function ComparePreviewImage({ id }) {
     return <div style={{ color: "var(--text-muted)", fontSize: "14px" }}>正在读取高清对比图...</div>;
   }
 
-  return <img src={src} className="compare-locked-img" alt="对比锁定图" />;
+  return <img src={src} className="compare-locked-img" alt="对比锁定图" decoding="async" />;
 }
 
 export default function TimelineGrid({

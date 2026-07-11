@@ -29,7 +29,7 @@ pub fn run() {
             commands::delete_photo,
             commands::permanently_delete_photo,
             commands::get_photo_thumbnail_url,
-            commands::get_photo_preview_base64,
+            commands::get_photo_preview_url,
             commands::get_albums,
             commands::create_album,
             commands::delete_album,

@@ -4,7 +4,6 @@ use std::path::Path;
 use tauri::{AppHandle, State};
 use uuid::Uuid;
 use chrono::Utc;
-use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64_ENGINE};
 
 use crate::db::{map_row_to_photo, Album, DbState, Photo};
 use crate::workspace::{load_workspaces, save_workspaces, open_workspace_db, Workspace};
@@ -345,62 +344,24 @@ pub async fn get_photo_thumbnail_url(state: State<'_, DbState>, id: String) -> R
 }
 
 #[tauri::command]
-pub async fn get_photo_preview_base64(state: State<'_, DbState>, id: String) -> Result<String, String> {
-    let (workspace_root, relative_path, file_type) = {
+pub async fn get_photo_preview_url(
+    state: State<'_, DbState>,
+    id: String,
+) -> Result<String, String> {
+    {
         let current_path_guard = state.current_path.lock().unwrap();
-        let workspace_root = current_path_guard.as_ref().ok_or("没有打开的工作空间")?.clone();
+        current_path_guard.as_ref().ok_or("没有打开的工作空间")?;
 
         let conn_guard = state.conn.lock().unwrap();
         let conn = conn_guard.as_ref().ok_or("数据库未连接")?;
-
-        let mut stmt = conn
-            .prepare("SELECT path, file_type FROM photos WHERE id = ?1")
+        conn.query_row("SELECT 1 FROM photos WHERE id = ?1", [&id], |_| Ok(()))
             .map_err(|e| e.to_string())?;
-        
-        let (rel_path, f_type): (String, String) = stmt
-            .query_row([&id], |row| Ok((row.get(0)?, row.get(1)?)))
-            .map_err(|e| e.to_string())?;
-        (workspace_root, rel_path, f_type)
-    };
+    }
 
-    tokio::task::spawn_blocking(move || {
-        let photo_physical_path = Path::new(&workspace_root).join(&relative_path);
-        if !photo_physical_path.exists() {
-            return Err("照片原文件不存在".to_string());
-        }
-
-        let is_raw = matches!(file_type.to_lowercase().as_str(), "arw" | "cr2" | "nef");
-
-        let bytes = if is_raw {
-            crate::metadata::extract_raw_preview(&photo_physical_path)
-                .map_err(|e| format!("RAW预览图提取失败: {}", e))?
-        } else {
-            fs::read(&photo_physical_path).map_err(|e| e.to_string())?
-        };
-
-        let img = image::load_from_memory(&bytes)
-            .map_err(|e| format!("图片解码失败: {}", e))?;
-        
-        let orientation = crate::metadata::get_orientation(&photo_physical_path);
-        let mut img = if orientation != 1 {
-            crate::metadata::rotate_image(img, orientation)
-        } else {
-            img
-        };
-
-        if img.width() > 1600 || img.height() > 1600 {
-            img = img.resize(1600, 1600, image::imageops::FilterType::Lanczos3);
-        }
-
-        let mut buffer = std::io::Cursor::new(Vec::new());
-        img.write_to(&mut buffer, image::ImageFormat::Jpeg)
-            .map_err(|e| format!("图片压缩失败: {}", e))?;
-
-        let b64 = BASE64_ENGINE.encode(buffer.into_inner());
-        Ok(format!("data:image/jpeg;base64,{}", b64))
-    })
-    .await
-    .map_err(|e| e.to_string())?
+    // The media protocol streams encoded image bytes straight to WebView2.
+    // This avoids a full Rust decode + resize + JPEG encode and the additional
+    // base64 copy over Tauri IPC on every open.
+    Ok(crate::media::photo_preview_url(&id))
 }
 
 // --- ALBUM COMMANDS ---

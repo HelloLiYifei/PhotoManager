@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { loadPhotoThumbnail } from "../lib/thumbnailLoader";
+import { loadPhotoPreview, prefetchPhotoPreview } from "../lib/previewLoader";
 
 export default function LightboxViewer({
   photosList,
@@ -9,13 +11,41 @@ export default function LightboxViewer({
 }) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [previewSrc, setPreviewSrc] = useState(null);
+  const [thumbnailSrc, setThumbnailSrc] = useState(null);
   const [loading, setLoading] = useState(true);
   
   const currentPhoto = photosList[currentIndex];
 
   useEffect(() => {
-    loadPreview();
-  }, [currentIndex]);
+    let active = true;
+    setLoading(true);
+    setPreviewSrc(null);
+    setThumbnailSrc(null);
+
+    loadPhotoThumbnail(currentPhoto.id)
+      .then((url) => {
+        if (active) setThumbnailSrc(url);
+      })
+      .catch(() => {});
+
+    loadPhotoPreview(currentPhoto.id)
+      .then((url) => {
+        if (active) setPreviewSrc(url);
+      })
+      .catch((error) => {
+        console.error(error);
+        if (active) setLoading(false);
+      });
+
+    // Warm both navigation directions. The browser keeps encoded bytes and
+    // decoded surfaces in its native image cache, making the next switch fast.
+    prefetchPhotoPreview(photosList[currentIndex - 1]?.id);
+    prefetchPhotoPreview(photosList[currentIndex + 1]?.id);
+
+    return () => {
+      active = false;
+    };
+  }, [currentIndex, currentPhoto?.id, photosList]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -31,20 +61,6 @@ export default function LightboxViewer({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [currentIndex, photosList.length]);
-
-  const loadPreview = async () => {
-    if (!currentPhoto) return;
-    setLoading(true);
-    setPreviewSrc(null);
-    try {
-      const b64 = await invoke("get_photo_preview_base64", { id: currentPhoto.id });
-      setPreviewSrc(b64);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handlePrev = () => {
     if (currentIndex > 0) {
@@ -147,14 +163,31 @@ export default function LightboxViewer({
         )}
 
         <div className="lightbox-image-container">
-          {loading ? (
-            <div style={{ color: "var(--text-muted)", fontSize: "14px", display: "flex", flexDirection: "column", gap: "10px", alignItems: "center" }}>
+          {thumbnailSrc && (
+            <img
+              key={`thumbnail-${currentPhoto.id}`}
+              src={thumbnailSrc}
+              alt=""
+              className={`lightbox-image lightbox-thumbnail ${loading ? "visible" : ""}`}
+            />
+          )}
+          {loading && !thumbnailSrc && (
+            <div className="lightbox-loading" style={{ color: "var(--text-muted)", fontSize: "14px", display: "flex", flexDirection: "column", gap: "10px", alignItems: "center" }}>
               <div className="photo-card-img" style={{ width: "40px", height: "40px", borderRadius: "50%", border: "2px solid rgba(255,255,255,0.1)", borderTopColor: "var(--accent-color)", animation: "spin 1s linear infinite" }} />
-              正在加载高清大图...
+              正在打开大图...
               <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
             </div>
-          ) : (
-            <img src={previewSrc || "/placeholder.svg"} alt={currentPhoto.filename} className="lightbox-image" />
+          )}
+          {previewSrc && (
+            <img
+              key={`preview-${currentPhoto.id}`}
+              src={previewSrc}
+              alt={currentPhoto.filename}
+              className={`lightbox-image lightbox-full-image ${loading ? "loading" : "loaded"}`}
+              decoding="async"
+              onLoad={() => setLoading(false)}
+              onError={() => setLoading(false)}
+            />
           )}
         </div>
 

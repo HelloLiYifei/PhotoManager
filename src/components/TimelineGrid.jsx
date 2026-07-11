@@ -136,6 +136,8 @@ export default function TimelineGrid({
   const [primaryTags, setPrimaryTags] = useState([]);
   const [newTagInput, setNewTagInput] = useState("");
   const gridScrollRef = useRef(null);
+  const galleryContainerRef = useRef(null);
+  const galleryWheelTimeRef = useRef(0);
 
   // Compare mode states
   const [compareMode, setCompareMode] = useState(false);
@@ -412,6 +414,12 @@ export default function TimelineGrid({
     }
   };
 
+  useEffect(() => {
+    if (viewMode !== "gallery") return undefined;
+    const frame = requestAnimationFrame(() => galleryContainerRef.current?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [viewMode]);
+
   // Custom Tagging dialog
   const handleBatchAddTag = async () => {
     const tagName = prompt("请输入要为选中照片批量添加的标签名称：");
@@ -528,17 +536,68 @@ export default function TimelineGrid({
   );
 
   const galleryPhoto = primaryPhoto || photos[0];
+  const galleryIndex = galleryPhoto ? photos.findIndex((photo) => photo.id === galleryPhoto.id) : -1;
+
+  const navigateGallery = (nextIndex) => {
+    if (photos.length === 0) return;
+    const boundedIndex = Math.max(0, Math.min(photos.length - 1, nextIndex));
+    const nextPhoto = photos[boundedIndex];
+    setSelectedIds([nextPhoto.id]);
+    setPrimaryPhoto(nextPhoto);
+  };
+
+  const handleGalleryKeyDown = (event) => {
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      navigateGallery(galleryIndex - 1);
+    } else if (event.key === "ArrowRight") {
+      event.preventDefault();
+      navigateGallery(galleryIndex + 1);
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      navigateGallery(0);
+    } else if (event.key === "End") {
+      event.preventDefault();
+      navigateGallery(photos.length - 1);
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      onPhotoClick(photos, galleryIndex);
+    }
+  };
+
+  const handleGalleryWheel = (event) => {
+    const now = Date.now();
+    if (now - galleryWheelTimeRef.current < 180) return;
+    const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
+    if (Math.abs(delta) < 8) return;
+    event.preventDefault();
+    galleryWheelTimeRef.current = now;
+    navigateGallery(galleryIndex + (delta > 0 ? 1 : -1));
+  };
+
   const renderGalleryView = () => galleryPhoto && (
-    <div className="finder-gallery">
+    <div
+      ref={galleryContainerRef}
+      className={`finder-gallery ${selectedIds.length > 0 ? "has-action-toolbar" : ""}`}
+      tabIndex={0}
+      onKeyDown={handleGalleryKeyDown}
+    >
       <div
         className="finder-gallery-stage"
+        onWheel={handleGalleryWheel}
         onDoubleClick={() => onPhotoClick(photos, photos.findIndex((photo) => photo.id === galleryPhoto.id))}
       >
+        {galleryIndex > 0 && (
+          <button type="button" className="gallery-stage-nav prev" onClick={() => navigateGallery(galleryIndex - 1)} aria-label="上一张">‹</button>
+        )}
         <GalleryPreviewImage id={galleryPhoto.id} alt={galleryPhoto.filename} />
         <div className="finder-gallery-caption">
           <strong>{galleryPhoto.filename}</strong>
           <span>{galleryPhoto.date_taken || "日期未知"} · {(galleryPhoto.file_size / (1024 * 1024)).toFixed(2)} MB</span>
         </div>
+        {galleryIndex < photos.length - 1 && (
+          <button type="button" className="gallery-stage-nav next" onClick={() => navigateGallery(galleryIndex + 1)} aria-label="下一张">›</button>
+        )}
       </div>
       <div className="finder-gallery-filmstrip" aria-label="照片胶片带">
         {photos.map((photo) => (

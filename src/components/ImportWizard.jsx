@@ -110,6 +110,8 @@ export default function ImportWizard({ onClose, onImportComplete }) {
   
   const gridContainerRef = useRef(null);
   const sentinelRef = useRef(null);
+  const galleryContainerRef = useRef(null);
+  const galleryWheelTimeRef = useRef(0);
   const [visibleLimit, setVisibleLimit] = useState(64);
   const [viewMode, setViewMode] = useState(() => {
     const saved = localStorage.getItem("photomanager-import-view");
@@ -161,6 +163,12 @@ export default function ImportWizard({ onClose, onImportComplete }) {
     detectDrives();
     loadAlbumsList();
   }, []);
+
+  useEffect(() => {
+    if (viewMode !== "gallery") return undefined;
+    const frame = requestAnimationFrame(() => galleryContainerRef.current?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [viewMode]);
 
   const detectDrives = async () => {
     try {
@@ -552,8 +560,52 @@ export default function ImportWizard({ onClose, onImportComplete }) {
     </div>
   );
 
+  const importGalleryIndex = galleryPhoto
+    ? filteredPhotos.findIndex((photo) => photo.absolute_path === galleryPhoto.absolute_path)
+    : -1;
+
+  const navigateImportGallery = (nextIndex) => {
+    if (filteredPhotos.length === 0) return;
+    const boundedIndex = Math.max(0, Math.min(filteredPhotos.length - 1, nextIndex));
+    setGalleryPath(filteredPhotos[boundedIndex].absolute_path);
+  };
+
+  const handleImportGalleryKeyDown = (event) => {
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      navigateImportGallery(importGalleryIndex - 1);
+    } else if (event.key === "ArrowRight") {
+      event.preventDefault();
+      navigateImportGallery(importGalleryIndex + 1);
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      navigateImportGallery(0);
+    } else if (event.key === "End") {
+      event.preventDefault();
+      navigateImportGallery(filteredPhotos.length - 1);
+    } else if ((event.key === "Enter" || event.key === " ") && brushAlbum && galleryPhoto) {
+      event.preventDefault();
+      applyBrushColor(galleryPhoto.absolute_path);
+    }
+  };
+
+  const handleImportGalleryWheel = (event) => {
+    const now = Date.now();
+    if (now - galleryWheelTimeRef.current < 180) return;
+    const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
+    if (Math.abs(delta) < 8) return;
+    event.preventDefault();
+    galleryWheelTimeRef.current = now;
+    navigateImportGallery(importGalleryIndex + (delta > 0 ? 1 : -1));
+  };
+
   const renderImportGalleryView = () => galleryPhoto && (
-    <div className="import-gallery-view">
+    <div
+      ref={galleryContainerRef}
+      className="import-gallery-view"
+      tabIndex={0}
+      onKeyDown={handleImportGalleryKeyDown}
+    >
       <div
         className={`import-gallery-stage ${galleryPhoto.already_imported ? "already-imported" : ""}`}
         style={{
@@ -569,13 +621,20 @@ export default function ImportWizard({ onClose, onImportComplete }) {
         onMouseDown={(event) => {
           if (brushAlbum) handlePhotoPointerDown(galleryPhoto, event);
         }}
+        onWheel={handleImportGalleryWheel}
       >
+        {importGalleryIndex > 0 && (
+          <button type="button" className="gallery-stage-nav prev" onMouseDown={(event) => event.stopPropagation()} onClick={() => navigateImportGallery(importGalleryIndex - 1)} aria-label="上一张">‹</button>
+        )}
         <CardThumbnailImage path={galleryPhoto.absolute_path} isRaw={galleryPhoto.is_raw} scrollRoot={gridContainerRef} fit="contain" />
         {renderImportMarkers(galleryPhoto)}
         <div className="import-gallery-caption">
           <strong>{galleryPhoto.relative_path}</strong>
           <span>{galleryPhoto.date_taken} · {(galleryPhoto.size / (1024 * 1024)).toFixed(2)} MB</span>
         </div>
+        {importGalleryIndex < filteredPhotos.length - 1 && (
+          <button type="button" className="gallery-stage-nav next" onMouseDown={(event) => event.stopPropagation()} onClick={() => navigateImportGallery(importGalleryIndex + 1)} aria-label="下一张">›</button>
+        )}
       </div>
       <div className="import-gallery-filmstrip" aria-label="存储卡照片胶片带">
         {filteredPhotos.map((photo) => {

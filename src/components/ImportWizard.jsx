@@ -118,6 +118,7 @@ export default function ImportWizard({ onClose, onImportComplete }) {
     return ["list", "icons", "gallery", "masonry"].includes(saved) ? saved : "masonry";
   });
   const [galleryPath, setGalleryPath] = useState(null);
+  const [focusedPreviewPath, setFocusedPreviewPath] = useState(null);
   const [hideImported, setHideImported] = useState(false);
   const [hideColored, setHideColored] = useState(false);
   const importedCount = photos.filter((photo) => photo.already_imported).length;
@@ -199,11 +200,13 @@ export default function ImportWizard({ onClose, onImportComplete }) {
     setSelectedPaths([]);
     setPhotoAlbums({});
     setGalleryPath(null);
+    setFocusedPreviewPath(null);
     try {
       // scan_card takes (state, path)
       const list = await invoke("scan_card", { path });
       setPhotos(list);
       setGalleryPath(list[0]?.absolute_path || null);
+      setFocusedPreviewPath(list[0]?.absolute_path || null);
       // Auto-checkmark files that are NOT already imported
       const freshPaths = list.filter(p => !p.already_imported).map(p => p.absolute_path);
       setSelectedPaths(freshPaths);
@@ -410,6 +413,9 @@ export default function ImportWizard({ onClose, onImportComplete }) {
   const handleViewModeChange = (mode) => {
     setViewMode(mode);
     localStorage.setItem("photomanager-import-view", mode);
+    if (mode === "gallery" && focusedPreviewPath) {
+      setGalleryPath(focusedPreviewPath);
+    }
   };
 
   const handleColorAll = () => {
@@ -450,6 +456,7 @@ export default function ImportWizard({ onClose, onImportComplete }) {
       : null;
     return {
       isChecked,
+      isFocused: focusedPreviewPath === photo.absolute_path,
       targetAlbum,
       albumColor: targetAlbum ? getAlbumColor(targetAlbum) : "transparent",
     };
@@ -457,6 +464,8 @@ export default function ImportWizard({ onClose, onImportComplete }) {
 
   const handlePhotoPointerDown = (photo, event) => {
     event.preventDefault();
+    setFocusedPreviewPath(photo.absolute_path);
+    setGalleryPath(photo.absolute_path);
     if (photo.already_imported || paintedPathsRef.current.has(photo.absolute_path)) return;
     paintedPathsRef.current.add(photo.absolute_path);
     applyBrushColor(photo.absolute_path);
@@ -474,6 +483,7 @@ export default function ImportWizard({ onClose, onImportComplete }) {
   const handleGalleryPointerDown = (photo, event) => {
     event.preventDefault();
     setGalleryPath(photo.absolute_path);
+    setFocusedPreviewPath(photo.absolute_path);
     if (brushAlbum
       && !photo.already_imported
       && !paintedPathsRef.current.has(photo.absolute_path)) {
@@ -500,11 +510,12 @@ export default function ImportWizard({ onClose, onImportComplete }) {
   const renderImportIconView = () => (
     <div className="import-icon-grid">
       {visiblePhotos.map((photo) => {
-        const { isChecked, targetAlbum, albumColor } = photoVisualState(photo);
+        const { isChecked, isFocused, targetAlbum, albumColor } = photoVisualState(photo);
         return (
           <div
             key={photo.absolute_path}
-            className={`import-icon-item ${isChecked ? "selected" : ""} ${photo.already_imported ? "already-imported" : ""}`}
+            className={`import-icon-item ${isChecked ? "selected" : ""} ${isFocused ? "preview-focused" : ""} ${photo.already_imported ? "already-imported" : ""}`}
+            aria-selected={isFocused}
             style={{ "--album-color": albumColor, borderColor: photo.already_imported ? "#10b981" : targetAlbum ? albumColor : undefined }}
             onMouseDown={(event) => handlePhotoPointerDown(photo, event)}
             onMouseEnter={() => handlePhotoPointerEnter(photo)}
@@ -526,13 +537,14 @@ export default function ImportWizard({ onClose, onImportComplete }) {
         <span>名称</span><span>拍摄日期</span><span>类型</span><span>大小</span><span>导入状态 / 相册</span>
       </div>
       {visiblePhotos.map((photo) => {
-        const { isChecked, targetAlbum, albumColor } = photoVisualState(photo);
+        const { isChecked, isFocused, targetAlbum, albumColor } = photoVisualState(photo);
         return (
           <div
             key={photo.absolute_path}
-            className={`import-list-row ${isChecked ? "selected" : ""} ${photo.already_imported ? "already-imported" : ""}`}
+            className={`import-list-row ${isChecked ? "selected" : ""} ${isFocused ? "preview-focused" : ""} ${photo.already_imported ? "already-imported" : ""}`}
             style={{ "--album-color": albumColor }}
             role="row"
+            aria-selected={isFocused}
             onMouseDown={(event) => handlePhotoPointerDown(photo, event)}
             onMouseEnter={() => handlePhotoPointerEnter(photo)}
           >
@@ -567,7 +579,9 @@ export default function ImportWizard({ onClose, onImportComplete }) {
   const navigateImportGallery = (nextIndex) => {
     if (filteredPhotos.length === 0) return;
     const boundedIndex = Math.max(0, Math.min(filteredPhotos.length - 1, nextIndex));
-    setGalleryPath(filteredPhotos[boundedIndex].absolute_path);
+    const path = filteredPhotos[boundedIndex].absolute_path;
+    setGalleryPath(path);
+    setFocusedPreviewPath(path);
   };
 
   const handleImportGalleryKeyDown = (event) => {
@@ -608,6 +622,7 @@ export default function ImportWizard({ onClose, onImportComplete }) {
     >
       <div
         className={`import-gallery-stage ${galleryPhoto.already_imported ? "already-imported" : ""}`}
+        aria-selected={focusedPreviewPath === galleryPhoto.absolute_path}
         style={{
           "--album-color": photoVisualState(galleryPhoto).albumColor,
           borderColor: galleryPhoto.already_imported
@@ -644,6 +659,7 @@ export default function ImportWizard({ onClose, onImportComplete }) {
               type="button"
               key={photo.absolute_path}
               className={`import-gallery-film ${galleryPhoto.absolute_path === photo.absolute_path ? "active" : ""} ${isChecked ? "selected" : ""} ${photo.already_imported ? "already-imported" : ""}`}
+              aria-selected={focusedPreviewPath === photo.absolute_path}
               style={{
                 "--album-color": albumColor,
                 borderColor: photo.already_imported
@@ -933,13 +949,14 @@ export default function ImportWizard({ onClose, onImportComplete }) {
                 {previewColumns.map((column, columnIndex) => (
                   <div className="wizard-photo-column" key={columnIndex}>
                     {column.map((photo) => {
-                      const { targetAlbum, albumColor } = photoVisualState(photo);
+                      const { isFocused, targetAlbum, albumColor } = photoVisualState(photo);
                       const hasColor = !!targetAlbum;
 
                       return (
                         <div
                           key={photo.absolute_path}
-                          className={`wizard-photo-card ${photo.already_imported ? "already-imported" : ""}`}
+                          className={`wizard-photo-card ${isFocused ? "preview-focused" : ""} ${photo.already_imported ? "already-imported" : ""}`}
+                          aria-selected={isFocused}
                           onMouseDown={(event) => handlePhotoPointerDown(photo, event)}
                           onMouseEnter={() => handlePhotoPointerEnter(photo)}
                           style={{

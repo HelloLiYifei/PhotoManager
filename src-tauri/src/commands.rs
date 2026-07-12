@@ -5,7 +5,7 @@ use tauri::{AppHandle, State};
 use uuid::Uuid;
 use chrono::Utc;
 
-use crate::db::{map_row_to_photo, Album, DbState, Photo};
+use crate::db::{map_row_to_photo, Album, AlbumSummary, DbState, Photo};
 use crate::workspace::{load_workspaces, save_workspaces, open_workspace_db, Workspace};
 use crate::scan::scan_workspace_dir;
 use crate::import::{detect_removable_cards, scan_card_files, execute_import, CardInfo, CardPhoto, ImportLocation, PhotoImportInfo};
@@ -404,6 +404,17 @@ pub fn get_albums(state: State<'_, DbState>) -> Result<Vec<Album>, String> {
     }
 
     Ok(albums)
+}
+
+#[tauri::command]
+pub fn get_album_summaries(state: State<'_, DbState>) -> Result<Vec<AlbumSummary>, String> {
+    let conn_guard = state.conn.lock().unwrap();
+    let conn = match &*conn_guard {
+        Some(conn) => conn,
+        None => return Ok(Vec::new()),
+    };
+
+    crate::db::query_album_summaries(conn).map_err(|error| error.to_string())
 }
 
 #[tauri::command]

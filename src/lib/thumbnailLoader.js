@@ -1,4 +1,5 @@
-import { invoke } from "@tauri-apps/api/core";
+import { getImageThumbnailUrl } from "../services/importService";
+import { getPhotoThumbnailUrl } from "../services/photoService";
 
 const MAX_CONCURRENT_REQUESTS = 6;
 const MAX_CACHE_ENTRIES = 180;
@@ -25,7 +26,7 @@ function runQueue() {
     const request = queue.shift();
     activeRequests += 1;
 
-    invoke(request.command, request.args)
+    request.load()
       .then((result) => {
         remember(request.key, result);
         request.resolve(result);
@@ -39,7 +40,7 @@ function runQueue() {
   }
 }
 
-function loadThumbnail(key, command, args, priority = 0) {
+function loadThumbnail(key, load, priority = 0) {
   const cached = cache.get(key);
   if (cached) {
     // Refresh the entry's position so frequently revisited views stay hot.
@@ -51,7 +52,7 @@ function loadThumbnail(key, command, args, priority = 0) {
   if (pending) return pending;
 
   const promise = new Promise((resolve, reject) => {
-    queue.push({ key, command, args, priority, resolve, reject });
+    queue.push({ key, load, priority, resolve, reject });
     runQueue();
   });
   inFlight.set(key, promise);
@@ -59,12 +60,13 @@ function loadThumbnail(key, command, args, priority = 0) {
 }
 
 export function loadPhotoThumbnail(id, priority) {
-  return loadThumbnail(`photo:${id}`, "get_photo_thumbnail_url", { id }, priority);
+  return loadThumbnail(`photo:${id}`, () => getPhotoThumbnailUrl({ id }), priority);
 }
 
 export function loadPathThumbnail(path, isRaw, priority) {
-  return loadThumbnail(`path:${path}:${isRaw}`, "get_image_thumbnail_url", {
-    path,
-    isRaw,
-  }, priority);
+  return loadThumbnail(
+    `path:${path}:${isRaw}`,
+    () => getImageThumbnailUrl({ path, isRaw }),
+    priority,
+  );
 }

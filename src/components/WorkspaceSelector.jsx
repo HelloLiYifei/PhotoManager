@@ -1,5 +1,11 @@
 import { useState, useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import {
+  createWorkspace,
+  deleteWorkspace,
+  getWorkspaces,
+  openWorkspace,
+  selectDirectory,
+} from "../services/workspaceService";
 
 export default function WorkspaceSelector({ onSelectWorkspace }) {
   const [workspaces, setWorkspaces] = useState([]);
@@ -14,9 +20,9 @@ export default function WorkspaceSelector({ onSelectWorkspace }) {
 
   const loadWorkspacesList = async () => {
     try {
-      const list = await invoke("get_workspaces");
+      const list = await getWorkspaces();
       // Sort by last opened descending
-      list.sort((a, b) => b.last_opened.localeCompare(a.last_opened));
+      list.sort((a, b) => b.lastOpened.localeCompare(a.lastOpened));
       setWorkspaces(list);
     } catch (e) {
       console.error(e);
@@ -31,7 +37,7 @@ export default function WorkspaceSelector({ onSelectWorkspace }) {
     }
     setErrorMsg("");
     try {
-      const ws = await invoke("create_workspace", {
+      const ws = await createWorkspace({
         name: newWsName.trim(),
         path: newWsPath.trim(),
       });
@@ -44,7 +50,7 @@ export default function WorkspaceSelector({ onSelectWorkspace }) {
   const handleOpenWorkspace = async (path) => {
     setErrorMsg("");
     try {
-      const ws = await invoke("open_workspace", { path });
+      const ws = await openWorkspace({ path });
       onSelectWorkspace(ws);
     } catch (err) {
       setErrorMsg(String(err));
@@ -57,7 +63,7 @@ export default function WorkspaceSelector({ onSelectWorkspace }) {
       return;
     }
     try {
-      await invoke("delete_workspace", { id });
+      await deleteWorkspace({ id });
       loadWorkspacesList();
     } catch (err) {
       alert(String(err));
@@ -72,7 +78,7 @@ export default function WorkspaceSelector({ onSelectWorkspace }) {
     }
     setErrorMsg("");
     try {
-      const ws = await invoke("open_workspace", { path: newWsPath.trim() });
+      const ws = await openWorkspace({ path: newWsPath.trim() });
       onSelectWorkspace(ws);
     } catch (err) {
       setErrorMsg(String(err));
@@ -81,7 +87,7 @@ export default function WorkspaceSelector({ onSelectWorkspace }) {
 
   const handleSelectFolder = async () => {
     try {
-      const selected = await invoke("select_directory");
+      const selected = await selectDirectory();
       if (selected) {
         setNewWsPath(selected);
         // Automatically extract folder name as warehouse name
@@ -112,8 +118,8 @@ export default function WorkspaceSelector({ onSelectWorkspace }) {
       </div>
 
       <div className="welcome-card glass-panel">
-        <h2 className="welcome-title gradient-text">智能相机相册导入管理系统</h2>
-        <p className="welcome-subtitle">开始您的专业级照片导入与整理之旅</p>
+        <h2 className="welcome-title gradient-text">PhotoManager</h2>
+        <p className="welcome-subtitle">专业、快速的本地照片导入与整理工具</p>
 
         {errorMsg && (
           <div style={{ color: "#EF4444", fontSize: "13px", background: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.2)", borderRadius: "8px", padding: "10px", marginBottom: "20px" }}>

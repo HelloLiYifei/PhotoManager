@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { loadPhotoThumbnail } from "../lib/thumbnailLoader";
+import { getPhotos } from "../services/photoService";
 
 const DEFAULT_ZOOM = 13;
 
@@ -108,7 +108,7 @@ export default function MapView({ onShowPhoto, focusedPhotoId = null }) {
   useEffect(() => {
     let active = true;
 
-    invoke("get_photos", {
+    getPhotos({
       search: null,
       favoriteOnly: false,
       deletedOnly: false,
@@ -243,11 +243,8 @@ export default function MapView({ onShowPhoto, focusedPhotoId = null }) {
 
   return (
     <div className="map-wrapper animate-fade-in">
-      <div className="map-header">
-        <div>
-          <h2>照片地图</h2>
-          <p>{gpsPhotos.length} 张照片，分布在 {locationGroups.length} 个位置。点击标记可查看照片。</p>
-        </div>
+      <div className="map-header map-header-summary" role="status">
+        <p>{gpsPhotos.length} 张照片，分布在 {locationGroups.length} 个位置。点击标记可查看照片。</p>
       </div>
 
       {tilesUnavailable && (

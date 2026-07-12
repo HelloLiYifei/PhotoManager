@@ -1,6 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { loadPathThumbnail } from "../lib/thumbnailLoader";
+import { createAlbum, getAlbums } from "../services/albumService";
+import {
+  detectCards,
+  importPhotos,
+  listenToImportProgress,
+  scanCard,
+} from "../services/importService";
+import { selectDirectory } from "../services/workspaceService";
 
 // Sub-component to lazy load locally cached preview URLs from a storage path
 function CardThumbnailImage({ path, isRaw, scrollRoot, fit = "natural" }) {
@@ -121,14 +128,14 @@ export default function ImportWizard({ onClose, onImportComplete }) {
   const [focusedPreviewPath, setFocusedPreviewPath] = useState(null);
   const [hideImported, setHideImported] = useState(false);
   const [hideColored, setHideColored] = useState(false);
-  const importedCount = photos.filter((photo) => photo.already_imported).length;
+  const importedCount = photos.filter((photo) => photo.alreadyImported).length;
   const alreadyImportedPaths = new Set(
-    photos.filter((photo) => photo.already_imported).map((photo) => photo.absolute_path)
+    photos.filter((photo) => photo.alreadyImported).map((photo) => photo.absolutePath)
   );
   const selectedImportPaths = selectedPaths.filter((path) => !alreadyImportedPaths.has(path));
   const filteredPhotos = photos.filter((photo) => {
-    if (hideImported && photo.already_imported) return false;
-    if (hideColored && selectedPaths.includes(photo.absolute_path)) return false;
+    if (hideImported && photo.alreadyImported) return false;
+    if (hideColored && selectedPaths.includes(photo.absolutePath)) return false;
     return true;
   });
 
@@ -173,7 +180,7 @@ export default function ImportWizard({ onClose, onImportComplete }) {
 
   const detectDrives = async () => {
     try {
-      const list = await invoke("detect_cards");
+      const list = await detectCards();
       setCards(list);
       if (list.length > 0) {
         handleSelectSource(list[0].path);
@@ -185,7 +192,7 @@ export default function ImportWizard({ onClose, onImportComplete }) {
 
   const loadAlbumsList = async () => {
     try {
-      const list = await invoke("get_albums");
+      const list = await getAlbums();
       setAlbums(list);
     } catch (e) {
       console.error(e);
@@ -203,12 +210,12 @@ export default function ImportWizard({ onClose, onImportComplete }) {
     setFocusedPreviewPath(null);
     try {
       // scan_card takes (state, path)
-      const list = await invoke("scan_card", { path });
+      const list = await scanCard({ path });
       setPhotos(list);
-      setGalleryPath(list[0]?.absolute_path || null);
-      setFocusedPreviewPath(list[0]?.absolute_path || null);
+      setGalleryPath(list[0]?.absolutePath || null);
+      setFocusedPreviewPath(list[0]?.absolutePath || null);
       // Auto-checkmark files that are NOT already imported
-      const freshPaths = list.filter(p => !p.already_imported).map(p => p.absolute_path);
+      const freshPaths = list.filter(p => !p.alreadyImported).map(p => p.absolutePath);
       setSelectedPaths(freshPaths);
     } catch (e) {
       console.error(e);
@@ -219,7 +226,7 @@ export default function ImportWizard({ onClose, onImportComplete }) {
 
   const handleBrowseSourceFolder = async () => {
     try {
-      const dir = await invoke("select_directory");
+      const dir = await selectDirectory();
       if (dir) {
         handleSelectSource(dir);
       }
@@ -230,7 +237,7 @@ export default function ImportWizard({ onClose, onImportComplete }) {
 
   const handleBrowseBackupFolder = async () => {
     try {
-      const dir = await invoke("select_directory");
+      const dir = await selectDirectory();
       if (dir) {
         setBackupPath(dir);
       }
@@ -243,7 +250,7 @@ export default function ImportWizard({ onClose, onImportComplete }) {
     e.preventDefault();
     if (!newAlbumName.trim()) return;
     try {
-      await invoke("create_album", {
+      await createAlbum({
         name: newAlbumName.trim(),
         description: newAlbumDesc.trim() || null,
       });
@@ -333,8 +340,7 @@ export default function ImportWizard({ onClose, onImportComplete }) {
   useEffect(() => {
     let unlistenFn = null;
     const setupListener = async () => {
-      const { listen } = await import("@tauri-apps/api/event");
-      unlistenFn = await listen("import-progress", (event) => {
+      unlistenFn = await listenToImportProgress((event) => {
         setImportProgress(event.payload);
       });
     };
@@ -369,7 +375,7 @@ export default function ImportWizard({ onClose, onImportComplete }) {
     if (!startConfirm) return;
 
     setImporting(true);
-    setImportProgress({ copied: 0, total: selectedImportPaths.length, current_file: "准备导入中..." });
+    setImportProgress({ copied: 0, total: selectedImportPaths.length, currentFile: "准备导入中..." });
 
     try {
       // Build PhotoImportInfo list
@@ -378,7 +384,7 @@ export default function ImportWizard({ onClose, onImportComplete }) {
         album_name: photoAlbums[path] || "默认相册",
       }));
 
-      const count = await invoke("import_photos", {
+      const count = await importPhotos({
         imports: importsList,
         nameTemplate,
         backupPath: backupPath.trim() || null,
@@ -404,7 +410,7 @@ export default function ImportWizard({ onClose, onImportComplete }) {
     previewColumns[index % previewColumns.length].push(photo);
   });
   const visiblePhotos = filteredPhotos.slice(0, visibleLimit);
-  const galleryPhoto = filteredPhotos.find((photo) => photo.absolute_path === galleryPath) || filteredPhotos[0];
+  const galleryPhoto = filteredPhotos.find((photo) => photo.absolutePath === galleryPath) || filteredPhotos[0];
   const albumBrushOptions = [
     { id: "__default_album__", name: "默认相册" },
     ...albums.filter((album) => album.name !== "默认相册"),
@@ -421,8 +427,8 @@ export default function ImportWizard({ onClose, onImportComplete }) {
   const handleColorAll = () => {
     const targetAlbum = brushAlbum || "默认相册";
     const importablePaths = photos
-      .filter((photo) => !photo.already_imported)
-      .map((photo) => photo.absolute_path);
+      .filter((photo) => !photo.alreadyImported)
+      .map((photo) => photo.absolutePath);
 
     setSelectedPaths(importablePaths);
     if (targetAlbum === "默认相册") {
@@ -450,13 +456,13 @@ export default function ImportWizard({ onClose, onImportComplete }) {
   };
 
   const photoVisualState = (photo) => {
-    const isChecked = selectedPaths.includes(photo.absolute_path);
+    const isChecked = selectedPaths.includes(photo.absolutePath);
     const targetAlbum = isChecked
-      ? photoAlbums[photo.absolute_path] || "默认相册"
+      ? photoAlbums[photo.absolutePath] || "默认相册"
       : null;
     return {
       isChecked,
-      isFocused: focusedPreviewPath === photo.absolute_path,
+      isFocused: focusedPreviewPath === photo.absolutePath,
       targetAlbum,
       albumColor: targetAlbum ? getAlbumColor(targetAlbum) : "transparent",
     };
@@ -464,31 +470,31 @@ export default function ImportWizard({ onClose, onImportComplete }) {
 
   const handlePhotoPointerDown = (photo, event) => {
     event.preventDefault();
-    setFocusedPreviewPath(photo.absolute_path);
-    setGalleryPath(photo.absolute_path);
-    if (photo.already_imported || paintedPathsRef.current.has(photo.absolute_path)) return;
-    paintedPathsRef.current.add(photo.absolute_path);
-    applyBrushColor(photo.absolute_path);
+    setFocusedPreviewPath(photo.absolutePath);
+    setGalleryPath(photo.absolutePath);
+    if (photo.alreadyImported || paintedPathsRef.current.has(photo.absolutePath)) return;
+    paintedPathsRef.current.add(photo.absolutePath);
+    applyBrushColor(photo.absolutePath);
   };
 
   const handlePhotoPointerEnter = (photo) => {
     if (isMouseDownRef.current
-      && !photo.already_imported
-      && !paintedPathsRef.current.has(photo.absolute_path)) {
-      paintedPathsRef.current.add(photo.absolute_path);
-      applyBrushColor(photo.absolute_path);
+      && !photo.alreadyImported
+      && !paintedPathsRef.current.has(photo.absolutePath)) {
+      paintedPathsRef.current.add(photo.absolutePath);
+      applyBrushColor(photo.absolutePath);
     }
   };
 
   const handleGalleryPointerDown = (photo, event) => {
     event.preventDefault();
-    setGalleryPath(photo.absolute_path);
-    setFocusedPreviewPath(photo.absolute_path);
+    setGalleryPath(photo.absolutePath);
+    setFocusedPreviewPath(photo.absolutePath);
     if (brushAlbum
-      && !photo.already_imported
-      && !paintedPathsRef.current.has(photo.absolute_path)) {
-      paintedPathsRef.current.add(photo.absolute_path);
-      applyBrushColor(photo.absolute_path);
+      && !photo.alreadyImported
+      && !paintedPathsRef.current.has(photo.absolutePath)) {
+      paintedPathsRef.current.add(photo.absolutePath);
+      applyBrushColor(photo.absolutePath);
     }
   };
 
@@ -496,13 +502,13 @@ export default function ImportWizard({ onClose, onImportComplete }) {
     const { targetAlbum, albumColor } = photoVisualState(photo);
     return (
       <>
-        {photo.already_imported && <div className="already-imported-badge">已存在</div>}
+        {photo.alreadyImported && <div className="already-imported-badge">已存在</div>}
         {targetAlbum && (
           <div className="import-album-overlay" style={{ background: albumColor }}>
             📂 {targetAlbum}
           </div>
         )}
-        {photo.is_raw && <div className="photo-card-badge import-raw-badge">RAW</div>}
+        {photo.isRaw && <div className="photo-card-badge import-raw-badge">RAW</div>}
       </>
     );
   };
@@ -513,18 +519,18 @@ export default function ImportWizard({ onClose, onImportComplete }) {
         const { isChecked, isFocused, targetAlbum, albumColor } = photoVisualState(photo);
         return (
           <div
-            key={photo.absolute_path}
-            className={`import-icon-item ${isChecked ? "selected" : ""} ${isFocused ? "preview-focused" : ""} ${photo.already_imported ? "already-imported" : ""}`}
+            key={photo.absolutePath}
+            className={`import-icon-item ${isChecked ? "selected" : ""} ${isFocused ? "preview-focused" : ""} ${photo.alreadyImported ? "already-imported" : ""}`}
             aria-selected={isFocused}
-            style={{ "--album-color": albumColor, borderColor: photo.already_imported ? "#10b981" : targetAlbum ? albumColor : undefined }}
+            style={{ "--album-color": albumColor, borderColor: photo.alreadyImported ? "#10b981" : targetAlbum ? albumColor : undefined }}
             onMouseDown={(event) => handlePhotoPointerDown(photo, event)}
             onMouseEnter={() => handlePhotoPointerEnter(photo)}
           >
             <div className="import-icon-thumbnail">
-              <CardThumbnailImage path={photo.absolute_path} isRaw={photo.is_raw} scrollRoot={gridContainerRef} fit="cover" />
+              <CardThumbnailImage path={photo.absolutePath} isRaw={photo.isRaw} scrollRoot={gridContainerRef} fit="cover" />
               {renderImportMarkers(photo)}
             </div>
-            <div className="import-icon-name" title={photo.relative_path}>{photo.relative_path}</div>
+            <div className="import-icon-name" title={photo.relativePath}>{photo.relativePath}</div>
           </div>
         );
       })}
@@ -540,8 +546,8 @@ export default function ImportWizard({ onClose, onImportComplete }) {
         const { isChecked, isFocused, targetAlbum, albumColor } = photoVisualState(photo);
         return (
           <div
-            key={photo.absolute_path}
-            className={`import-list-row ${isChecked ? "selected" : ""} ${isFocused ? "preview-focused" : ""} ${photo.already_imported ? "already-imported" : ""}`}
+            key={photo.absolutePath}
+            className={`import-list-row ${isChecked ? "selected" : ""} ${isFocused ? "preview-focused" : ""} ${photo.alreadyImported ? "already-imported" : ""}`}
             style={{ "--album-color": albumColor }}
             role="row"
             aria-selected={isFocused}
@@ -550,15 +556,15 @@ export default function ImportWizard({ onClose, onImportComplete }) {
           >
             <span className="import-list-name">
               <span className="import-list-thumb">
-                <CardThumbnailImage path={photo.absolute_path} isRaw={photo.is_raw} scrollRoot={gridContainerRef} fit="cover" />
+                <CardThumbnailImage path={photo.absolutePath} isRaw={photo.isRaw} scrollRoot={gridContainerRef} fit="cover" />
               </span>
-              <span title={photo.relative_path}>{photo.relative_path}</span>
+              <span title={photo.relativePath}>{photo.relativePath}</span>
             </span>
-            <span>{photo.date_taken || "—"}</span>
-            <span>{photo.is_raw ? "RAW" : photo.relative_path.split(".").pop()?.toUpperCase()}</span>
+            <span>{photo.dateTaken || "—"}</span>
+            <span>{photo.isRaw ? "RAW" : photo.relativePath.split(".").pop()?.toUpperCase()}</span>
             <span>{(photo.size / (1024 * 1024)).toFixed(2)} MB</span>
             <span className="import-list-status">
-              {photo.already_imported ? (
+              {photo.alreadyImported ? (
                 <strong className="is-imported">✓ 已导入</strong>
               ) : isChecked ? (
                 <strong style={{ color: albumColor }}>● {targetAlbum}</strong>
@@ -573,13 +579,13 @@ export default function ImportWizard({ onClose, onImportComplete }) {
   );
 
   const importGalleryIndex = galleryPhoto
-    ? filteredPhotos.findIndex((photo) => photo.absolute_path === galleryPhoto.absolute_path)
+    ? filteredPhotos.findIndex((photo) => photo.absolutePath === galleryPhoto.absolutePath)
     : -1;
 
   const navigateImportGallery = (nextIndex) => {
     if (filteredPhotos.length === 0) return;
     const boundedIndex = Math.max(0, Math.min(filteredPhotos.length - 1, nextIndex));
-    const path = filteredPhotos[boundedIndex].absolute_path;
+    const path = filteredPhotos[boundedIndex].absolutePath;
     setGalleryPath(path);
     setFocusedPreviewPath(path);
   };
@@ -599,7 +605,7 @@ export default function ImportWizard({ onClose, onImportComplete }) {
       navigateImportGallery(filteredPhotos.length - 1);
     } else if ((event.key === "Enter" || event.key === " ") && brushAlbum && galleryPhoto) {
       event.preventDefault();
-      applyBrushColor(galleryPhoto.absolute_path);
+      applyBrushColor(galleryPhoto.absolutePath);
     }
   };
 
@@ -621,11 +627,11 @@ export default function ImportWizard({ onClose, onImportComplete }) {
       onKeyDown={handleImportGalleryKeyDown}
     >
       <div
-        className={`import-gallery-stage ${galleryPhoto.already_imported ? "already-imported" : ""}`}
-        aria-selected={focusedPreviewPath === galleryPhoto.absolute_path}
+        className={`import-gallery-stage ${galleryPhoto.alreadyImported ? "already-imported" : ""}`}
+        aria-selected={focusedPreviewPath === galleryPhoto.absolutePath}
         style={{
           "--album-color": photoVisualState(galleryPhoto).albumColor,
-          borderColor: galleryPhoto.already_imported
+          borderColor: galleryPhoto.alreadyImported
             ? "#10b981"
             : photoVisualState(galleryPhoto).targetAlbum
             ? photoVisualState(galleryPhoto).albumColor
@@ -641,11 +647,11 @@ export default function ImportWizard({ onClose, onImportComplete }) {
         {importGalleryIndex > 0 && (
           <button type="button" className="gallery-stage-nav prev" onMouseDown={(event) => event.stopPropagation()} onClick={() => navigateImportGallery(importGalleryIndex - 1)} aria-label="上一张">‹</button>
         )}
-        <CardThumbnailImage path={galleryPhoto.absolute_path} isRaw={galleryPhoto.is_raw} scrollRoot={gridContainerRef} fit="contain" />
+        <CardThumbnailImage path={galleryPhoto.absolutePath} isRaw={galleryPhoto.isRaw} scrollRoot={gridContainerRef} fit="contain" />
         {renderImportMarkers(galleryPhoto)}
         <div className="import-gallery-caption">
-          <strong>{galleryPhoto.relative_path}</strong>
-          <span>{galleryPhoto.date_taken} · {(galleryPhoto.size / (1024 * 1024)).toFixed(2)} MB</span>
+          <strong>{galleryPhoto.relativePath}</strong>
+          <span>{galleryPhoto.dateTaken} · {(galleryPhoto.size / (1024 * 1024)).toFixed(2)} MB</span>
         </div>
         {importGalleryIndex < filteredPhotos.length - 1 && (
           <button type="button" className="gallery-stage-nav next" onMouseDown={(event) => event.stopPropagation()} onClick={() => navigateImportGallery(importGalleryIndex + 1)} aria-label="下一张">›</button>
@@ -657,12 +663,12 @@ export default function ImportWizard({ onClose, onImportComplete }) {
           return (
             <button
               type="button"
-              key={photo.absolute_path}
-              className={`import-gallery-film ${galleryPhoto.absolute_path === photo.absolute_path ? "active" : ""} ${isChecked ? "selected" : ""} ${photo.already_imported ? "already-imported" : ""}`}
-              aria-selected={focusedPreviewPath === photo.absolute_path}
+              key={photo.absolutePath}
+              className={`import-gallery-film ${galleryPhoto.absolutePath === photo.absolutePath ? "active" : ""} ${isChecked ? "selected" : ""} ${photo.alreadyImported ? "already-imported" : ""}`}
+              aria-selected={focusedPreviewPath === photo.absolutePath}
               style={{
                 "--album-color": albumColor,
-                borderColor: photo.already_imported
+                borderColor: photo.alreadyImported
                   ? "#10b981"
                   : targetAlbum
                   ? albumColor
@@ -674,11 +680,11 @@ export default function ImportWizard({ onClose, onImportComplete }) {
               onMouseEnter={() => {
                 if (brushAlbum) handlePhotoPointerEnter(photo);
               }}
-              title={photo.relative_path}
+              title={photo.relativePath}
             >
-              <CardThumbnailImage path={photo.absolute_path} isRaw={photo.is_raw} scrollRoot={gridContainerRef} fit="cover" />
-              {photo.already_imported && <span className="import-film-status imported">已导入</span>}
-              {!photo.already_imported && targetAlbum && <span className="import-film-status" style={{ background: albumColor }}>{targetAlbum}</span>}
+              <CardThumbnailImage path={photo.absolutePath} isRaw={photo.isRaw} scrollRoot={gridContainerRef} fit="cover" />
+              {photo.alreadyImported && <span className="import-film-status imported">已导入</span>}
+              {!photo.alreadyImported && targetAlbum && <span className="import-film-status" style={{ background: albumColor }}>{targetAlbum}</span>}
             </button>
           );
         })}
@@ -733,7 +739,7 @@ export default function ImportWizard({ onClose, onImportComplete }) {
                       className="text-input"
                       style={{ padding: "6px", textAlign: "left", fontSize: "11px", background: sourcePath === c.path ? "rgba(96,165,250,0.1)" : "none" }}
                     >
-                      💾 [{c.drive_letter}] {c.label || "移动磁盘"}
+                      💾 [{c.driveLetter}] {c.label || "移动磁盘"}
                     </button>
                   ))}
                 </div>
@@ -954,13 +960,13 @@ export default function ImportWizard({ onClose, onImportComplete }) {
 
                       return (
                         <div
-                          key={photo.absolute_path}
-                          className={`wizard-photo-card ${isFocused ? "preview-focused" : ""} ${photo.already_imported ? "already-imported" : ""}`}
+                          key={photo.absolutePath}
+                          className={`wizard-photo-card ${isFocused ? "preview-focused" : ""} ${photo.alreadyImported ? "already-imported" : ""}`}
                           aria-selected={isFocused}
                           onMouseDown={(event) => handlePhotoPointerDown(photo, event)}
                           onMouseEnter={() => handlePhotoPointerEnter(photo)}
                           style={{
-                            border: photo.already_imported
+                            border: photo.alreadyImported
                               ? "2px solid #10B981"
                               : hasColor
                               ? `3px solid ${albumColor}`
@@ -970,12 +976,12 @@ export default function ImportWizard({ onClose, onImportComplete }) {
                         >
                           <div style={{ position: "relative", width: "100%" }}>
                             <CardThumbnailImage
-                              path={photo.absolute_path}
-                              isRaw={photo.is_raw}
+                              path={photo.absolutePath}
+                              isRaw={photo.isRaw}
                               scrollRoot={gridContainerRef}
                             />
                             {/* Duplication green badge */}
-                            {photo.already_imported && (
+                            {photo.alreadyImported && (
                               <div className="already-imported-badge">
                                 已存在
                               </div>
@@ -1004,7 +1010,7 @@ export default function ImportWizard({ onClose, onImportComplete }) {
                             )}
 
                             {/* Raw badge */}
-                            {photo.is_raw && (
+                            {photo.isRaw && (
                               <div className="photo-card-badge" style={{ zIndex: 5 }}>RAW</div>
                             )}
                           </div>
@@ -1107,7 +1113,7 @@ export default function ImportWizard({ onClose, onImportComplete }) {
                 />
               </div>
               <span style={{ fontSize: "11px", color: "var(--text-dark)", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap", textAlign: "center" }}>
-                正在拷贝: {importProgress.current_file}
+                正在拷贝: {importProgress.currentFile}
               </span>
             </div>
           </div>

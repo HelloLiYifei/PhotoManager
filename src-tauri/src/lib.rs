@@ -31,6 +31,7 @@ pub fn run() {
             commands::get_photo_thumbnail_url,
             commands::get_photo_preview_url,
             commands::get_albums,
+            commands::get_album_summaries,
             commands::create_album,
             commands::delete_album,
             commands::add_photos_to_album,

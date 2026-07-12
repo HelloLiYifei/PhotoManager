@@ -1,352 +1,331 @@
-import { useState, useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Plus } from "lucide-react";
 import "./App.css";
 
-import WorkspaceSelector from "./components/WorkspaceSelector";
-import TimelineGrid from "./components/TimelineGrid";
+import AlbumsPage from "./components/AlbumsPage";
+import CreateAlbumDialog from "./components/CreateAlbumDialog";
 import ImportWizard from "./components/ImportWizard";
 import LightboxViewer from "./components/LightboxViewer";
 import MapView from "./components/MapView";
-import { loadPhotoThumbnail } from "./lib/thumbnailLoader";
+import { AppShell, PageHeader, Sidebar } from "./components/shell";
+import TimelineGrid from "./components/TimelineGrid";
+import WorkspaceSelector from "./components/WorkspaceSelector";
+import { createAlbum, getAlbumSummaries } from "./services/albumService";
+import { detectCards } from "./services/importService";
+import { getActiveWorkspace, getWorkspaces } from "./services/workspaceService";
+
+const WIDE_SIDEBAR_QUERY = "(min-width: 1200px)";
+
+function getInitialWideViewport() {
+  if (typeof window === "undefined") return true;
+  if (typeof window.matchMedia === "function") {
+    return window.matchMedia(WIDE_SIDEBAR_QUERY).matches;
+  }
+  return window.innerWidth >= 1200;
+}
+
+function getViewMeta(currentView, activeAlbumName, albumCount) {
+  switch (currentView) {
+    case "albums":
+      return {
+        title: "相册",
+        description: albumCount > 0 ? `${albumCount} 个相册` : "整理和浏览工作区中的照片",
+      };
+    case "favorites":
+      return { title: "我的喜欢", description: "集中浏览已标记喜欢的照片" };
+    case "trash":
+      return { title: "垃圾桶", description: "恢复照片或将其移入系统回收站" };
+    case "map":
+      return { title: "照片地图", description: "按照拍摄位置浏览照片" };
+    case "album":
+      return {
+        title: activeAlbumName || "相册",
+        description: "浏览和管理这个相册中的照片",
+      };
+    default:
+      return { title: "图库", description: "浏览工作区中的照片" };
+  }
+}
 
 function App() {
   const [activeWorkspace, setActiveWorkspace] = useState(null);
-  const [currentView, setCurrentView] = useState("albums"); // "albums", "album", "favorites", "trash", "map"
+  const [currentView, setCurrentView] = useState("albums");
   const [activeAlbumId, setActiveAlbumId] = useState(null);
   const [activeAlbumName, setActiveAlbumName] = useState("");
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  
+  const [isWideViewport, setIsWideViewport] = useState(getInitialWideViewport);
+  const [isWideSidebarCollapsed, setIsWideSidebarCollapsed] = useState(false);
+  const [isCompactSidebarOpen, setIsCompactSidebarOpen] = useState(false);
+
   const [albums, setAlbums] = useState([]);
+  const [albumsLoading, setAlbumsLoading] = useState(false);
+  const [albumsError, setAlbumsError] = useState(null);
+  const albumsRequestIdRef = useRef(0);
   const [detectedCard, setDetectedCard] = useState(null);
-  
-  // Modals
+
   const [showImportWizard, setShowImportWizard] = useState(false);
-  const [lightboxData, setLightboxData] = useState(null); // { photosList, index }
+  const [lightboxData, setLightboxData] = useState(null);
   const [mapFocusedPhotoId, setMapFocusedPhotoId] = useState(null);
-  
-  // Triggers
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+
   const [showCreateAlbum, setShowCreateAlbum] = useState(false);
   const [newAlbumName, setNewAlbumName] = useState("");
   const [newAlbumDesc, setNewAlbumDesc] = useState("");
+  const [createAlbumBusy, setCreateAlbumBusy] = useState(false);
+  const [createAlbumError, setCreateAlbumError] = useState(null);
 
-  // Check active workspace on mount
-  useEffect(() => {
-    checkActiveWorkspace();
+  const sidebarMode = isWideViewport
+    ? isWideSidebarCollapsed
+      ? "collapsed"
+      : "expanded"
+    : isCompactSidebarOpen
+      ? "overlay"
+      : "collapsed";
+
+  const closeCompactSidebar = useCallback(() => {
+    setIsCompactSidebarOpen(false);
   }, []);
 
-  // Poll for SD card detection every 8 seconds
+  const checkActiveWorkspace = useCallback(async () => {
+    try {
+      const activePath = await getActiveWorkspace();
+      if (!activePath) return;
+
+      const workspaces = await getWorkspaces();
+      const match = workspaces.find((workspace) => workspace.path === activePath);
+      if (match) {
+        setAlbumsLoading(true);
+        setActiveWorkspace(match);
+        return;
+      }
+
+      const folderName = activePath.split(/[/\\]/).pop() || "本地相册";
+      setAlbumsLoading(true);
+      setActiveWorkspace({ name: folderName, path: activePath });
+    } catch (error) {
+      console.error(error);
+    }
+  }, []);
+
+  const checkSDCards = useCallback(async () => {
+    try {
+      const cards = await detectCards();
+      setDetectedCard(cards[0] || null);
+    } catch (error) {
+      console.error(error);
+    }
+  }, []);
+
+  const loadAlbums = useCallback(async () => {
+    const requestId = ++albumsRequestIdRef.current;
+    setAlbumsLoading(true);
+    setAlbumsError(null);
+
+    try {
+      const list = await getAlbumSummaries();
+      if (requestId === albumsRequestIdRef.current) setAlbums(list);
+    } catch (error) {
+      if (requestId === albumsRequestIdRef.current) setAlbumsError(error);
+    } finally {
+      if (requestId === albumsRequestIdRef.current) setAlbumsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    if (!activeWorkspace) return;
-    
-    // Check initially
+    checkActiveWorkspace();
+  }, [checkActiveWorkspace]);
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") {
+      const handleResize = () => {
+        setIsWideViewport(window.innerWidth >= 1200);
+        setIsCompactSidebarOpen(false);
+      };
+      window.addEventListener("resize", handleResize);
+      return () => window.removeEventListener("resize", handleResize);
+    }
+
+    const mediaQuery = window.matchMedia(WIDE_SIDEBAR_QUERY);
+    const handleChange = (event) => {
+      setIsWideViewport(event.matches);
+      setIsCompactSidebarOpen(false);
+    };
+
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
+  }, []);
+
+  useEffect(() => {
+    if (!activeWorkspace) return undefined;
+
     checkSDCards();
-
-    const interval = setInterval(() => {
-      checkSDCards();
-    }, 8000);
-
+    const interval = setInterval(checkSDCards, 8000);
     return () => clearInterval(interval);
-  }, [activeWorkspace]);
+  }, [activeWorkspace, checkSDCards]);
 
   useEffect(() => {
     if (activeWorkspace) {
       loadAlbums();
+      return;
     }
-  }, [activeWorkspace, refreshTrigger]);
 
-  const checkActiveWorkspace = async () => {
-    try {
-      const activePath = await invoke("get_active_workspace");
-      if (activePath) {
-        // Find workspace name in recent list
-        const workspaces = await invoke("get_workspaces");
-        const match = workspaces.find((w) => w.path === activePath);
-        if (match) {
-          setActiveWorkspace(match);
-        } else {
-          // If not found in list, fallback
-          const folderName = activePath.split(/[/\\]/).pop() || "本地相册";
-          setActiveWorkspace({ name: folderName, path: activePath });
-        }
+    albumsRequestIdRef.current += 1;
+    setAlbums([]);
+    setAlbumsError(null);
+    setAlbumsLoading(false);
+  }, [activeWorkspace, loadAlbums, refreshTrigger]);
+
+  const handleToggleSidebar = useCallback(
+    (requestedMode) => {
+      if (isWideViewport) {
+        setIsWideSidebarCollapsed((current) =>
+          requestedMode ? requestedMode === "collapsed" : !current,
+        );
+        return;
       }
-    } catch (e) {
-      console.error(e);
-    }
-  };
 
-  const checkSDCards = async () => {
-    try {
-      const cards = await invoke("detect_cards");
-      if (cards.length > 0) {
-        setDetectedCard(cards[0]);
-      } else {
-        setDetectedCard(null);
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
+      setIsCompactSidebarOpen((current) =>
+        requestedMode ? requestedMode !== "collapsed" : !current,
+      );
+    },
+    [isWideViewport],
+  );
 
-  const loadAlbums = async () => {
-    try {
-      const list = await invoke("get_albums");
-      const updatedList = await Promise.all(list.map(async (alb) => {
-        const photos = await invoke("get_photos", {
-          search: null,
-          favoriteOnly: false,
-          deletedOnly: false,
-          albumId: alb.id,
-          ratingFilter: null,
-          tagFilter: null,
-        });
-        return {
-          ...alb,
-          coverPhotoId: photos.length > 0 ? photos[0].id : null,
-          photoCount: photos.length,
-        };
-      }));
-      setAlbums(updatedList);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const handleSelectWorkspace = (ws) => {
-    setActiveWorkspace(ws);
+  const handleSelectWorkspace = (workspace) => {
+    setAlbumsLoading(true);
+    setActiveWorkspace(workspace);
     setCurrentView("albums");
     setActiveAlbumId(null);
+    setActiveAlbumName("");
+    closeCompactSidebar();
   };
 
   const handleSwitchWorkspace = () => {
-    if (confirm("确定要返回选择仓库界面吗？")) {
-      setActiveWorkspace(null);
-    }
+    if (!confirm("确定要返回选择仓库界面吗？")) return;
+
+    albumsRequestIdRef.current += 1;
+    setActiveWorkspace(null);
+    setActiveAlbumId(null);
+    setActiveAlbumName("");
+    setDetectedCard(null);
+    closeCompactSidebar();
   };
 
-  const handleCreateAlbumSubmit = async (e) => {
-    e.preventDefault();
-    if (!newAlbumName.trim()) return;
+  const handleNavigate = (view) => {
+    setCurrentView(view);
+    setActiveAlbumId(null);
+    setActiveAlbumName("");
+    if (view === "map") setMapFocusedPhotoId(null);
+    closeCompactSidebar();
+  };
+
+  const handleOpenAlbum = (album) => {
+    setCurrentView("album");
+    setActiveAlbumId(album.id);
+    setActiveAlbumName(album.name);
+    closeCompactSidebar();
+  };
+
+  const handleOpenCreateAlbum = () => {
+    setCreateAlbumError(null);
+    setShowCreateAlbum(true);
+    closeCompactSidebar();
+  };
+
+  const handleCloseCreateAlbum = () => {
+    if (createAlbumBusy) return;
+    setShowCreateAlbum(false);
+    setCreateAlbumError(null);
+    setNewAlbumName("");
+    setNewAlbumDesc("");
+  };
+
+  const handleCreateAlbumSubmit = async () => {
+    if (createAlbumBusy || !newAlbumName.trim()) return;
+
+    setCreateAlbumBusy(true);
+    setCreateAlbumError(null);
     try {
-      await invoke("create_album", {
+      await createAlbum({
         name: newAlbumName.trim(),
         description: newAlbumDesc.trim() || null,
       });
+      setShowCreateAlbum(false);
       setNewAlbumName("");
       setNewAlbumDesc("");
-      setShowCreateAlbum(false);
-      loadAlbums();
-    } catch (err) {
-      alert("创建相册失败: " + err);
+      void loadAlbums();
+    } catch (error) {
+      setCreateAlbumError(error);
+    } finally {
+      setCreateAlbumBusy(false);
     }
   };
 
-  const triggerRefresh = () => {
-    setRefreshTrigger((prev) => prev + 1);
-  };
+  const triggerRefresh = useCallback(() => {
+    setRefreshTrigger((previous) => previous + 1);
+  }, []);
 
-  const getHeaderTitle = () => {
-    switch (currentView) {
-      case "albums":
-        return "📁 相册";
-      case "favorites":
-        return "💖 我的喜欢";
-      case "trash":
-        return "🗑️ 垃圾桶";
-      case "map":
-        return "🌍 地图";
-      case "album":
-        return `相册: ${activeAlbumName}`;
-      default:
-        return "图库";
-    }
-  };
-
-  // If no workspace is active, show Welcome screen
   if (!activeWorkspace) {
     return <WorkspaceSelector onSelectWorkspace={handleSelectWorkspace} />;
   }
 
+  const viewMeta = getViewMeta(currentView, activeAlbumName, albums.length);
+  const pageActions = currentView === "albums" ? (
+    <button
+      type="button"
+      className="page-header__primary-action"
+      onClick={handleOpenCreateAlbum}
+    >
+      <Plus size={17} aria-hidden="true" />
+      <span>新建相册</span>
+    </button>
+  ) : null;
+
+  const sidebar = (
+    <Sidebar
+      workspace={activeWorkspace}
+      currentView={currentView}
+      activeAlbumId={activeAlbumId}
+      albums={albums}
+      detectedCard={detectedCard}
+      mode={sidebarMode}
+      currentTitle={viewMeta.title}
+      onNavigate={handleNavigate}
+      onOpenAlbum={handleOpenAlbum}
+      onCreateAlbum={handleOpenCreateAlbum}
+      onImport={() => {
+        setShowImportWizard(true);
+        closeCompactSidebar();
+      }}
+      onSwitchWorkspace={handleSwitchWorkspace}
+      onToggleMode={handleToggleSidebar}
+      onShowWorkspaceInfo={() =>
+        alert(
+          `工作区信息\n\n路径：${activeWorkspace.path}\n存储格式：物理目录直接映射`,
+        )
+      }
+    />
+  );
+
+  const header = (
+    <PageHeader
+      title={viewMeta.title}
+      description={viewMeta.description}
+      workspaceName={activeWorkspace.name}
+      sidebarMode={sidebarMode}
+      onToggleSidebar={() => handleToggleSidebar()}
+      actions={pageActions}
+    />
+  );
+
   return (
-    <div className="app-container">
-      {/* Sidebar */}
-      <aside className={`main-sidebar glass-panel ${isSidebarCollapsed ? "collapsed" : ""}`} style={{ borderTopLeftRadius: 0, borderBottomLeftRadius: 0, borderTopRightRadius: 16, borderBottomRightRadius: 16 }}>
-        <div className="sidebar-header" style={{ cursor: "pointer" }} onClick={handleSwitchWorkspace}>
-          <div className="sidebar-logo">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="url(#sidebarGrad)" strokeWidth="2.5">
-              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-              <circle cx="12" cy="13" r="4"></circle>
-              <defs>
-                <linearGradient id="sidebarGrad" x1="1" y1="3" x2="23" y2="21" gradientUnits="userSpaceOnUse">
-                  <stop stopColor="#60A5FA" />
-                  <stop offset="1" stopColor="#C084FC" />
-                </linearGradient>
-              </defs>
-            </svg>
-            <span className="gradient-text sidebar-text">PhotoGallery</span>
-          </div>
-          {!isSidebarCollapsed && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleSwitchWorkspace();
-              }}
-              title="返回选择仓库"
-              style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", display: "flex" }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="15 3 21 3 21 9"></polyline>
-                <polyline points="9 21 3 21 3 15"></polyline>
-                <line x1="21" y1="3" x2="14" y2="10"></line>
-                <line x1="3" y1="21" x2="10" y2="14"></line>
-              </svg>
-            </button>
-          )}
-        </div>
-
-        <div className="sidebar-context sidebar-text">
-          <strong>{getHeaderTitle()}</strong>
-          <span title={activeWorkspace.path}>🏢 {activeWorkspace.name}</span>
-        </div>
-
-        {/* Navigation */}
-        <nav className="sidebar-nav">
-          <div
-            className={`nav-item ${currentView === "albums" ? "active" : ""}`}
-            onClick={() => {
-              setCurrentView("albums");
-              setActiveAlbumId(null);
-            }}
-            title="相册"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-              <circle cx="8.5" cy="8.5" r="1.5"></circle>
-              <polyline points="21 15 16 10 5 21"></polyline>
-            </svg>
-            <span className="nav-text">相册</span>
-          </div>
-          
-          <div
-            className={`nav-item ${currentView === "favorites" ? "active" : ""}`}
-            onClick={() => {
-              setCurrentView("favorites");
-              setActiveAlbumId(null);
-            }}
-            title="我的喜欢"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-            </svg>
-            <span className="nav-text">我的喜欢</span>
-          </div>
-
-          <div
-            className={`nav-item ${currentView === "map" ? "active" : ""}`}
-            onClick={() => {
-              setCurrentView("map");
-              setActiveAlbumId(null);
-              setMapFocusedPhotoId(null);
-            }}
-            title="地图"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-              <circle cx="12" cy="10" r="3"></circle>
-            </svg>
-            <span className="nav-text">地图</span>
-          </div>
-          
-          <div
-            className={`nav-item ${currentView === "trash" ? "active" : ""}`}
-            onClick={() => {
-              setCurrentView("trash");
-              setActiveAlbumId(null);
-            }}
-            title="垃圾桶"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="3 6 5 6 21 6"></polyline>
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-              <line x1="10" y1="11" x2="10" y2="17"></line>
-              <line x1="14" y1="11" x2="14" y2="17"></line>
-            </svg>
-            <span className="nav-text">垃圾桶</span>
-          </div>
-        </nav>
-
-        <div className="sidebar-divider"></div>
-
-        {/* Albums Header with Fold button */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", padding: "0 8px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <span className="sidebar-section-title sidebar-text" style={{ margin: 0 }}>快捷列表</span>
-            <button
-              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-              style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center" }}
-              title={isSidebarCollapsed ? "展开侧边栏" : "折叠侧边栏"}
-            >
-              {isSidebarCollapsed ? "▶" : "◀"}
-            </button>
-          </div>
-          {!isSidebarCollapsed && (
-            <button
-              onClick={() => setShowCreateAlbum(true)}
-              style={{ background: "none", border: "none", color: "var(--accent-color)", cursor: "pointer", fontWeight: 600, fontSize: "16px", padding: 0 }}
-              title="新建相册"
-            >
-              ＋
-            </button>
-          )}
-        </div>
-
-        {/* Albums List */}
-        <div className="albums-list" style={{ flexGrow: 1, overflowY: "auto" }}>
-          {albums.map((album) => (
-            <div
-              key={album.id}
-              className={`album-item ${currentView === "album" && activeAlbumId === album.id ? "active" : ""}`}
-              onClick={() => {
-                setCurrentView("album");
-                setActiveAlbumId(album.id);
-                setActiveAlbumName(album.name);
-              }}
-              title={album.name}
-            >
-              <span className="album-name">📁 {album.name}</span>
-              <span className="album-count" style={{ display: isSidebarCollapsed ? "none" : "inline" }}>{album.photoCount || 0}</span>
-            </div>
-          ))}
-        </div>
-
-        <div className="sidebar-primary-actions sidebar-bottom-import">
-          <button
-            type="button"
-            onClick={() => setShowImportWizard(true)}
-            className={`sidebar-import-button ${detectedCard ? "card-detected" : ""}`}
-            title={detectedCard ? `检测到存储卡 ${detectedCard.label || detectedCard.drive_letter}，点击导入` : "导入新照片"}
-          >
-            <span className="sidebar-import-icon" aria-hidden="true">{detectedCard ? "💾" : "📥"}</span>
-            <span className="sidebar-text">{detectedCard ? "检测到存储卡 · 导入" : "导入新照片"}</span>
-          </button>
-        </div>
-
-        {/* Settings button at bottom */}
-        <div style={{ padding: "8px", borderTop: "1px solid var(--border-color)", marginTop: 0 }}>
-          <button
-            onClick={() => alert(`⚙️ 设置\n工作空间路径:\n${activeWorkspace.path}\n相册存储格式: 物理目录直接映射`)}
-            className="nav-item"
-            style={{ width: "100%", background: "none", border: "none", padding: "8px", justifyContent: isSidebarCollapsed ? "center" : "flex-start", cursor: "pointer", gap: 0 }}
-            title="设置"
-          >
-            ⚙️ <span className="sidebar-text" style={{ marginLeft: "8px" }}>设置</span>
-          </button>
-        </div>
-
-      </aside>
-
-      {/* Main Content Area */}
-      <main className="content-wrapper">
+    <>
+      <AppShell
+        sidebar={sidebar}
+        header={header}
+        sidebarMode={sidebarMode}
+        onRequestSidebarClose={closeCompactSidebar}
+        contentLabel={viewMeta.title}
+      >
         {currentView === "map" ? (
           <MapView
             key={`map-${refreshTrigger}`}
@@ -354,42 +333,14 @@ function App() {
             onShowPhoto={(photo) => setLightboxData({ photosList: [photo], index: 0 })}
           />
         ) : currentView === "albums" ? (
-          <div className="albums-grid animate-fade-in" style={{ overflowY: "auto", flexGrow: 1, paddingRight: "8px" }}>
-            {/* Create Album Card */}
-            <div className="album-card" onClick={() => setShowCreateAlbum(true)} style={{ borderStyle: "dashed", borderColor: "var(--accent-color)", background: "transparent", minHeight: "220px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <div style={{ textAlign: "center", color: "var(--accent-color)", fontSize: "14px" }}>
-                <div style={{ fontSize: "36px", marginBottom: "8px" }}>＋</div>
-                <div style={{ fontWeight: "600" }}>创建新相册</div>
-              </div>
-            </div>
-
-            {/* Existing Album Cards */}
-            {albums.map((album) => (
-              <div
-                key={album.id}
-                className="album-card animate-fade-in"
-                onClick={() => {
-                  setCurrentView("album");
-                  setActiveAlbumId(album.id);
-                  setActiveAlbumName(album.name);
-                }}
-              >
-                <div className="album-cover-wrapper">
-                  {album.coverPhotoId ? (
-                    <AlbumCover photoId={album.coverPhotoId} />
-                  ) : (
-                    <span>空</span>
-                  )}
-                </div>
-                <div className="album-card-info">
-                  <div className="album-card-title">{album.name}</div>
-                  <div className="album-card-desc">
-                    {album.photoCount || 0} 张照片
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+          <AlbumsPage
+            albums={albums}
+            loading={albumsLoading}
+            error={albumsError}
+            onRetry={loadAlbums}
+            onOpenAlbum={handleOpenAlbum}
+            onCreateAlbum={handleOpenCreateAlbum}
+          />
         ) : (
           <TimelineGrid
             currentView={currentView}
@@ -399,58 +350,20 @@ function App() {
             onPhotoClick={(list, index) => setLightboxData({ photosList: list, index })}
           />
         )}
-      </main>
+      </AppShell>
 
-      {/* Modal: Create Album Popup */}
-      {showCreateAlbum && (
-        <div className="wizard-overlay" style={{ zIndex: 1100 }}>
-          <div className="welcome-card glass-panel" style={{ maxWidth: "400px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-              <span className="header-title" style={{ fontSize: "16px" }}>🆕 创建新相册</span>
-              <button
-                className="photo-action-btn"
-                onClick={() => setShowCreateAlbum(false)}
-                style={{ fontSize: "18px", padding: 0 }}
-              >
-                ×
-              </button>
-            </div>
-            <form onSubmit={handleCreateAlbumSubmit}>
-              <div className="input-group">
-                <span className="input-label">相册名称</span>
-                <input
-                  type="text"
-                  className="text-input"
-                  value={newAlbumName}
-                  onChange={(e) => setNewAlbumName(e.target.value)}
-                  placeholder="例如: 杭州之旅"
-                  required
-                />
-              </div>
-              <div className="input-group">
-                <span className="input-label">描述 (可选)</span>
-                <input
-                  type="text"
-                  className="text-input"
-                  value={newAlbumDesc}
-                  onChange={(e) => setNewAlbumDesc(e.target.value)}
-                  placeholder="例如: 2026年夏季拍摄"
-                />
-              </div>
-              <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
-                <button type="submit" className="gradient-btn" style={{ flexGrow: 1, padding: "10px", borderRadius: "6px" }}>
-                  创建
-                </button>
-                <button type="button" onClick={() => setShowCreateAlbum(false)} className="text-input" style={{ width: "100px", padding: "10px", borderRadius: "6px" }}>
-                  取消
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <CreateAlbumDialog
+        open={showCreateAlbum}
+        name={newAlbumName}
+        description={newAlbumDesc}
+        busy={createAlbumBusy}
+        error={createAlbumError}
+        onNameChange={setNewAlbumName}
+        onDescriptionChange={setNewAlbumDesc}
+        onSubmit={handleCreateAlbumSubmit}
+        onClose={handleCloseCreateAlbum}
+      />
 
-      {/* Modal: Import Wizard */}
       {showImportWizard && (
         <ImportWizard
           onClose={() => setShowImportWizard(false)}
@@ -458,7 +371,6 @@ function App() {
         />
       )}
 
-      {/* Modal: Lightbox Viewer */}
       {lightboxData && (
         <LightboxViewer
           photosList={lightboxData.photosList}
@@ -472,25 +384,8 @@ function App() {
           onPhotosUpdated={triggerRefresh}
         />
       )}
-    </div>
+    </>
   );
-}
-
-// Helper to load Cover Photo
-function AlbumCover({ photoId }) {
-  const [src, setSrc] = useState("");
-
-  useEffect(() => {
-    if (!photoId) return;
-    loadPhotoThumbnail(photoId)
-      .then((b64) => setSrc(b64))
-      .catch((e) => console.error(e));
-  }, [photoId]);
-
-  if (!src) {
-    return <div className="album-cover-placeholder">加载中...</div>;
-  }
-  return <img src={src} className="album-cover-img" alt="封面" />;
 }
 
 export default App;

@@ -1,0 +1,220 @@
+.viewport {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  box-sizing: border-box;
+  padding: var(--space-6);
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.content {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.scrollArea {
+  min-width: 0;
+  min-height: 0;
+  padding-right: var(--space-2);
+  flex: 1;
+  overflow: auto;
+  outline: none;
+}
+
+.state {
+  display: flex;
+  min-height: 280px;
+  padding: var(--space-8) var(--space-4);
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: var(--space-3);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.state > svg {
+  width: 42px;
+  height: 42px;
+  color: var(--text-dark);
+  stroke-width: 1.45;
+}
+
+.state strong {
+  color: var(--text-main);
+  font-size: var(--font-size-md);
+}
+
+.state span {
+  max-width: 420px;
+  font-size: var(--font-size-sm);
+}
+
+.state button,
+.inlineError button,
+.compareClose {
+  display: inline-flex;
+  min-height: 34px;
+  padding: 0 var(--space-3);
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  color: var(--text-main);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.state button svg,
+.inlineError button svg,
+.compareClose svg {
+  width: 15px;
+  height: 15px;
+}
+
+.state button:focus-visible,
+.inlineError button:focus-visible,
+.compareClose:focus-visible {
+  box-shadow: var(--focus-ring);
+  outline: none;
+}
+
+.spinner {
+  animation: spin 0.9s linear infinite;
+}
+
+.inlineError {
+  min-height: 38px;
+  margin-bottom: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  color: #fecaca;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+}
+
+.compareLayout {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  min-height: 420px;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 1fr);
+  gap: var(--space-4);
+}
+
+.compareBrowser {
+  min-width: 0;
+  overflow-y: auto;
+  border-right: 1px solid var(--border-color);
+}
+
+.comparePreview {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  padding: var(--space-6);
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: var(--space-3);
+  overflow: hidden;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+}
+
+.comparePreview > img {
+  max-width: 100%;
+  max-height: calc(100% - 60px);
+}
+
+.comparePreview > strong {
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.compareClose {
+  position: absolute;
+  z-index: 2;
+  top: var(--space-3);
+  right: var(--space-3);
+  color: #fff;
+  background: var(--danger-color);
+  border-color: transparent;
+}
+
+@media (max-width: 900px) {
+  .viewport {
+    padding: var(--space-4);
+  }
+
+  .scrollArea {
+    padding-right: 0;
+  }
+
+  .scrollArea :global(.finder-list) {
+    min-width: 0;
+  }
+
+  .scrollArea :global(.finder-list-header),
+  .scrollArea :global(.finder-list-row) {
+    grid-template-columns: minmax(170px, 1fr) 116px 64px;
+  }
+
+  .scrollArea :global(.finder-list-header > span:nth-child(n + 4)),
+  .scrollArea :global(.finder-list-row > span:nth-child(n + 4)) {
+    display: none;
+  }
+
+  .scrollArea :global(.finder-gallery) {
+    min-height: 0;
+  }
+
+  .compareLayout {
+    grid-template-columns: minmax(0, 1fr) minmax(240px, 0.9fr);
+    gap: var(--space-2);
+  }
+
+  .comparePreview {
+    padding: var(--space-4);
+  }
+}
+
+@media (max-width: 640px) {
+  .compareLayout {
+    height: auto;
+    grid-template-columns: 1fr;
+  }
+
+  .compareBrowser,
+  .comparePreview {
+    min-height: 300px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 1.8s;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

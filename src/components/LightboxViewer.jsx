@@ -1,7 +1,15 @@
 import { useState, useEffect, useRef } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { loadPhotoThumbnail } from "../lib/thumbnailLoader";
 import { loadPhotoPreview, prefetchPhotoPreview } from "../lib/previewLoader";
+import {
+  addTagToPhoto,
+  deletePhoto,
+  getPhotoTags,
+  permanentlyDeletePhoto,
+  removeTagFromPhoto,
+  toggleFavorite,
+  updateRating,
+} from "../services/photoService";
 
 export default function LightboxViewer({
   photosList,
@@ -64,7 +72,7 @@ export default function LightboxViewer({
     setPhotoTags([]);
     setTagInput("");
     setShowTagEditor(false);
-    invoke("get_photo_tags", { photoId: currentPhoto.id })
+    getPhotoTags({ photoId: currentPhoto.id })
       .then((tags) => {
         if (active) setPhotoTags(tags);
       })
@@ -185,11 +193,11 @@ export default function LightboxViewer({
   const handleToggleFav = async () => {
     if (!currentPhoto) return;
     try {
-      const nextFav = !currentPhoto.is_favorite;
-      await invoke("toggle_favorite", { id: currentPhoto.id, isFavorite: nextFav });
+      const nextFav = !currentPhoto.isFavorite;
+      await toggleFavorite({ id: currentPhoto.id, isFavorite: nextFav });
       
       // Update local state
-      currentPhoto.is_favorite = nextFav;
+      currentPhoto.isFavorite = nextFav;
       if (onPhotosUpdated) onPhotosUpdated();
     } catch (e) {
       console.error(e);
@@ -199,7 +207,7 @@ export default function LightboxViewer({
   const handleRatingChange = async (rating) => {
     if (!currentPhoto) return;
     try {
-      await invoke("update_rating", { id: currentPhoto.id, rating });
+      await updateRating({ id: currentPhoto.id, rating });
       // Update local state
       currentPhoto.rating = rating;
       if (onPhotosUpdated) onPhotosUpdated();
@@ -213,7 +221,7 @@ export default function LightboxViewer({
     const tagName = tagInput.trim();
     if (!tagName || !currentPhoto || photoTags.includes(tagName)) return;
     try {
-      await invoke("add_tag_to_photo", { photoId: currentPhoto.id, tagName });
+      await addTagToPhoto({ photoId: currentPhoto.id, tagName });
       setPhotoTags((current) => [...current, tagName]);
       setTagInput("");
       if (onPhotosUpdated) onPhotosUpdated();
@@ -225,7 +233,7 @@ export default function LightboxViewer({
   const handleRemoveTag = async (tagName) => {
     if (!currentPhoto) return;
     try {
-      await invoke("remove_tag_from_photo", { photoId: currentPhoto.id, tagName });
+      await removeTagFromPhoto({ photoId: currentPhoto.id, tagName });
       setPhotoTags((current) => current.filter((tag) => tag !== tagName));
       if (onPhotosUpdated) onPhotosUpdated();
     } catch (error) {
@@ -235,9 +243,9 @@ export default function LightboxViewer({
 
   const handleDelete = async () => {
     if (!currentPhoto) return;
-    const isTrash = currentPhoto.is_deleted;
+    const isTrash = currentPhoto.isDeleted;
     try {
-      await invoke("delete_photo", { id: currentPhoto.id, isDeleted: !isTrash });
+      await deletePhoto({ id: currentPhoto.id, isDeleted: !isTrash });
       alert(isTrash ? "照片已恢复" : "照片已移动到回收站");
       
       // Remove from list or trigger refresh
@@ -260,7 +268,7 @@ export default function LightboxViewer({
       return;
     }
     try {
-      await invoke("permanently_delete_photo", { id: currentPhoto.id });
+      await permanentlyDeletePhoto({ id: currentPhoto.id });
       alert("照片已永久删除");
       if (onPhotosUpdated) onPhotosUpdated();
       
@@ -383,20 +391,20 @@ export default function LightboxViewer({
           <button
             type="button"
             onClick={handleToggleFav}
-            className={`lightbox-bottom-action ${currentPhoto.is_favorite ? "is-favorite" : ""}`}
-            title={currentPhoto.is_favorite ? "取消喜欢" : "标记喜欢"}
+            className={`lightbox-bottom-action ${currentPhoto.isFavorite ? "is-favorite" : ""}`}
+            title={currentPhoto.isFavorite ? "取消喜欢" : "标记喜欢"}
           >
-            {currentPhoto.is_favorite ? "♥ 已喜欢" : "♡ 喜欢"}
+            {currentPhoto.isFavorite ? "♥ 已喜欢" : "♡ 喜欢"}
           </button>
           <button
             type="button"
             onClick={handleDelete}
-            className={`lightbox-bottom-action ${currentPhoto.is_deleted ? "is-restore" : "is-danger"}`}
-            title={currentPhoto.is_deleted ? "恢复照片" : "移入回收站"}
+            className={`lightbox-bottom-action ${currentPhoto.isDeleted ? "is-restore" : "is-danger"}`}
+            title={currentPhoto.isDeleted ? "恢复照片" : "移入回收站"}
           >
-            {currentPhoto.is_deleted ? "↩ 恢复" : "⌫ 回收站"}
+            {currentPhoto.isDeleted ? "↩ 恢复" : "⌫ 回收站"}
           </button>
-          {currentPhoto.is_deleted && (
+          {currentPhoto.isDeleted && (
             <button
               type="button"
               onClick={handlePermanentDelete}
@@ -450,23 +458,23 @@ export default function LightboxViewer({
           <div className="exif-grid">
             <div className="exif-item">
               <span className="exif-label">📸 相机品牌</span>
-              <span className="exif-val">{currentPhoto.camera_make || "—"}</span>
+              <span className="exif-val">{currentPhoto.cameraMake || "—"}</span>
             </div>
             <div className="exif-item">
               <span className="exif-label">🎥 相机型号</span>
-              <span className="exif-val">{currentPhoto.camera_model || "—"}</span>
+              <span className="exif-val">{currentPhoto.cameraModel || "—"}</span>
             </div>
             <div className="exif-item" style={{ gridColumn: "span 2" }}>
               <span className="exif-label">👓 镜头型号</span>
-              <span className="exif-val">{currentPhoto.lens_model || "—"}</span>
+              <span className="exif-val">{currentPhoto.lensModel || "—"}</span>
             </div>
             <div className="exif-item">
               <span className="exif-label">⏱️ 快门速度</span>
-              <span className="exif-val">{currentPhoto.exposure_time || "—"}</span>
+              <span className="exif-val">{currentPhoto.exposureTime || "—"}</span>
             </div>
             <div className="exif-item">
               <span className="exif-label">🔘 光圈数值</span>
-              <span className="exif-val">{currentPhoto.f_number ? `f/${currentPhoto.f_number}` : "—"}</span>
+              <span className="exif-val">{currentPhoto.fNumber ? `f/${currentPhoto.fNumber}` : "—"}</span>
             </div>
             <div className="exif-item">
               <span className="exif-label">⚡ 感光度 (ISO)</span>
@@ -474,7 +482,7 @@ export default function LightboxViewer({
             </div>
             <div className="exif-item">
               <span className="exif-label">📏 焦距</span>
-              <span className="exif-val">{currentPhoto.focal_length ? `${currentPhoto.focal_length} mm` : "—"}</span>
+              <span className="exif-val">{currentPhoto.focalLength ? `${currentPhoto.focalLength} mm` : "—"}</span>
             </div>
           </div>
         </div>
@@ -513,7 +521,7 @@ export default function LightboxViewer({
             </div>
             <div className="exif-item">
               <span className="exif-label">文件大小</span>
-              <span className="exif-val">{(currentPhoto.file_size / (1024 * 1024)).toFixed(2)} MB</span>
+              <span className="exif-val">{(currentPhoto.fileSize / (1024 * 1024)).toFixed(2)} MB</span>
             </div>
             <div className="exif-item">
               <span className="exif-label">图片尺寸</span>
@@ -523,7 +531,7 @@ export default function LightboxViewer({
             </div>
             <div className="exif-item">
               <span className="exif-label">拍摄时间</span>
-              <span className="exif-val">{currentPhoto.date_taken || "—"}</span>
+              <span className="exif-val">{currentPhoto.dateTaken || "—"}</span>
             </div>
           </div>
         </div>

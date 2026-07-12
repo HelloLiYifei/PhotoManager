@@ -1,32 +1,32 @@
-/* Design System and Variables */
-:root {
-  --bg-main: #0B0B0F;
-  --bg-card: rgba(18, 18, 24, 0.7);
-  --bg-sidebar: rgba(13, 13, 18, 0.85);
-  --border-color: rgba(255, 255, 255, 0.08);
-  --border-hover: rgba(255, 255, 255, 0.15);
-  
-  --text-main: #F3F4F6;
-  --text-muted: #9CA3AF;
-  --text-dark: #6B7280;
-  
-  --primary-start: #3B82F6;
-  --primary-end: #8B5CF6;
-  --accent-color: #A78BFA;
-  
-  --success-color: #10B981;
-  --danger-color: #EF4444;
-  --warning-color: #F59E0B;
-  
-  --glass-blur: blur(20px);
-  --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-}
+/* Design tokens live in styles/tokens.css. */
 
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+}
+
+:where(html, body, #root) {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+}
+
+:where(button, input, select, textarea) {
+  font: inherit;
+}
+
+:where(button) {
+  color: inherit;
+}
+
+:where(button:disabled, input:disabled, select:disabled, textarea:disabled) {
+  cursor: not-allowed;
+}
+
+:where(button, input, select, textarea, [tabindex]):focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 body {
@@ -63,26 +63,27 @@ body {
   display: flex;
   height: 100vh;
   width: 100vw;
-  background: radial-gradient(circle at 50% -20%, #1E1B4B 0%, var(--bg-main) 70%);
+  min-width: 0;
+  overflow: hidden;
+  background: var(--bg-main);
   position: relative;
 }
 
 /* Glassmorphism utility classes */
 .glass-panel {
   background: var(--bg-card);
-  backdrop-filter: var(--glass-blur);
   border: 1px solid var(--border-color);
   border-radius: 12px;
 }
 
 .gradient-text {
-  background: linear-gradient(135deg, #60A5FA 0%, #C084FC 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  background: none;
+  color: var(--text-main);
+  -webkit-text-fill-color: currentColor;
 }
 
 .gradient-btn {
-  background: linear-gradient(135deg, var(--primary-start) 0%, var(--primary-end) 100%);
+  background: var(--primary-start);
   color: #fff;
   border: none;
   cursor: pointer;
@@ -91,13 +92,12 @@ body {
 }
 
 .gradient-btn:hover {
-  filter: brightness(1.15);
-  box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
-  transform: translateY(-1px);
+  background: var(--primary-end);
+  box-shadow: 0 5px 16px rgba(46, 108, 224, 0.28);
 }
 
 .gradient-btn:active {
-  transform: translateY(1px);
+  filter: brightness(0.94);
 }
 
 /* Welcome Page / Workspace Selector */
@@ -465,6 +465,7 @@ body {
 /* Content Area Layout */
 .content-wrapper {
   flex-grow: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   height: 100vh;
@@ -482,12 +483,16 @@ body {
 
 .header-title-area {
   display: flex;
+  min-width: 0;
   flex-direction: column;
 }
 
 .header-title {
+  overflow: hidden;
   font-size: 18px;
   font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .header-path {
@@ -497,6 +502,7 @@ body {
 
 .header-actions {
   display: flex;
+  min-width: 0;
   align-items: center;
   gap: 14px;
 }
@@ -504,6 +510,7 @@ body {
 /* Timeline Grid */
 .timeline-viewport {
   flex-grow: 1;
+  min-width: 0;
   overflow-y: auto;
   padding: 24px;
 }
@@ -989,12 +996,14 @@ body {
 /* Album Overview Grid */
 .albums-grid {
   display: grid;
+  min-width: 0;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 24px;
   padding: 16px 0;
 }
 
 .album-card {
+  min-width: 0;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--border-color);
   border-radius: 12px;
@@ -2133,77 +2142,6 @@ body {
   background: #181821;
 }
 
-/* Finder-inspired icon view */
-.finder-icon-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
-  gap: 22px 16px;
-  padding: 4px 6px 28px;
-}
-
-.finder-icon-item {
-  min-width: 0;
-  padding: 6px;
-  border: 2px solid transparent;
-  border-radius: 10px;
-  cursor: default;
-  transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
-}
-
-.finder-icon-item:hover {
-  background: rgba(255, 255, 255, 0.045);
-  transform: translateY(-1px);
-}
-
-.finder-icon-item.selected {
-  border-color: var(--primary-start);
-  background: rgba(59, 130, 246, 0.16);
-}
-
-.finder-icon-thumbnail {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 1 / 1;
-  overflow: hidden;
-  border-radius: 8px;
-  background: #17171f;
-  box-shadow: 0 5px 16px rgba(0, 0, 0, 0.22);
-}
-
-.finder-icon-name {
-  margin-top: 8px;
-  overflow: hidden;
-  color: var(--text-main);
-  font-size: 11px;
-  font-weight: 500;
-  text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.finder-favorite-badge,
-.finder-type-badge {
-  position: absolute;
-  top: 7px;
-  padding: 2px 6px;
-  border-radius: 5px;
-  color: #fff;
-  background: rgba(0, 0, 0, 0.68);
-  font-size: 9px;
-  font-weight: 700;
-  backdrop-filter: blur(5px);
-}
-
-.finder-favorite-badge {
-  right: 7px;
-  color: #f87171;
-  font-size: 12px;
-}
-
-.finder-type-badge {
-  left: 7px;
-}
-
 /* Finder-inspired gallery view */
 .finder-gallery {
   display: flex;
@@ -2679,6 +2617,10 @@ body {
   font-size: 13px;
 }
 
+.map-header-summary p {
+  margin-top: 0;
+}
+
 .photo-map-marker-shell {
   background: transparent;
   border: 0;
@@ -2863,5 +2805,37 @@ body {
 .photo-location-arrow {
   color: var(--text-muted);
   font-size: 18px;
+}
+
+/* Keep legacy feature views contained while the phase-two shell is responsive. */
+@media (max-width: 800px), (max-height: 600px) {
+  .content-header {
+    min-width: 0;
+    padding-inline: var(--space-4);
+    gap: var(--space-3);
+  }
+
+  .header-actions {
+    flex-shrink: 0;
+    gap: var(--space-2);
+  }
+
+  .timeline-viewport {
+    padding: var(--space-4);
+  }
+
+  .albums-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: var(--space-4);
+  }
+
+  .wizard-overlay:not(.fullscreen) {
+    padding: var(--space-4);
+  }
+
+  .wizard-overlay:not(.fullscreen) .welcome-card {
+    max-height: calc(100vh - (2 * var(--space-4)));
+    overflow-y: auto;
+  }
 }
 

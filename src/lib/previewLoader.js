@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { getPhotoPreviewUrl } from "../services/photoService";
 
 const urlCache = new Map();
 const inFlight = new Map();
@@ -12,7 +12,7 @@ export function loadPhotoPreview(id) {
   const pending = inFlight.get(id);
   if (pending) return pending;
 
-  const promise = invoke("get_photo_preview_url", { id })
+  const promise = getPhotoPreviewUrl({ id })
     .then((url) => {
       urlCache.set(id, url);
       return url;

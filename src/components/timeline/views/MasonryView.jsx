@@ -1,0 +1,81 @@
+import { ThumbnailImage } from "../media";
+import { handlePhotoItemKeyDown } from "./photoItemKeyboard";
+import styles from "./PhotoViews.module.css";
+
+export default function MasonryView({
+  photos,
+  selectedIds = [],
+  compareLockedId = null,
+  scrollRoot,
+  onSelect,
+  onOpen,
+}) {
+  return (
+    <div className="masonry-grid" role="grid" aria-label="瀑布流照片">
+      {photos.map((photo, index) => {
+        const isSelected = selectedIds.includes(photo.id);
+        const isCompareBase = compareLockedId === photo.id;
+
+        return (
+          <div
+            key={photo.id}
+            className={[
+              "masonry-item",
+              styles.photoItem,
+              isSelected ? "selected" : "",
+              isCompareBase ? styles.compareBase : "",
+            ].filter(Boolean).join(" ")}
+            role="gridcell"
+            tabIndex={0}
+            aria-label={photo.filename}
+            aria-selected={isSelected}
+            data-compare-base={isCompareBase || undefined}
+            onClick={(event) => {
+              if (event.detail < 2) onSelect?.(photo, event);
+            }}
+            onDoubleClick={() => onOpen?.(photos, index)}
+            onKeyDown={(event) => handlePhotoItemKeyDown({
+              event,
+              photo,
+              photos,
+              index,
+              onSelect,
+              onOpen,
+            })}
+          >
+            <ThumbnailImage
+              id={photo.id}
+              alt={photo.filename}
+              scrollRoot={scrollRoot}
+            />
+
+            {photo.fileType && !["JPG", "JPEG"].includes(photo.fileType.toUpperCase()) && (
+              <span className={`${styles.badge} ${styles.fileTypeBadge}`}>
+                {photo.fileType}
+              </span>
+            )}
+
+            {photo.isFavorite && (
+              <span className={`${styles.badge} ${styles.favoriteBadge}`} aria-label="已收藏">
+                ♥
+              </span>
+            )}
+
+            <span className={`photo-card-overlay ${styles.overlay}`}>
+              <strong className={styles.filename}>{photo.filename}</strong>
+              {photo.rating > 0 && (
+                <span className={styles.rating} aria-label={`${photo.rating} 星`}>
+                  ★ {photo.rating}
+                </span>
+              )}
+            </span>
+
+            {isCompareBase && (
+              <span className={styles.compareLabel}>对比基准</span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}

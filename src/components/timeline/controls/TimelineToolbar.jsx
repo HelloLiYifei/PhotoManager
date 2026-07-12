@@ -1,19 +1,7 @@
 import { useEffect, useId } from "react";
-import {
-  GalleryHorizontal,
-  Grid3X3,
-  List,
-  Search,
-  SlidersHorizontal,
-  X,
-} from "lucide-react";
+import { Search, SlidersHorizontal, X } from "lucide-react";
+import ViewSwitcher from "../../shared/ViewSwitcher";
 import styles from "./TimelineToolbar.module.css";
-
-const VIEW_OPTIONS = [
-  { value: "masonry", label: "瀑布流", Icon: Grid3X3 },
-  { value: "list", label: "列表", Icon: List },
-  { value: "gallery", label: "画廊", Icon: GalleryHorizontal },
-];
 
 function FilterFields({
   allTags,
@@ -121,22 +109,11 @@ export default function TimelineToolbar({
         {activeFilterCount ? <strong aria-hidden="true">{activeFilterCount}</strong> : null}
       </button>
 
-      <div className={styles.viewSwitcher} role="group" aria-label="照片视图">
-        {VIEW_OPTIONS.map(({ value, label, Icon }) => (
-          <button
-            type="button"
-            key={value}
-            className={viewMode === value ? styles.activeView : undefined}
-            onClick={() => onViewModeChange?.(value)}
-            title={`${label}视图`}
-            aria-label={`${label}视图`}
-            aria-pressed={viewMode === value}
-          >
-            <Icon aria-hidden="true" />
-            <span>{label}</span>
-          </button>
-        ))}
-      </div>
+      <ViewSwitcher
+        value={viewMode}
+        onChange={onViewModeChange}
+        ariaLabel="照片视图"
+      />
 
       {filtersOpen ? (
         <div

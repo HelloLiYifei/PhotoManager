@@ -3,9 +3,37 @@ import { loadPhotoThumbnail } from "../../../lib/thumbnailLoader";
 import { loadPhotoPreview } from "../../../lib/previewLoader";
 
 export function ThumbnailImage({ id, alt, scrollRoot, fit = "natural" }) {
+  return (
+    <LazyThumbnail
+      sourceKey={`photo:${id}`}
+      load={(priority) => loadPhotoThumbnail(id, priority)}
+      alt={alt}
+      scrollRoot={scrollRoot}
+      fit={fit}
+      className="photo-thumbnail"
+      loadingClassName="photo-card-img"
+    />
+  );
+}
+
+export function LazyThumbnail({
+  load,
+  alt = "",
+  sourceKey = alt,
+  scrollRoot,
+  fit = "natural",
+  className = "",
+  loadingClassName = className,
+  onLoad,
+}) {
   const [src, setSrc] = useState("");
   const [loading, setLoading] = useState(true);
   const imageRef = useRef(null);
+  const loadRef = useRef(load);
+
+  useEffect(() => {
+    loadRef.current = load;
+  }, [load]);
 
   useEffect(() => {
     let active = true;
@@ -16,7 +44,7 @@ export function ThumbnailImage({ id, alt, scrollRoot, fit = "natural" }) {
 
     const load = async (priority = 0) => {
       try {
-        const imageUrl = await loadPhotoThumbnail(id, priority);
+        const imageUrl = await loadRef.current(priority);
         if (active) setSrc(imageUrl);
       } catch {
         // The fallback is rendered below. A broken thumbnail should not make
@@ -55,13 +83,15 @@ export function ThumbnailImage({ id, alt, scrollRoot, fit = "natural" }) {
       active = false;
       observer?.disconnect();
     };
-  }, [id, scrollRoot]);
+  }, [scrollRoot, sourceKey]);
+
+  const fitClassName = `thumbnail-${fit}`;
 
   if (loading) {
     return (
       <div
         ref={imageRef}
-        className={`photo-card-img thumbnail-${fit}`}
+        className={`${loadingClassName} ${fitClassName}`.trim()}
         role="status"
         aria-label={`正在加载${alt || "照片"}`}
       />
@@ -73,9 +103,11 @@ export function ThumbnailImage({ id, alt, scrollRoot, fit = "natural" }) {
       ref={imageRef}
       src={src || "/placeholder.svg"}
       alt={alt}
-      className={`photo-thumbnail thumbnail-${fit}`}
+      className={`${className} ${fitClassName}`.trim()}
       loading="lazy"
       decoding="async"
+      data-fit={fit}
+      onLoad={onLoad}
     />
   );
 }

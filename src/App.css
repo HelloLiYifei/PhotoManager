@@ -1761,59 +1761,6 @@ body {
   position: static;
 }
 
-/* Storage-card icon view */
-.import-icon-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 18px 14px;
-  padding: 2px 2px 28px;
-}
-
-.import-icon-item {
-  min-width: 0;
-  padding: 5px;
-  overflow: hidden;
-  border: 2px solid transparent;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.018);
-  cursor: pointer;
-  transition: transform 0.16s ease, background 0.16s ease, border-color 0.16s ease;
-}
-
-.import-icon-item:hover {
-  background: rgba(255, 255, 255, 0.055);
-  transform: translateY(-2px);
-}
-
-.import-icon-item.selected:not(.already-imported) {
-  border-color: var(--primary-start);
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.12);
-}
-
-.import-icon-item.preview-focused,
-.wizard-photo-card.preview-focused {
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.88), 0 0 0 5px rgba(96, 165, 250, 0.3), 0 10px 24px rgba(0, 0, 0, 0.34) !important;
-}
-
-.import-icon-thumbnail {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 1 / 1;
-  overflow: hidden;
-  border-radius: 7px;
-  background: #1a1a24;
-}
-
-.import-icon-name {
-  margin: 7px 3px 2px;
-  overflow: hidden;
-  color: var(--text-main);
-  font-size: 10px;
-  text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* Storage-card list view */
 .import-list-view {
   min-width: 700px;

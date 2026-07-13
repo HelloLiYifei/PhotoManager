@@ -11,7 +11,11 @@ import {
 } from "./importViewUtils";
 import styles from "./ImportViews.module.css";
 
-const MASONRY_THUMBNAIL_ASPECT_RATIO = "4 / 3";
+function getStableAspectRatio(photo) {
+  const width = Number(photo.width);
+  const height = Number(photo.height);
+  return width > 0 && height > 0 ? `${width} / ${height}` : "4 / 3";
+}
 
 export default function ImportMasonryView({
   photos = [],
@@ -70,8 +74,7 @@ export default function ImportMasonryView({
               <ImportThumbnail
                 photo={photo}
                 scrollRoot={scrollRoot}
-                fit="cover"
-                aspectRatio={MASONRY_THUMBNAIL_ASPECT_RATIO}
+                aspectRatio={getStableAspectRatio(photo)}
               />
             </div>
             <ImportPhotoMarkers photo={photo} state={state} />

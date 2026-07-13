@@ -36,6 +36,8 @@ const photos = [
     relativePath: "DCIM/first.jpg",
     dateTaken: "2026-06-01",
     size: 2 * 1024 * 1024,
+    width: 6000,
+    height: 4000,
     isRaw: false,
     alreadyImported: false,
   },
@@ -44,6 +46,8 @@ const photos = [
     relativePath: "DCIM/existing.jpg",
     dateTaken: "2026-06-02",
     size: 3 * 1024 * 1024,
+    width: 3000,
+    height: 4500,
     isRaw: false,
     alreadyImported: true,
   },
@@ -95,8 +99,11 @@ describe("导入照片视图", () => {
 
     const fresh = screen.getByRole("gridcell", { name: "DCIM/first.jpg" });
     const freshThumbnail = within(fresh).getByRole("img", { name: "DCIM/first.jpg" });
-    expect(freshThumbnail).toHaveAttribute("data-fit", "cover");
-    expect(freshThumbnail).toHaveStyle({ aspectRatio: "4 / 3" });
+    expect(freshThumbnail).toHaveAttribute("data-fit", "natural");
+    expect(freshThumbnail).toHaveStyle({ aspectRatio: "6000 / 4000" });
+    expect(within(screen.getByRole("gridcell", { name: "DCIM/existing.jpg" }))
+      .getByRole("img", { name: "DCIM/existing.jpg" }))
+      .toHaveStyle({ aspectRatio: "3000 / 4500" });
     fireEvent.mouseDown(fresh);
     fireEvent.mouseEnter(fresh);
     expect(onBrushPhoto).toHaveBeenCalledWith(photos[0], expect.anything());

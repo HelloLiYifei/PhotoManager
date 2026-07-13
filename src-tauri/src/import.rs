@@ -32,8 +32,43 @@ pub struct CardPhoto {
     pub absolute_path: String,
     pub size: i64,
     pub date_taken: String,
+    pub width: Option<i32>,
+    pub height: Option<i32>,
     pub is_raw: bool,
     pub already_imported: bool,
+}
+
+fn card_photo_dimensions(path: &Path, is_raw: bool) -> (Option<i32>, Option<i32>) {
+    // Camera EXIF dimensions include orientation handling, so portrait photos
+    // reserve the same space before and after their thumbnail is decoded.
+    let exif = read_exif_metadata(path);
+    if exif.width.is_some_and(|width| width > 0)
+        && exif.height.is_some_and(|height| height > 0)
+    {
+        return (exif.width, exif.height);
+    }
+
+    let dimensions = if is_raw {
+        crate::metadata::extract_raw_small_preview(path)
+            .ok()
+            .and_then(|bytes| image::load_from_memory(&bytes).ok())
+            .map(|preview| (preview.width(), preview.height()))
+    } else {
+        image::image_dimensions(path).ok()
+    };
+
+    match dimensions {
+        Some((width, height)) if width > 0 && height > 0 => {
+            let (Ok(width), Ok(height)) = (i32::try_from(width), i32::try_from(height)) else {
+                return (None, None);
+            };
+            match crate::metadata::get_orientation(path) {
+                5 | 6 | 7 | 8 => (Some(height), Some(width)),
+                _ => (Some(width), Some(height)),
+            }
+        }
+        _ => (None, None),
+    }
 }
 
 fn normalized_import_identity(filename: &str, size: i64) -> (String, i64) {
@@ -229,9 +264,10 @@ pub fn scan_card_files(card_path: &str, conn: Option<&Connection>) -> Vec<CardPh
                     let file_ext = ext.to_lowercase();
                     let is_raw = matches!(file_ext.as_str(), "arw" | "cr2" | "nef");
 
-                    // Do not parse EXIF during card discovery. It forces a
-                    // second read of every file on slow removable media; the
-                    // full EXIF is still extracted once, during import.
+                    // Dimensions are collected up front so the UI can reserve
+                    // each card's final height and avoid masonry layout shifts.
+                    // Other metadata is still deferred until import.
+                    let (width, height) = card_photo_dimensions(entry.path(), is_raw);
                     let mod_time = metadata.modified().unwrap_or(std::time::SystemTime::now());
                     let datetime: chrono::DateTime<Utc> = mod_time.into();
                     let date_taken = datetime.format("%Y-%m-%d %H:%M:%S").to_string();
@@ -250,6 +286,8 @@ pub fn scan_card_files(card_path: &str, conn: Option<&Connection>) -> Vec<CardPh
                         absolute_path,
                         size,
                         date_taken,
+                        width,
+                        height,
                         is_raw,
                         already_imported,
                     });
@@ -515,10 +553,23 @@ pub fn execute_import(
 #[cfg(test)]
 mod tests {
     use super::{
-        load_imported_file_index, normalized_import_identity, resolve_import_coordinates,
-        ImportLocation,
+        card_photo_dimensions, load_imported_file_index, normalized_import_identity,
+        resolve_import_coordinates, ImportLocation,
     };
     use rusqlite::Connection;
+
+    #[test]
+    fn reads_card_dimensions_before_thumbnail_loading() {
+        let path = std::env::temp_dir().join(format!(
+            "photomanager-card-dimensions-{}.png",
+            uuid::Uuid::new_v4()
+        ));
+        image::RgbImage::new(12, 20).save(&path).unwrap();
+
+        assert_eq!(card_photo_dimensions(&path, false), (Some(12), Some(20)));
+
+        let _ = std::fs::remove_file(path);
+    }
 
     #[test]
     fn detects_an_import_after_the_destination_was_renamed() {

@@ -93,7 +93,8 @@ describe("App phase-two shell", () => {
       await screen.findByRole("button", { name: "打开相册旅行，3张照片" }),
     );
 
-    expect(screen.getByRole("heading", { name: "旅行" })).toBeInTheDocument();
+    expect(screen.queryByRole("banner")).not.toBeInTheDocument();
+    expect(document.querySelector(".page-header")).not.toBeInTheDocument();
     expect(screen.getByTestId("timeline-view")).toHaveTextContent("album:album-1");
   });
 

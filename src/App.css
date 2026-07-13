@@ -2100,10 +2100,6 @@ body {
   outline: none;
 }
 
-.finder-gallery.has-action-toolbar {
-  padding-bottom: 84px;
-}
-
 .finder-gallery:focus-visible .finder-gallery-stage,
 .import-gallery-view:focus-visible .import-gallery-stage {
   box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.42);
@@ -2155,19 +2151,31 @@ body {
   display: flex;
   min-height: 330px;
   flex: 1 1 auto;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: stretch;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.055);
   border-radius: 12px;
   background: radial-gradient(circle at 50% 35%, #22232d 0%, #111118 68%);
 }
 
+.finder-gallery-media {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
 .gallery-preview-image {
   width: auto;
   max-width: calc(100% - 40px);
   height: auto;
-  max-height: calc(100% - 82px);
+  max-height: calc(100% - 40px);
   border-radius: 6px;
   object-fit: contain;
   box-shadow: 0 14px 44px rgba(0, 0, 0, 0.5);
@@ -2180,17 +2188,18 @@ body {
 }
 
 .finder-gallery-caption {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  display: flex;
-  padding: 24px 18px 12px;
-  align-items: flex-end;
-  justify-content: space-between;
+  position: relative;
+  z-index: 20;
+  display: grid;
+  min-height: 64px;
+  box-sizing: border-box;
+  padding: 8px 16px;
+  flex: 0 0 64px;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
   gap: 12px;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.72), transparent);
-  pointer-events: none;
+  background: rgba(8, 9, 13, 0.88);
+  border-top: 1px solid rgba(255, 255, 255, 0.055);
 }
 
 .finder-gallery-caption strong {
@@ -2201,16 +2210,38 @@ body {
 }
 
 .finder-gallery-caption span {
+  min-width: 0;
+  justify-self: end;
   flex-shrink: 0;
+  overflow: hidden;
   color: rgba(255, 255, 255, 0.72);
   font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.finder-gallery-actions {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  justify-content: center;
+}
+
+.finder-gallery-actions > [aria-label="批量操作"] {
+  position: relative;
+  bottom: auto;
+  left: auto;
+  max-width: 100%;
+  transform: none;
 }
 
 .finder-gallery-filmstrip {
   display: flex;
-  height: 108px;
-  padding: 4px 6px 12px;
-  flex: 0 0 108px;
+  height: 116px;
+  box-sizing: border-box;
+  margin-bottom: var(--space-3);
+  padding: 4px 6px 18px;
+  flex: 0 0 116px;
   align-items: center;
   gap: 10px;
   overflow-x: auto;

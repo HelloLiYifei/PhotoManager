@@ -192,6 +192,9 @@ describe("TimelineGrid phase-three integration", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "画廊视图" }));
     expect(screen.getByLabelText("画廊照片预览")).toBeInTheDocument();
+    expect(container.querySelector(".finder-gallery-caption")).toContainElement(
+      screen.getByRole("region", { name: "批量操作" }),
+    );
     expect(localStorage.getItem("photomanager-photo-view")).toBe("gallery");
 
     fireEvent.click(screen.getByRole("button", { name: "瀑布流视图" }));

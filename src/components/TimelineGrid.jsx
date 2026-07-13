@@ -226,6 +226,25 @@ export default function TimelineGrid({
   const showBatchActions =
     selectedIds.length > 0 || (currentView === "trash" && photos.length > 0);
 
+  const batchActionBar = (
+    <BatchActionBar
+      currentView={currentView}
+      selectedCount={selectedIds.length}
+      totalCount={photos.length}
+      compareActive={compareMode}
+      onInspect={() => setInspectorOpen(true)}
+      onFavorite={actions.favoriteSelected}
+      onCompare={toggleCompare}
+      onMove={openMoveDialog}
+      onAddTag={actions.tagSelected}
+      onExport={actions.exportSelected}
+      onDelete={actions.deleteSelected}
+      onRestore={actions.restoreSelected}
+      onPermanentDelete={actions.deleteSelected}
+      onEmptyTrash={actions.emptyTrash}
+    />
+  );
+
   let photoView = null;
   if (viewMode === "list") {
     photoView = (
@@ -244,7 +263,7 @@ export default function TimelineGrid({
         activePhoto={primaryPhoto || photos[0]}
         selectedIds={selectedIds}
         scrollRoot={gridScrollRef}
-        hasActionToolbar={showBatchActions}
+        actionToolbar={showBatchActions ? batchActionBar : null}
         onSelect={selectGalleryPhoto}
         onOpen={openPhoto}
       />
@@ -353,22 +372,7 @@ export default function TimelineGrid({
         />
       </div>
 
-      <BatchActionBar
-        currentView={currentView}
-        selectedCount={selectedIds.length}
-        totalCount={photos.length}
-        compareActive={compareMode}
-        onInspect={() => setInspectorOpen(true)}
-        onFavorite={actions.favoriteSelected}
-        onCompare={toggleCompare}
-        onMove={openMoveDialog}
-        onAddTag={actions.tagSelected}
-        onExport={actions.exportSelected}
-        onDelete={actions.deleteSelected}
-        onRestore={actions.restoreSelected}
-        onPermanentDelete={actions.deleteSelected}
-        onEmptyTrash={actions.emptyTrash}
-      />
+      {viewMode !== "gallery" ? batchActionBar : null}
 
       <MoveAlbumDialog
         open={moveDialogOpen}

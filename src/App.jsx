@@ -309,7 +309,7 @@ function App() {
     />
   );
 
-  const header = (
+  const header = currentView === "album" ? null : (
     <PageHeader
       title={viewMeta.title}
       description={viewMeta.description}

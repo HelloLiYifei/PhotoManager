@@ -13,7 +13,7 @@ export default function GalleryView({
   activePhoto,
   selectedIds = [],
   scrollRoot,
-  hasActionToolbar = false,
+  actionToolbar = null,
   onSelect,
   onOpen,
 }) {
@@ -73,7 +73,7 @@ export default function GalleryView({
   return (
     <div
       ref={galleryRef}
-      className={`finder-gallery ${hasActionToolbar ? "has-action-toolbar" : ""}`}
+      className={`finder-gallery ${actionToolbar ? "has-action-toolbar" : ""}`}
       tabIndex={0}
       aria-label="画廊照片预览"
       onKeyDown={handleGalleryKeyDown}
@@ -81,38 +81,45 @@ export default function GalleryView({
       <div
         className="finder-gallery-stage"
         onWheel={handleWheel}
-        onDoubleClick={() => onOpen?.(photos, activeIndex)}
       >
-        {activeIndex > 0 && (
-          <button
-            type="button"
-            className="gallery-stage-nav prev"
-            onClick={(event) => selectIndex(activeIndex - 1, event)}
-            aria-label="上一张"
-          >
-            ‹
-          </button>
-        )}
+        <div
+          className="finder-gallery-media"
+          onDoubleClick={() => onOpen?.(photos, activeIndex)}
+        >
+          {activeIndex > 0 && (
+            <button
+              type="button"
+              className="gallery-stage-nav prev"
+              onClick={(event) => selectIndex(activeIndex - 1, event)}
+              aria-label="上一张"
+            >
+              ‹
+            </button>
+          )}
 
-        <GalleryPreviewImage id={currentPhoto.id} alt={currentPhoto.filename} />
+          <GalleryPreviewImage id={currentPhoto.id} alt={currentPhoto.filename} />
+
+          {activeIndex < photos.length - 1 && (
+            <button
+              type="button"
+              className="gallery-stage-nav next"
+              onClick={(event) => selectIndex(activeIndex + 1, event)}
+              aria-label="下一张"
+            >
+              ›
+            </button>
+          )}
+        </div>
 
         <div className="finder-gallery-caption">
           <strong>{currentPhoto.filename}</strong>
+          {actionToolbar ? (
+            <div className="finder-gallery-actions">{actionToolbar}</div>
+          ) : <span aria-hidden="true" />}
           <span>
             {currentPhoto.dateTaken || "日期未知"} · {formatFileSize(currentPhoto.fileSize)}
           </span>
         </div>
-
-        {activeIndex < photos.length - 1 && (
-          <button
-            type="button"
-            className="gallery-stage-nav next"
-            onClick={(event) => selectIndex(activeIndex + 1, event)}
-            aria-label="下一张"
-          >
-            ›
-          </button>
-        )}
       </div>
 
       <div className="finder-gallery-filmstrip" role="listbox" aria-label="照片胶片带">

@@ -48,4 +48,27 @@ describe("useAlbumBrush", () => {
     expect(result.current.selectedPaths).toEqual([]);
     expect(result.current.photoAlbums).toEqual({});
   });
+
+  it("sets and clears an explicit detail-view album while protecting duplicates", () => {
+    const { result } = renderHook(useHarness);
+
+    act(() => {
+      expect(result.current.setPhotoAlbum(fresh.absolutePath, "旅行")).toBe(true);
+    });
+    expect(result.current.selectedPaths).toEqual([fresh.absolutePath]);
+    expect(result.current.photoAlbums).toEqual({ [fresh.absolutePath]: "旅行" });
+
+    act(() => result.current.setPhotoAlbum(fresh.absolutePath, "默认相册"));
+    expect(result.current.selectedPaths).toEqual([fresh.absolutePath]);
+    expect(result.current.photoAlbums).toEqual({});
+
+    act(() => result.current.setPhotoAlbum(fresh.absolutePath, null));
+    expect(result.current.selectedPaths).toEqual([]);
+    expect(result.current.photoAlbums).toEqual({});
+
+    act(() => {
+      expect(result.current.setPhotoAlbum(duplicate.absolutePath, "旅行")).toBe(false);
+    });
+    expect(result.current.selectedPaths).toEqual([]);
+  });
 });

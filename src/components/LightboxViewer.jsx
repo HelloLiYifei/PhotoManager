@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { loadPhotoThumbnail } from "../lib/thumbnailLoader";
-import { loadPhotoPreview, prefetchPhotoPreview } from "../lib/previewLoader";
+import { loadPathThumbnail, loadPhotoThumbnail } from "../lib/thumbnailLoader";
+import { loadPathPreview, loadPhotoPreview, prefetchPhotoPreview } from "../lib/previewLoader";
 import {
   addTagToPhoto,
   deletePhoto,
@@ -21,16 +21,38 @@ import styles from "./lightbox/Lightbox.module.css";
 
 const clampZoom = (value) => Math.min(8, Math.max(0.25, value));
 
+function importPhotoForDisplay(photo) {
+  const pathParts = photo.relativePath?.split(/[/\\]/) || [];
+  return {
+    ...photo,
+    id: photo.absolutePath,
+    filename: pathParts.at(-1) || photo.absolutePath,
+    path: photo.absolutePath,
+    fileSize: photo.size,
+  };
+}
+
 export default function LightboxViewer({
   photosList,
   initialIndex,
   onClose,
   onPhotosUpdated,
   onShowOnMap,
+  mode = "library",
+  importAlbums = [],
+  getImportPhotoState,
+  onSetImportAlbum,
 }) {
   const safeInitialIndex = Math.min(Math.max(initialIndex ?? 0, 0), Math.max(photosList.length - 1, 0));
   const [currentIndex, setCurrentIndex] = useState(safeInitialIndex);
   const currentPhoto = photosList[currentIndex];
+  const isImportMode = mode === "import";
+  const displayPhoto = isImportMode && currentPhoto
+    ? importPhotoForDisplay(currentPhoto)
+    : currentPhoto;
+  const importPhotoState = isImportMode && currentPhoto
+    ? getImportPhotoState?.(currentPhoto) || {}
+    : null;
   const isNarrow = useNarrowLightbox();
   const [detailsOpen, setDetailsOpen] = useState(() => !isNarrow);
   const [previewSrc, setPreviewSrc] = useState(null);
@@ -89,13 +111,20 @@ export default function LightboxViewer({
     setThumbnailSrc(null);
     resetTransform();
 
-    loadPhotoThumbnail(currentPhoto.id)
+    const thumbnailRequest = isImportMode
+      ? loadPathThumbnail(currentPhoto.absolutePath, Boolean(currentPhoto.isRaw))
+      : loadPhotoThumbnail(currentPhoto.id);
+    const previewRequest = isImportMode
+      ? loadPathPreview(currentPhoto.absolutePath, Boolean(currentPhoto.isRaw))
+      : loadPhotoPreview(currentPhoto.id);
+
+    thumbnailRequest
       .then((url) => {
         if (active) setThumbnailSrc(url);
       })
       .catch(() => {});
 
-    loadPhotoPreview(currentPhoto.id)
+    previewRequest
       .then((url) => {
         if (active) setPreviewSrc(url);
       })
@@ -106,16 +135,25 @@ export default function LightboxViewer({
         setLoading(false);
       });
 
-    prefetchPhotoPreview(photosList[currentIndex - 1]?.id);
-    prefetchPhotoPreview(photosList[currentIndex + 1]?.id);
+    if (!isImportMode) {
+      prefetchPhotoPreview(photosList[currentIndex - 1]?.id);
+      prefetchPhotoPreview(photosList[currentIndex + 1]?.id);
+    }
 
     return () => {
       active = false;
     };
-  }, [currentIndex, currentPhoto, loadRevision, photosList, resetTransform]);
+  }, [currentIndex, currentPhoto, isImportMode, loadRevision, photosList, resetTransform]);
 
   useEffect(() => {
     if (!currentPhoto) return undefined;
+    if (isImportMode) {
+      setPhotoTags([]);
+      setTagInput("");
+      setRating(0);
+      setFavorite(false);
+      return undefined;
+    }
     let active = true;
     setPhotoTags([]);
     setTagInput("");
@@ -129,7 +167,7 @@ export default function LightboxViewer({
     return () => {
       active = false;
     };
-  }, [currentPhoto]);
+  }, [currentPhoto, isImportMode]);
 
   useEffect(() => {
     setDetailsOpen(!isNarrow);
@@ -297,11 +335,16 @@ export default function LightboxViewer({
     }
   };
 
+  const handleImportAlbumChange = (albumName) => {
+    if (!isImportMode || !currentPhoto || currentPhoto.alreadyImported) return;
+    onSetImportAlbum?.(currentPhoto, albumName);
+  };
+
   if (!currentPhoto) return null;
 
   const infoPanel = (
     <LightboxInfoPanel
-      photo={currentPhoto}
+      photo={displayPhoto}
       tags={photoTags}
       tagInput={tagInput}
       onTagInputChange={setTagInput}
@@ -309,14 +352,21 @@ export default function LightboxViewer({
       onRemoveTag={handleRemoveTag}
       onShowOnMap={onShowOnMap}
       disabled={Boolean(pendingAction)}
+      showTags={!isImportMode}
+      showMapAction={!isImportMode}
     />
   );
 
   return (
-    <div className={styles.overlay} role="dialog" aria-modal="true" aria-label="照片预览">
+    <div
+      className={`${styles.overlay} ${isImportMode ? styles.importOverlay : ""}`}
+      role="dialog"
+      aria-modal="true"
+      aria-label={isImportMode ? "导入照片详细预览" : "照片预览"}
+    >
       <main className={styles.main}>
         <LightboxCanvas
-          photo={currentPhoto}
+          photo={displayPhoto}
           previewSrc={previewSrc}
           thumbnailSrc={thumbnailSrc}
           loading={loading}
@@ -354,6 +404,12 @@ export default function LightboxViewer({
           onToggleFavorite={handleToggleFavorite}
           onDelete={handleDelete}
           onPermanentDelete={handlePermanentDelete}
+          mode={mode}
+          importAlbums={importAlbums}
+          importTargetAlbum={importPhotoState?.targetAlbum || null}
+          importTargetColor={importPhotoState?.albumColor || "transparent"}
+          importColorDisabled={Boolean(currentPhoto.alreadyImported)}
+          onImportAlbumChange={handleImportAlbumChange}
         />
       </main>
 
@@ -368,7 +424,7 @@ export default function LightboxViewer({
           open={detailsOpen}
           onClose={() => setDetailsOpen(false)}
           title="照片信息"
-          description="查看拍摄参数、文件信息与标签"
+          description={isImportMode ? "查看拍摄参数与来源文件信息" : "查看拍摄参数、文件信息与标签"}
           side="right"
           closeDisabled={Boolean(pendingAction)}
         >

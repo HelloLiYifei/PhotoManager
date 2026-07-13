@@ -114,6 +114,7 @@ describe("ImportWizard phase-four integration", () => {
       return unlisten;
     });
     mocks.loadPathPreview.mockResolvedValue("preview.jpg");
+    mocks.loadPathThumbnail.mockResolvedValue("thumbnail.jpg");
     mocks.selectDirectory.mockResolvedValue(null);
     vi.spyOn(window, "alert").mockImplementation(() => {});
     vi.spyOn(window, "confirm").mockReturnValue(true);
@@ -281,5 +282,22 @@ describe("ImportWizard phase-four integration", () => {
     });
     await waitFor(() => expect(onImportComplete).toHaveBeenCalledWith(2));
     expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it("opens an import detail snapshot and colors the current photo from its toolbar", async () => {
+    renderWizard();
+    const first = await screen.findByRole("gridcell", { name: "IMG_0001.JPG" });
+
+    fireEvent.doubleClick(first);
+    expect(await screen.findByRole("dialog", { name: "导入照片详细预览" })).toBeInTheDocument();
+    expect(mocks.loadPathPreview).toHaveBeenCalledWith(freshOne.absolutePath, false);
+
+    fireEvent.click(screen.getByRole("button", { name: "为当前照片染色" }));
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "旅行" }));
+    expect(screen.getByText("染色 · 旅行")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "关闭照片预览" }));
+    expect(screen.queryByRole("dialog", { name: "导入照片详细预览" })).not.toBeInTheDocument();
+    expect(screen.getByText("相册 · 旅行")).toBeInTheDocument();
   });
 });

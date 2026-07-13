@@ -20,6 +20,7 @@ export default function ImportListView({
   onActivatePhoto,
   onBrushPhoto,
   onBrushEnter,
+  onOpenPhoto,
 }) {
   if (photos.length === 0) {
     return <div className={styles.empty} role="status">暂无可预览照片</div>;
@@ -74,6 +75,9 @@ export default function ImportListView({
                 onActivatePhoto,
                 onBrushPhoto,
               })}
+              onDoubleClick={() => {
+                if (!brushAlbum) onOpenPhoto?.(photo);
+              }}
             >
               <span className={styles.listName} role="cell">
                 <span className={styles.listThumb}>

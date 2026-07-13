@@ -27,6 +27,7 @@ export default function ImportGalleryView({
   onActivatePhoto,
   onBrushPhoto,
   onBrushEnter,
+  onOpenPhoto,
 }) {
   const galleryRef = useRef(null);
   const lastWheelTimeRef = useRef(0);
@@ -111,12 +112,20 @@ export default function ImportGalleryView({
         })}
         onWheel={handleWheel}
       >
-        <div className={styles.galleryMedia} role="group" aria-label="当前导入照片预览">
+        <div
+          className={styles.galleryMedia}
+          role="group"
+          aria-label="当前导入照片预览"
+          onDoubleClick={() => {
+            if (!brushAlbum) onOpenPhoto?.(photo);
+          }}
+        >
           {activeIndex > 0 && (
             <button
               type="button"
               className={`${styles.galleryNav} ${styles.previous}`}
               onMouseDown={(event) => event.stopPropagation()}
+              onDoubleClick={(event) => event.stopPropagation()}
               onClick={() => activateIndex(activeIndex - 1)}
               aria-label="上一张"
             >
@@ -132,6 +141,7 @@ export default function ImportGalleryView({
               type="button"
               className={`${styles.galleryNav} ${styles.next}`}
               onMouseDown={(event) => event.stopPropagation()}
+              onDoubleClick={(event) => event.stopPropagation()}
               onClick={() => activateIndex(activeIndex + 1)}
               aria-label="下一张"
             >
@@ -179,6 +189,9 @@ export default function ImportGalleryView({
                 brushAlbum,
                 onBrushEnter,
               })}
+              onDoubleClick={() => {
+                if (!brushAlbum) onOpenPhoto?.(filmPhoto);
+              }}
               title={filmPhoto.relativePath}
             >
               <ImportThumbnail photo={filmPhoto} scrollRoot={scrollRoot} fit="cover" />

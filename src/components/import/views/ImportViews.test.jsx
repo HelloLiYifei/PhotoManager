@@ -213,4 +213,65 @@ describe("导入照片视图", () => {
     expect(getImportAlbumColor("旅行")).toBe(getImportAlbumColor("旅行"));
     expect(getImportAlbumColor("旅行")).toMatch(/^#[0-9A-F]{6}$/);
   });
+
+  it("无刷子时从瀑布流、列表、画廊主图和胶片带双击打开详情", async () => {
+    const onOpenPhoto = vi.fn();
+    const masonry = render(
+      <ImportMasonryView
+        photos={[photos[0]]}
+        getPhotoVisualState={photoState}
+        onOpenPhoto={onOpenPhoto}
+      />,
+    );
+    fireEvent.doubleClick(screen.getByRole("gridcell", { name: "DCIM/first.jpg" }));
+    expect(onOpenPhoto).toHaveBeenLastCalledWith(photos[0]);
+    masonry.unmount();
+
+    const list = render(
+      <ImportListView
+        photos={[photos[0]]}
+        getPhotoVisualState={photoState}
+        onOpenPhoto={onOpenPhoto}
+      />,
+    );
+    fireEvent.doubleClick(screen.getByRole("row", { name: "DCIM/first.jpg" }));
+    expect(onOpenPhoto).toHaveBeenLastCalledWith(photos[0]);
+    list.unmount();
+
+    render(
+      <ImportGalleryView
+        photos={photos}
+        activePath={photos[0].absolutePath}
+        getPhotoVisualState={photoState}
+        onOpenPhoto={onOpenPhoto}
+      />,
+    );
+    const galleryMedia = screen.getByRole("group", { name: "当前导入照片预览" });
+    await waitFor(() => expect(within(galleryMedia).getByRole("img", { name: "DCIM/first.jpg" }))
+      .toHaveAttribute("src", `preview://${photos[0].absolutePath}`));
+    fireEvent.doubleClick(galleryMedia);
+    expect(onOpenPhoto).toHaveBeenLastCalledWith(photos[0]);
+    fireEvent.doubleClick(screen.getByRole("option", { name: "DCIM/existing.jpg" }));
+    expect(onOpenPhoto).toHaveBeenLastCalledWith(photos[1]);
+  });
+
+  it("刷子激活时双击仍只染色而不打开详情", () => {
+    const onBrushPhoto = vi.fn();
+    const onOpenPhoto = vi.fn();
+    render(
+      <ImportMasonryView
+        photos={[photos[0]]}
+        brushAlbum="旅行"
+        getPhotoVisualState={photoState}
+        onBrushPhoto={onBrushPhoto}
+        onOpenPhoto={onOpenPhoto}
+      />,
+    );
+
+    const card = screen.getByRole("gridcell", { name: "DCIM/first.jpg" });
+    fireEvent.mouseDown(card);
+    fireEvent.doubleClick(card);
+    expect(onBrushPhoto).toHaveBeenCalled();
+    expect(onOpenPhoto).not.toHaveBeenCalled();
+  });
 });

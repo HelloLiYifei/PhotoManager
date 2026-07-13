@@ -1,16 +1,18 @@
+use chrono::Utc;
+use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
-use std::collections::HashSet;
-use serde::{Deserialize, Serialize};
-use walkdir::WalkDir;
-use uuid::Uuid;
-use chrono::Utc;
 use tauri::Emitter;
+use uuid::Uuid;
+use walkdir::WalkDir;
 
 use crate::db::DbState;
-use rusqlite::Connection;
-use crate::metadata::{generate_thumbnail, read_exif_metadata, thumbnail_cache_path};
+use crate::metadata::{
+    generate_thumbnail, read_exif_metadata, thumbnail_cache_path, ImageMetadata,
+};
 use crate::scan::is_supported_image;
+use rusqlite::Connection;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ImportProgress {
@@ -34,18 +36,27 @@ pub struct CardPhoto {
     pub date_taken: String,
     pub width: Option<i32>,
     pub height: Option<i32>,
+    pub camera_make: Option<String>,
+    pub camera_model: Option<String>,
+    pub lens_model: Option<String>,
+    pub exposure_time: Option<String>,
+    pub f_number: Option<f64>,
+    pub iso: Option<i32>,
+    pub focal_length: Option<f64>,
+    pub latitude: Option<f64>,
+    pub longitude: Option<f64>,
     pub is_raw: bool,
     pub already_imported: bool,
 }
 
-fn card_photo_dimensions(path: &Path, is_raw: bool) -> (Option<i32>, Option<i32>) {
+fn card_photo_metadata(path: &Path, is_raw: bool) -> ImageMetadata {
     // Camera EXIF dimensions include orientation handling, so portrait photos
     // reserve the same space before and after their thumbnail is decoded.
-    let exif = read_exif_metadata(path);
-    if exif.width.is_some_and(|width| width > 0)
-        && exif.height.is_some_and(|height| height > 0)
+    let mut metadata = read_exif_metadata(path);
+    if metadata.width.is_some_and(|width| width > 0)
+        && metadata.height.is_some_and(|height| height > 0)
     {
-        return (exif.width, exif.height);
+        return metadata;
     }
 
     let dimensions = if is_raw {
@@ -60,15 +71,25 @@ fn card_photo_dimensions(path: &Path, is_raw: bool) -> (Option<i32>, Option<i32>
     match dimensions {
         Some((width, height)) if width > 0 && height > 0 => {
             let (Ok(width), Ok(height)) = (i32::try_from(width), i32::try_from(height)) else {
-                return (None, None);
+                return metadata;
             };
-            match crate::metadata::get_orientation(path) {
+            let (width, height) = match crate::metadata::get_orientation(path) {
                 5 | 6 | 7 | 8 => (Some(height), Some(width)),
                 _ => (Some(width), Some(height)),
-            }
+            };
+            metadata.width = width;
+            metadata.height = height;
         }
-        _ => (None, None),
+        _ => {}
     }
+
+    metadata
+}
+
+#[cfg(test)]
+fn card_photo_dimensions(path: &Path, is_raw: bool) -> (Option<i32>, Option<i32>) {
+    let metadata = card_photo_metadata(path, is_raw);
+    (metadata.width, metadata.height)
 }
 
 fn normalized_import_identity(filename: &str, size: i64) -> (String, i64) {
@@ -185,7 +206,7 @@ pub fn detect_removable_cards() -> Vec<CardInfo> {
             wide_path.push(0);
 
             let drive_type = unsafe { GetDriveTypeW(wide_path.as_ptr()) };
-            
+
             // DRIVE_REMOVABLE = 2
             if drive_type == 2 {
                 let drive_path = Path::new(&drive_letter);
@@ -215,7 +236,11 @@ pub fn detect_removable_cards() -> Vec<CardInfo> {
                     let path = entry.path();
                     let dcim_path = path.join("DCIM");
                     if dcim_path.exists() {
-                        let label = path.file_name().and_then(|s| s.to_str()).unwrap_or("存储卡").to_string();
+                        let label = path
+                            .file_name()
+                            .and_then(|s| s.to_str())
+                            .unwrap_or("存储卡")
+                            .to_string();
                         cards.push(CardInfo {
                             drive_letter: path.to_string_lossy().to_string(),
                             path: path.to_string_lossy().to_string(),
@@ -241,15 +266,13 @@ pub fn scan_card_files(card_path: &str, conn: Option<&Connection>) -> Vec<CardPh
     let existing_files = conn.map(load_imported_file_index).unwrap_or_default();
 
     let mut photos = Vec::new();
-    for entry in WalkDir::new(scan_root)
-        .into_iter()
-        .filter_map(|e| e.ok())
-    {
+    for entry in WalkDir::new(scan_root).into_iter().filter_map(|e| e.ok()) {
         if entry.file_type().is_file() {
             if let Some(ext) = entry.path().extension().and_then(|s| s.to_str()) {
                 if is_supported_image(ext) {
                     let absolute_path = entry.path().to_string_lossy().to_string();
-                    let relative_path = entry.path()
+                    let relative_path = entry
+                        .path()
                         .strip_prefix(root)
                         .unwrap_or(entry.path())
                         .to_string_lossy()
@@ -259,20 +282,23 @@ pub fn scan_card_files(card_path: &str, conn: Option<&Connection>) -> Vec<CardPh
                         Ok(m) => m,
                         Err(_) => continue,
                     };
-                    
+
                     let size = metadata.len() as i64;
                     let file_ext = ext.to_lowercase();
                     let is_raw = matches!(file_ext.as_str(), "arw" | "cr2" | "nef");
 
-                    // Dimensions are collected up front so the UI can reserve
-                    // each card's final height and avoid masonry layout shifts.
-                    // Other metadata is still deferred until import.
-                    let (width, height) = card_photo_dimensions(entry.path(), is_raw);
+                    // Read EXIF once for both layout dimensions and the import
+                    // lightbox's read-only photo details.
+                    let photo_metadata = card_photo_metadata(entry.path(), is_raw);
                     let mod_time = metadata.modified().unwrap_or(std::time::SystemTime::now());
                     let datetime: chrono::DateTime<Utc> = mod_time.into();
-                    let date_taken = datetime.format("%Y-%m-%d %H:%M:%S").to_string();
+                    let date_taken = photo_metadata
+                        .date_taken
+                        .clone()
+                        .unwrap_or_else(|| datetime.format("%Y-%m-%d %H:%M:%S").to_string());
 
-                    let filename = entry.path()
+                    let filename = entry
+                        .path()
                         .file_name()
                         .and_then(|s| s.to_str())
                         .unwrap_or("unknown")
@@ -286,8 +312,17 @@ pub fn scan_card_files(card_path: &str, conn: Option<&Connection>) -> Vec<CardPh
                         absolute_path,
                         size,
                         date_taken,
-                        width,
-                        height,
+                        width: photo_metadata.width,
+                        height: photo_metadata.height,
+                        camera_make: photo_metadata.camera_make,
+                        camera_model: photo_metadata.camera_model,
+                        lens_model: photo_metadata.lens_model,
+                        exposure_time: photo_metadata.exposure_time,
+                        f_number: photo_metadata.f_number,
+                        iso: photo_metadata.iso,
+                        focal_length: photo_metadata.focal_length,
+                        latitude: photo_metadata.latitude,
+                        longitude: photo_metadata.longitude,
                         is_raw,
                         already_imported,
                     });
@@ -365,7 +400,7 @@ pub fn execute_import(
     let total = imports.len() as i32;
     let mut copied = 0;
     let mut imported_files = load_imported_file_index(conn);
-    
+
     let _ = fs::create_dir_all(workspace_root.join(".photomanager").join("thumbnails"));
 
     for import in imports {
@@ -388,7 +423,7 @@ pub fn execute_import(
         let album_id = match conn.query_row(
             "SELECT id FROM albums WHERE name = ?1",
             [&album_name],
-            |row| row.get::<_, String>(0)
+            |row| row.get::<_, String>(0),
         ) {
             Ok(id) => id,
             Err(_) => {
@@ -396,7 +431,7 @@ pub fn execute_import(
                 let created_at = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
                 let _ = conn.execute(
                     "INSERT INTO albums (id, name, created_at) VALUES (?1, ?2, ?3)",
-                    rusqlite::params![&id, &album_name, &created_at]
+                    rusqlite::params![&id, &album_name, &created_at],
                 );
                 id
             }
@@ -409,8 +444,16 @@ pub fn execute_import(
         };
 
         let file_size = metadata.len() as i64;
-        let file_ext = src_path.extension().and_then(|s| s.to_str()).unwrap_or("").to_string();
-        let filename = src_path.file_name().and_then(|s| s.to_str()).unwrap_or("unknown").to_string();
+        let file_ext = src_path
+            .extension()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .to_string();
+        let filename = src_path
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("unknown")
+            .to_string();
         let is_raw = matches!(file_ext.to_lowercase().as_str(), "arw" | "cr2" | "nef");
 
         // Re-check at execution time as the import list may be stale or may
@@ -432,17 +475,20 @@ pub fn execute_import(
         // Parse date for template substitution
         let dt_parsed = chrono::NaiveDateTime::parse_from_str(&date_taken_str, "%Y-%m-%d %H:%M:%S")
             .unwrap_or_else(|_| chrono::NaiveDateTime::from_timestamp_opt(0, 0).unwrap());
-        
+
         let date_str = dt_parsed.format("%Y-%m-%d").to_string();
         let time_str = dt_parsed.format("%H%M%S").to_string();
 
         // Resolve destination file name
         let mut resolved_filename = name_template.to_string();
-        let base_name = src_path.file_stem().and_then(|s| s.to_str()).unwrap_or(&filename);
+        let base_name = src_path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or(&filename);
         resolved_filename = resolved_filename.replace("{time}", &time_str);
         resolved_filename = resolved_filename.replace("{date}", &date_str);
         resolved_filename = resolved_filename.replace("{original}", base_name);
-        
+
         // Add extension
         let final_filename = format!("{}.{}", resolved_filename, file_ext);
         let dest_file_path = dest_folder_path.join(&final_filename);
@@ -478,7 +524,7 @@ pub fn execute_import(
 
         let (width, height) = match generate_thumbnail(&final_dest_path, &cache_file_path, is_raw) {
             Ok(dims) => dims,
-            Err(_) => (exif.width.unwrap_or(0), exif.height.unwrap_or(0))
+            Err(_) => (exif.width.unwrap_or(0), exif.height.unwrap_or(0)),
         };
 
         // Get relative path for database: "album_name/filename"
@@ -489,11 +535,8 @@ pub fn execute_import(
             .to_string();
 
         let date_added = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
-        let (latitude, longitude) = resolve_import_coordinates(
-            exif.latitude,
-            exif.longitude,
-            import_location,
-        );
+        let (latitude, longitude) =
+            resolve_import_coordinates(exif.latitude, exif.longitude, import_location);
 
         // 6. Write record to database
         let _ = conn.execute(
@@ -529,7 +572,7 @@ pub fn execute_import(
         // 7. Insert mapping in album_photos
         let _ = conn.execute(
             "INSERT OR IGNORE INTO album_photos (album_id, photo_id) VALUES (?1, ?2)",
-            rusqlite::params![&album_id, &photo_id]
+            rusqlite::params![&album_id, &photo_id],
         );
 
         copied += 1;
@@ -554,7 +597,7 @@ pub fn execute_import(
 mod tests {
     use super::{
         card_photo_dimensions, load_imported_file_index, normalized_import_identity,
-        resolve_import_coordinates, ImportLocation,
+        resolve_import_coordinates, scan_card_files, ImportLocation,
     };
     use rusqlite::Connection;
 
@@ -569,6 +612,29 @@ mod tests {
         assert_eq!(card_photo_dimensions(&path, false), (Some(12), Some(20)));
 
         let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn scans_card_details_and_falls_back_to_file_time_without_exif() {
+        let root = std::env::temp_dir().join(format!(
+            "photomanager-card-details-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let dcim = root.join("DCIM");
+        std::fs::create_dir_all(&dcim).unwrap();
+        let path = dcim.join("plain.png");
+        image::RgbImage::new(18, 12).save(&path).unwrap();
+
+        let photos = scan_card_files(root.to_str().unwrap(), None);
+        assert_eq!(photos.len(), 1);
+        let photo = &photos[0];
+        assert_eq!(photo.width, Some(18));
+        assert_eq!(photo.height, Some(12));
+        assert!(!photo.date_taken.is_empty());
+        assert_eq!(photo.camera_make, None);
+        assert_eq!(photo.latitude, None);
+
+        let _ = std::fs::remove_dir_all(root);
     }
 
     #[test]
@@ -631,7 +697,10 @@ mod tests {
 
     #[test]
     fn keeps_valid_exif_coordinates() {
-        let current = ImportLocation { latitude: 30.0, longitude: 120.0 };
+        let current = ImportLocation {
+            latitude: 30.0,
+            longitude: 120.0,
+        };
         assert_eq!(
             resolve_import_coordinates(Some(39.9), Some(116.4), Some(current)),
             (Some(39.9), Some(116.4))
@@ -640,7 +709,10 @@ mod tests {
 
     #[test]
     fn fills_missing_coordinates_from_current_location() {
-        let current = ImportLocation { latitude: 30.0, longitude: 120.0 };
+        let current = ImportLocation {
+            latitude: 30.0,
+            longitude: 120.0,
+        };
         assert_eq!(
             resolve_import_coordinates(None, None, Some(current)),
             (Some(30.0), Some(120.0))
@@ -649,7 +721,13 @@ mod tests {
 
     #[test]
     fn rejects_invalid_current_location() {
-        let current = ImportLocation { latitude: 91.0, longitude: 120.0 };
-        assert_eq!(resolve_import_coordinates(None, None, Some(current)), (None, None));
+        let current = ImportLocation {
+            latitude: 91.0,
+            longitude: 120.0,
+        };
+        assert_eq!(
+            resolve_import_coordinates(None, None, Some(current)),
+            (None, None)
+        );
     }
 }

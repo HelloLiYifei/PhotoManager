@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import LightboxViewer from "./LightboxViewer";
 import {
@@ -10,12 +11,15 @@ import {
   toggleFavorite,
   updateRating,
 } from "../services/photoService";
+import { loadPathPreview } from "../lib/previewLoader";
 
 vi.mock("../lib/thumbnailLoader", () => ({
+  loadPathThumbnail: vi.fn((path) => Promise.resolve(`path-thumbnail://${path}`)),
   loadPhotoThumbnail: vi.fn((id) => Promise.resolve(`thumbnail://${id}`)),
 }));
 
 vi.mock("../lib/previewLoader", () => ({
+  loadPathPreview: vi.fn((path) => Promise.resolve(`path-preview://${path}`)),
   loadPhotoPreview: vi.fn((id) => Promise.resolve(`preview://${id}`)),
   prefetchPhotoPreview: vi.fn(),
 }));
@@ -163,5 +167,81 @@ describe("LightboxViewer", () => {
     await screen.findByRole("button", { name: "永久删除" });
     fireEvent.click(screen.getByRole("button", { name: "永久删除" }));
     await waitFor(() => expect(permanentlyDeletePhoto).toHaveBeenCalledWith({ id: 1 }));
+  });
+
+  it("uses import media, metadata and coloring controls without library actions or tags", async () => {
+    mockViewport(false);
+    const onSetImportAlbum = vi.fn();
+    const importPhotos = [
+      {
+        absolutePath: "D:/DCIM/card.jpg",
+        relativePath: "DCIM/card.jpg",
+        size: 3 * 1024 * 1024,
+        width: 6000,
+        height: 4000,
+        dateTaken: "2026-07-12 10:20:30",
+        cameraMake: "Example",
+        cameraModel: "Card Camera",
+        latitude: 31.2,
+        longitude: 121.4,
+        isRaw: false,
+        alreadyImported: false,
+      },
+      {
+        absolutePath: "D:/DCIM/existing.nef",
+        relativePath: "DCIM/existing.nef",
+        size: 20 * 1024 * 1024,
+        isRaw: true,
+        alreadyImported: true,
+      },
+    ];
+
+    function ImportHarness() {
+      const [targetAlbum, setTargetAlbum] = useState(null);
+      return (
+        <LightboxViewer
+          mode="import"
+          photosList={importPhotos}
+          initialIndex={0}
+          importAlbums={[
+            { id: "default", name: "默认相册", color: "#3B82F6" },
+            { id: "trip", name: "旅行", color: "#EF4444" },
+          ]}
+          getImportPhotoState={() => ({
+            targetAlbum,
+            albumColor: targetAlbum === "旅行" ? "#EF4444" : "#3B82F6",
+          })}
+          onSetImportAlbum={(photo, albumName) => {
+            onSetImportAlbum(photo, albumName);
+            setTargetAlbum(albumName);
+          }}
+          onClose={vi.fn()}
+        />
+      );
+    }
+
+    render(<ImportHarness />);
+    expect(await screen.findByText("card.jpg")).toBeInTheDocument();
+    expect(loadPathPreview).toHaveBeenCalledWith("D:/DCIM/card.jpg", false);
+    expect(screen.getByText("Card Camera")).toBeInTheDocument();
+    expect(screen.getByLabelText("照片 GPS 坐标")).toHaveTextContent("31.20000, 121.40000");
+    expect(screen.queryByRole("heading", { name: "标签" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "照片评分" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "喜欢" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "移入回收站" })).not.toBeInTheDocument();
+    expect(getPhotoTags).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "为当前照片染色" }));
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "旅行" }));
+    expect(onSetImportAlbum).toHaveBeenLastCalledWith(importPhotos[0], "旅行");
+    expect(screen.getByText("染色 · 旅行")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "为当前照片染色" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "取消染色" }));
+    expect(onSetImportAlbum).toHaveBeenLastCalledWith(importPhotos[0], null);
+
+    fireEvent.click(screen.getByRole("button", { name: "下一张照片" }));
+    expect(await screen.findByText("existing.nef")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "已导入，不可染色" })).toBeDisabled();
   });
 });

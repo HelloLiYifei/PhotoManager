@@ -17,6 +17,28 @@ export default function useAlbumBrush({
   selectedPathsRef.current = selectedPaths;
   photoAlbumsRef.current = photoAlbums;
 
+  const setPhotoAlbum = useCallback((path, albumName) => {
+    if (alreadyImportedPaths.has(path)) return false;
+
+    const targetAlbum = typeof albumName === "string" && albumName.trim()
+      ? albumName.trim()
+      : null;
+    setSelectedPaths((current) => {
+      if (!targetAlbum) return current.filter((selectedPath) => selectedPath !== path);
+      return current.includes(path) ? current : [...current, path];
+    });
+    setPhotoAlbums((current) => {
+      const updated = { ...current };
+      if (!targetAlbum || targetAlbum === DEFAULT_IMPORT_ALBUM_NAME) {
+        delete updated[path];
+      } else {
+        updated[path] = targetAlbum;
+      }
+      return updated;
+    });
+    return true;
+  }, [alreadyImportedPaths, setPhotoAlbums, setSelectedPaths]);
+
   const applyBrushColor = useCallback((path) => {
     if (!brushAlbum || alreadyImportedPaths.has(path)) return false;
 
@@ -27,21 +49,8 @@ export default function useAlbumBrush({
     const shouldDeselect = brushAlbum === DEFAULT_IMPORT_ALBUM_NAME
       && currentAlbum === DEFAULT_IMPORT_ALBUM_NAME;
 
-    setSelectedPaths((current) => {
-      if (shouldDeselect) return current.filter((selectedPath) => selectedPath !== path);
-      return current.includes(path) ? current : [...current, path];
-    });
-    setPhotoAlbums((current) => {
-      const updated = { ...current };
-      if (shouldDeselect || brushAlbum === DEFAULT_IMPORT_ALBUM_NAME) {
-        delete updated[path];
-      } else {
-        updated[path] = brushAlbum;
-      }
-      return updated;
-    });
-    return true;
-  }, [alreadyImportedPaths, brushAlbum, setPhotoAlbums, setSelectedPaths]);
+    return setPhotoAlbum(path, shouldDeselect ? null : brushAlbum);
+  }, [alreadyImportedPaths, brushAlbum, setPhotoAlbum]);
 
   const colorAll = useCallback(() => {
     const targetAlbum = brushAlbum || DEFAULT_IMPORT_ALBUM_NAME;
@@ -78,6 +87,7 @@ export default function useAlbumBrush({
   return {
     brushAlbum,
     setBrushAlbum,
+    setPhotoAlbum,
     applyBrushColor,
     colorAll,
     clearColors,

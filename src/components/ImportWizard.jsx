@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, Camera, FolderOpen, LoaderCircle, X } from "lucide-react";
 
 import CreateAlbumDialog from "./CreateAlbumDialog";
+import LightboxViewer from "./LightboxViewer";
 import {
   AlbumBrushPanel,
   ConfigurationPanel,
@@ -47,6 +48,7 @@ export default function ImportWizard({ onClose, onImportComplete }) {
   const [newAlbumDescription, setNewAlbumDescription] = useState("");
   const [createAlbumBusy, setCreateAlbumBusy] = useState(false);
   const [createAlbumError, setCreateAlbumError] = useState(null);
+  const [detailData, setDetailData] = useState(null);
   const previewScrollRef = useRef(null);
   const sentinelRef = useRef(null);
   const paintingRef = useRef(false);
@@ -211,6 +213,26 @@ export default function ImportWizard({ onClose, onImportComplete }) {
     }
   }, [createAlbumBusy, data, newAlbumDescription, newAlbumName]);
 
+  const handleOpenPhotoDetail = useCallback((photo) => {
+    if (brush.brushAlbum) return;
+    const initialIndex = filteredPhotos.findIndex(
+      (candidate) => candidate.absolutePath === photo.absolutePath,
+    );
+    if (initialIndex < 0) return;
+    setDetailData({
+      photosList: [...filteredPhotos],
+      initialIndex,
+    });
+  }, [brush.brushAlbum, filteredPhotos]);
+
+  const detailAlbums = useMemo(
+    () => albumBrushOptions.map((album) => ({
+      ...album,
+      color: getImportAlbumColor(album.name),
+    })),
+    [albumBrushOptions],
+  );
+
   const previewProps = {
     scrollRoot: previewScrollRef,
     brushAlbum: brush.brushAlbum,
@@ -218,6 +240,7 @@ export default function ImportWizard({ onClose, onImportComplete }) {
     onActivatePhoto: activatePhoto,
     onBrushPhoto: paintPhoto,
     onBrushEnter: paintEnteredPhoto,
+    onOpenPhoto: handleOpenPhotoDetail,
   };
 
   let preview = null;
@@ -242,6 +265,7 @@ export default function ImportWizard({ onClose, onImportComplete }) {
   };
 
   return (
+    <>
     <div className={styles.overlay} role="dialog" aria-modal="true" aria-label="照片导入向导">
       <section className={styles.wizard} aria-busy={importBusy}>
         <header className={styles.header}>
@@ -437,5 +461,19 @@ export default function ImportWizard({ onClose, onImportComplete }) {
         />
       </section>
     </div>
+    {detailData && (
+      <LightboxViewer
+        mode="import"
+        photosList={detailData.photosList}
+        initialIndex={detailData.initialIndex}
+        importAlbums={detailAlbums}
+        getImportPhotoState={getPhotoVisualState}
+        onSetImportAlbum={(photo, albumName) => {
+          brush.setPhotoAlbum(photo.absolutePath, albumName);
+        }}
+        onClose={() => setDetailData(null)}
+      />
+    )}
+    </>
   );
 }

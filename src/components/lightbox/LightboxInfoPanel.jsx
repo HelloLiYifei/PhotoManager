@@ -17,13 +17,15 @@ function MetadataItem({ label, value, wide = false, mono = false }) {
 
 export default function LightboxInfoPanel({
   photo,
-  tags,
-  tagInput,
+  tags = [],
+  tagInput = "",
   onTagInputChange,
   onAddTag,
   onRemoveTag,
   onShowOnMap,
   disabled,
+  showTags = true,
+  showMapAction = true,
 }) {
   const hasLocation = Number.isFinite(photo.latitude) && Number.isFinite(photo.longitude);
   const fileSize = Number.isFinite(photo.fileSize)
@@ -48,17 +50,24 @@ export default function LightboxInfoPanel({
       {hasLocation && (
         <section className={styles.infoSection} aria-labelledby="lightbox-location-heading">
           <h2 id="lightbox-location-heading">拍摄位置</h2>
-          <Button variant="secondary" className={styles.mapButton} onClick={() => onShowOnMap?.(photo)}>
-            <MapPin aria-hidden="true" />
-            <span>
-              <strong>在地图中查看</strong>
-              <small>{photo.latitude.toFixed(5)}, {photo.longitude.toFixed(5)}</small>
-            </span>
-          </Button>
+          {showMapAction ? (
+            <Button variant="secondary" className={styles.mapButton} onClick={() => onShowOnMap?.(photo)}>
+              <MapPin aria-hidden="true" />
+              <span>
+                <strong>在地图中查看</strong>
+                <small>{photo.latitude.toFixed(5)}, {photo.longitude.toFixed(5)}</small>
+              </span>
+            </Button>
+          ) : (
+            <div className={styles.locationCoordinates} aria-label="照片 GPS 坐标">
+              <MapPin aria-hidden="true" />
+              <span>{photo.latitude.toFixed(5)}, {photo.longitude.toFixed(5)}</span>
+            </div>
+          )}
         </section>
       )}
 
-      <section className={styles.infoSection} aria-labelledby="lightbox-tags-heading">
+      {showTags && <section className={styles.infoSection} aria-labelledby="lightbox-tags-heading">
         <h2 id="lightbox-tags-heading">标签</h2>
         {tags.length > 0 ? (
           <div className={styles.tagList} aria-label="照片标签">
@@ -98,7 +107,7 @@ export default function LightboxInfoPanel({
             </div>
           </Field>
         </form>
-      </section>
+      </section>}
 
       <section className={styles.infoSection} aria-labelledby="lightbox-file-heading">
         <h2 id="lightbox-file-heading">文件信息</h2>

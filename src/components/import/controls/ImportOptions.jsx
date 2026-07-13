@@ -42,14 +42,12 @@ export default function ImportOptions({
         <span className={styles.sectionIcon}><Settings2 aria-hidden="true" /></span>
         <div>
           <h3 id="import-options-heading">导入选项</h3>
-          <p>设置定位、命名和可选备份。</p>
         </div>
       </div>
 
       <label className={styles.switchRow}>
         <span>
           <strong>补充当前位置</strong>
-          <small>仅为缺少 GPS 的照片添加坐标。</small>
         </span>
         <input
           type="checkbox"

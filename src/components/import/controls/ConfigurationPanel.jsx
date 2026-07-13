@@ -5,7 +5,7 @@ import styles from "./ImportControls.module.css";
 export default function ConfigurationPanel({
   open = false,
   title = "导入配置",
-  description = "设置来源、相册刷子和导入选项。",
+  description = null,
   disabled = false,
   children,
   onOpen,
@@ -40,7 +40,7 @@ export default function ConfigurationPanel({
         <header className={styles.configurationHeader}>
           <div>
             <h2>{title}</h2>
-            <p>{description}</p>
+            {description ? <p>{description}</p> : null}
           </div>
           <button type="button" onClick={onClose} disabled={disabled} aria-label="关闭导入配置面板">
             <X aria-hidden="true" />

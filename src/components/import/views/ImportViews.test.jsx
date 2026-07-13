@@ -1,6 +1,7 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { loadPathPreview } from "../../../lib/previewLoader";
 import { loadPathThumbnail } from "../../../lib/thumbnailLoader";
 import {
   getImportAlbumColor,
@@ -10,18 +11,23 @@ import {
 } from ".";
 
 vi.mock("../../timeline/media", () => ({
-  LazyThumbnail: ({ sourceKey, alt, fit, load }) => (
+  LazyThumbnail: ({ sourceKey, alt, fit, aspectRatio, load }) => (
     <img
       src={`/thumb/${encodeURIComponent(sourceKey)}`}
       alt={alt}
       data-fit={fit}
       data-load={typeof load}
+      style={{ aspectRatio }}
     />
   ),
 }));
 
 vi.mock("../../../lib/thumbnailLoader", () => ({
   loadPathThumbnail: vi.fn(),
+}));
+
+vi.mock("../../../lib/previewLoader", () => ({
+  loadPathPreview: vi.fn(),
 }));
 
 const photos = [
@@ -62,6 +68,8 @@ function photoState(photo, focusedPath = photos[0].absolutePath) {
 
 describe("导入照片视图", () => {
   beforeEach(() => {
+    loadPathPreview.mockReset();
+    loadPathPreview.mockImplementation((path) => Promise.resolve(`preview://${path}`));
     loadPathThumbnail.mockReset();
   });
 
@@ -86,6 +94,9 @@ describe("导入照片视图", () => {
     expect(screen.getByText("相册 · 旅行")).toBeInTheDocument();
 
     const fresh = screen.getByRole("gridcell", { name: "DCIM/first.jpg" });
+    const freshThumbnail = within(fresh).getByRole("img", { name: "DCIM/first.jpg" });
+    expect(freshThumbnail).toHaveAttribute("data-fit", "cover");
+    expect(freshThumbnail).toHaveStyle({ aspectRatio: "4 / 3" });
     fireEvent.mouseDown(fresh);
     fireEvent.mouseEnter(fresh);
     expect(onBrushPhoto).toHaveBeenCalledWith(photos[0], expect.anything());
@@ -123,7 +134,7 @@ describe("导入照片视图", () => {
     expect(onBrushPhoto).toHaveBeenCalledTimes(1);
   });
 
-  it("画廊支持方向键、Home/End、滚轮和 Enter/Space 刷色", () => {
+  it("画廊使用高清路径预览，并支持方向键、Home/End、滚轮和 Enter/Space 刷色", async () => {
     const onBrushPhoto = vi.fn();
 
     function GalleryHarness() {
@@ -142,21 +153,45 @@ describe("导入照片视图", () => {
 
     render(<GalleryHarness />);
     const gallery = screen.getByRole("region", { name: "导入照片画廊" });
+    const media = within(gallery).getByRole("group", { name: "当前导入照片预览" });
+    await waitFor(() => {
+      expect(within(media).getByRole("img", { name: "DCIM/first.jpg" }))
+        .toHaveAttribute("src", `preview://${photos[0].absolutePath}`);
+    });
+    expect(loadPathPreview).toHaveBeenCalledWith(photos[0].absolutePath, false);
+    expect(within(gallery).getByRole("listbox", { name: "存储卡照片胶片带" }))
+      .toBeInTheDocument();
 
     fireEvent.keyDown(gallery, { key: "ArrowRight" });
     expect(screen.getByText("DCIM/existing.jpg")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(within(media).getByRole("img", { name: "DCIM/existing.jpg" }))
+        .toHaveAttribute("src", `preview://${photos[1].absolutePath}`);
+    });
     fireEvent.keyDown(gallery, { key: "Enter" });
     expect(onBrushPhoto).not.toHaveBeenCalled();
 
     fireEvent.keyDown(gallery, { key: "End" });
     expect(screen.getByText("DCIM/raw.nef")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(within(media).getByRole("img", { name: "DCIM/raw.nef" }))
+        .toHaveAttribute("src", `preview://${photos[2].absolutePath}`);
+    });
     fireEvent.keyDown(gallery, { key: " " });
     expect(onBrushPhoto).toHaveBeenCalledWith(photos[2], expect.anything());
 
     fireEvent.keyDown(gallery, { key: "Home" });
+    await waitFor(() => {
+      expect(within(media).getByRole("img", { name: "DCIM/first.jpg" }))
+        .toHaveAttribute("src", `preview://${photos[0].absolutePath}`);
+    });
     const stage = screen.getByLabelText("DCIM/first.jpg", { selector: "div" });
     fireEvent.wheel(stage, { deltaY: 100 });
     expect(screen.getByText("DCIM/existing.jpg")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(within(media).getByRole("img", { name: "DCIM/existing.jpg" }))
+        .toHaveAttribute("src", `preview://${photos[1].absolutePath}`);
+    });
   });
 
   it("缩略图把路径作为 sourceKey 交给共享加载组件", () => {

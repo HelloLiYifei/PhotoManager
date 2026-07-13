@@ -42,6 +42,7 @@ pub fn run() {
             commands::import_photos,
             commands::select_directory,
             commands::get_image_thumbnail_url,
+            commands::get_image_preview_url,
             commands::move_photos_to_album,
             commands::add_tag_to_photo,
             commands::remove_tag_from_photo,

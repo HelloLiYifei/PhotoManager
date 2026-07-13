@@ -1,3 +1,4 @@
+import { getImagePreviewUrl } from "../services/importService";
 import { getPhotoPreviewUrl } from "../services/photoService";
 
 const urlCache = new Map();
@@ -19,6 +20,24 @@ export function loadPhotoPreview(id) {
     })
     .finally(() => inFlight.delete(id));
   inFlight.set(id, promise);
+  return promise;
+}
+
+export function loadPathPreview(path, isRaw = false) {
+  const key = `path:${path}:${Boolean(isRaw)}`;
+  const cached = urlCache.get(key);
+  if (cached) return Promise.resolve(cached);
+
+  const pending = inFlight.get(key);
+  if (pending) return pending;
+
+  const promise = getImagePreviewUrl({ path, isRaw: Boolean(isRaw) })
+    .then((url) => {
+      urlCache.set(key, url);
+      return url;
+    })
+    .finally(() => inFlight.delete(key));
+  inFlight.set(key, promise);
   return promise;
 }
 

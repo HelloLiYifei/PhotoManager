@@ -8,6 +8,8 @@ export const importPhotos = (args) => invokeCommand("import_photos", args);
 
 export const getImageThumbnailUrl = (args) => invokeCommand("get_image_thumbnail_url", args);
 
+export const getImagePreviewUrl = (args) => invokeCommand("get_image_preview_url", args);
+
 export const listenToImportProgress = (handler) => (
   listenToEvent("import-progress", handler)
 );

@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   getAlbums: vi.fn(),
   importPhotos: vi.fn(),
   listenToImportProgress: vi.fn(),
+  loadPathPreview: vi.fn(),
   loadPathThumbnail: vi.fn(),
   scanCard: vi.fn(),
   selectDirectory: vi.fn(),
@@ -32,6 +33,10 @@ vi.mock("../services/workspaceService", () => ({
 
 vi.mock("../lib/thumbnailLoader", () => ({
   loadPathThumbnail: mocks.loadPathThumbnail,
+}));
+
+vi.mock("../lib/previewLoader", () => ({
+  loadPathPreview: mocks.loadPathPreview,
 }));
 
 vi.mock("./timeline/media", () => ({
@@ -108,6 +113,7 @@ describe("ImportWizard phase-four integration", () => {
       progressHandler = handler;
       return unlisten;
     });
+    mocks.loadPathPreview.mockResolvedValue("preview.jpg");
     mocks.selectDirectory.mockResolvedValue(null);
     vi.spyOn(window, "alert").mockImplementation(() => {});
     vi.spyOn(window, "confirm").mockReturnValue(true);
@@ -144,8 +150,10 @@ describe("ImportWizard phase-four integration", () => {
     expect(localStorage.getItem("photomanager-import-view")).toBe("list");
 
     fireEvent.click(screen.getByRole("button", { name: "画廊视图" }));
-    expect(screen.getByRole("region", { name: "导入照片画廊" })).toBeInTheDocument();
-    fireEvent.keyDown(screen.getByRole("region", { name: "导入照片画廊" }), {
+    const importGallery = screen.getByRole("region", { name: "导入照片画廊" });
+    expect(importGallery).toBeInTheDocument();
+    expect(importGallery.closest('[data-view-mode="gallery"]')).not.toBeNull();
+    fireEvent.keyDown(importGallery, {
       key: "End",
     });
     expect(screen.getByText("IMG_0003.JPG")).toBeInTheDocument();

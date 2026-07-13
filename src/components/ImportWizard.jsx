@@ -323,6 +323,7 @@ export default function ImportWizard({ onClose, onImportComplete }) {
             <div
               ref={previewScrollRef}
               className={styles.previewScroller}
+              data-view-mode={viewMode}
               onMouseUp={() => { paintingRef.current = false; }}
               onMouseLeave={() => { paintingRef.current = false; }}
             >
@@ -360,7 +361,7 @@ export default function ImportWizard({ onClose, onImportComplete }) {
                 </div>
               ) : null}
 
-              <div className={styles.previewContent}>
+              <div className={styles.previewContent} data-view-mode={viewMode}>
                 {data.scanning ? (
                   <div className={styles.emptyState} role="status">
                     <LoaderCircle className={styles.spinner} aria-hidden="true" />

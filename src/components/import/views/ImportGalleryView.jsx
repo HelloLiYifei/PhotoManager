@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import {
+  ImportGalleryPreview,
   ImportPhotoMarkers,
   ImportThumbnail,
 } from "./ImportViewShared";
@@ -110,36 +111,39 @@ export default function ImportGalleryView({
         })}
         onWheel={handleWheel}
       >
-        {activeIndex > 0 && (
-          <button
-            type="button"
-            className={`${styles.galleryNav} ${styles.previous}`}
-            onMouseDown={(event) => event.stopPropagation()}
-            onClick={() => activateIndex(activeIndex - 1)}
-            aria-label="上一张"
-          >
-            ‹
-          </button>
-        )}
+        <div className={styles.galleryMedia} role="group" aria-label="当前导入照片预览">
+          {activeIndex > 0 && (
+            <button
+              type="button"
+              className={`${styles.galleryNav} ${styles.previous}`}
+              onMouseDown={(event) => event.stopPropagation()}
+              onClick={() => activateIndex(activeIndex - 1)}
+              aria-label="上一张"
+            >
+              ‹
+            </button>
+          )}
 
-        <ImportThumbnail photo={photo} scrollRoot={scrollRoot} fit="contain" />
-        <ImportPhotoMarkers photo={photo} state={state} />
+          <ImportGalleryPreview photo={photo} />
+          <ImportPhotoMarkers photo={photo} state={state} />
+
+          {activeIndex < photos.length - 1 && (
+            <button
+              type="button"
+              className={`${styles.galleryNav} ${styles.next}`}
+              onMouseDown={(event) => event.stopPropagation()}
+              onClick={() => activateIndex(activeIndex + 1)}
+              aria-label="下一张"
+            >
+              ›
+            </button>
+          )}
+        </div>
+
         <div className={styles.galleryCaption}>
           <strong>{photo.relativePath}</strong>
           <span>{photo.dateTaken || "日期未知"} · {formatImportFileSize(photo.size)}</span>
         </div>
-
-        {activeIndex < photos.length - 1 && (
-          <button
-            type="button"
-            className={`${styles.galleryNav} ${styles.next}`}
-            onMouseDown={(event) => event.stopPropagation()}
-            onClick={() => activateIndex(activeIndex + 1)}
-            aria-label="下一张"
-          >
-            ›
-          </button>
-        )}
       </div>
 
       <div className={styles.filmstrip} role="listbox" aria-label="存储卡照片胶片带">

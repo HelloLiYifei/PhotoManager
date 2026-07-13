@@ -11,6 +11,8 @@ import {
 } from "./importViewUtils";
 import styles from "./ImportViews.module.css";
 
+const MASONRY_THUMBNAIL_ASPECT_RATIO = "4 / 3";
+
 export default function ImportMasonryView({
   photos = [],
   scrollRoot,
@@ -64,7 +66,14 @@ export default function ImportMasonryView({
               onBrushPhoto,
             })}
           >
-            <ImportThumbnail photo={photo} scrollRoot={scrollRoot} />
+            <div className={styles.masonryMedia}>
+              <ImportThumbnail
+                photo={photo}
+                scrollRoot={scrollRoot}
+                fit="cover"
+                aspectRatio={MASONRY_THUMBNAIL_ASPECT_RATIO}
+              />
+            </div>
             <ImportPhotoMarkers photo={photo} state={state} />
             <span className={styles.cardName} title={photo.relativePath}>
               {photo.relativePath}

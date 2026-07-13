@@ -21,7 +21,6 @@ export default function AlbumBrushPanel({
           <span className={styles.sectionIcon}><Brush aria-hidden="true" /></span>
           <div>
             <h3 id="album-brush-heading">相册染色刷</h3>
-            <p>选择相册后点击或拖过照片完成分类。</p>
           </div>
         </div>
         <button type="button" className={styles.iconTextButton} onClick={onCreateAlbum} disabled={disabled}>
@@ -30,8 +29,8 @@ export default function AlbumBrushPanel({
         </button>
       </div>
 
-      <p className={styles.helpText}>
-        新照片默认分配到“默认相册”；再次使用默认相册刷过照片可取消导入。
+      <p className={styles.compactHint}>
+        选中相册后点击或拖过照片；默认相册再次刷色可取消导入。
       </p>
 
       <div className={styles.brushList} role="listbox" aria-label="选择相册染色刷">

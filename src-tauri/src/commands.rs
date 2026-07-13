@@ -694,6 +694,33 @@ pub async fn get_image_thumbnail_url(
 }
 
 #[tauri::command]
+pub fn get_image_preview_url(
+    state: State<'_, DbState>,
+    path: String,
+    is_raw: bool,
+) -> Result<String, String> {
+    {
+        let current_path_guard = state.current_path.lock().unwrap();
+        current_path_guard.as_ref().ok_or("没有打开的工作空间")?;
+    }
+
+    let source_path = Path::new(&path);
+    if !source_path.is_file() {
+        return Err("文件不存在".to_string());
+    }
+
+    let source_metadata = fs::metadata(source_path).map_err(|e| e.to_string())?;
+    let source_key = import_preview_cache_key(&path, &source_metadata);
+    crate::media::register_import_source(
+        source_key.clone(),
+        source_path.to_path_buf(),
+        is_raw,
+    )?;
+
+    Ok(crate::media::import_source_url(&source_key))
+}
+
+#[tauri::command]
 pub fn move_photos_to_album(state: State<'_, DbState>, photo_ids: Vec<String>, target_album_id: String) -> Result<(), String> {
     let current_path_guard = state.current_path.lock().unwrap();
     let workspace_root_str = match &*current_path_guard {

@@ -1,5 +1,7 @@
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, OnceLock};
 
 use tauri::http::{header, Method, Request, Response, StatusCode};
 use tauri::{AppHandle, Manager, Runtime};
@@ -20,6 +22,10 @@ pub fn photo_thumbnail_url(photo_id: &str) -> String {
 
 pub fn import_preview_url(cache_key: &str) -> String {
     format!("{}/import-preview/{}.jpg", MEDIA_ORIGIN, cache_key)
+}
+
+pub fn import_source_url(source_key: &str) -> String {
+    format!("{}/import-source/{}", MEDIA_ORIGIN, source_key)
 }
 
 pub fn photo_preview_url(photo_id: &str) -> String {
@@ -51,6 +57,38 @@ fn legacy_thumbnail_path(workspace_root: &Path, photo_id: &str) -> PathBuf {
 
 fn valid_import_key(key: &str) -> bool {
     key.len() == 16 && key.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+#[derive(Clone)]
+struct ImportSource {
+    path: PathBuf,
+    is_raw: bool,
+}
+
+static IMPORT_SOURCES: OnceLock<Mutex<HashMap<String, ImportSource>>> = OnceLock::new();
+
+fn import_sources() -> &'static Mutex<HashMap<String, ImportSource>> {
+    IMPORT_SOURCES.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+pub fn register_import_source(
+    source_key: String,
+    path: PathBuf,
+    is_raw: bool,
+) -> Result<(), String> {
+    if !valid_import_key(&source_key) || !path.is_file() {
+        return Err("无效的导入预览来源".to_string());
+    }
+
+    import_sources()
+        .lock()
+        .map_err(|_| "无法登记导入预览来源".to_string())?
+        .insert(source_key, ImportSource { path, is_raw });
+    Ok(())
+}
+
+fn registered_import_source(source_key: &str) -> Option<ImportSource> {
+    import_sources().lock().ok()?.get(source_key).cloned()
 }
 
 fn photo_source<R: Runtime>(
@@ -118,6 +156,32 @@ pub fn serve_media_request<R: Runtime>(
                 "image/jpeg",
                 fs::read(legacy_thumbnail_path(workspace_root, photo_id)),
             )
+        }
+    } else if let Some(source_key) = request_path.strip_prefix("import-source/") {
+        if !valid_import_key(source_key) {
+            return response(StatusCode::BAD_REQUEST, "text/plain", Vec::new());
+        }
+        let Some(source) = registered_import_source(source_key) else {
+            return response(StatusCode::NOT_FOUND, "text/plain", Vec::new());
+        };
+
+        if source.is_raw {
+            match crate::metadata::extract_raw_preview(source.path) {
+                Ok(bytes) => ("image/jpeg", Ok(bytes)),
+                Err(error) => ("text/plain", Err(error)),
+            }
+        } else {
+            let content_type = match source
+                .path
+                .extension()
+                .and_then(|extension| extension.to_str())
+                .map(|extension| extension.to_ascii_lowercase())
+                .as_deref()
+            {
+                Some("png") => "image/png",
+                _ => "image/jpeg",
+            };
+            (content_type, fs::read(source.path))
         }
     } else if let Some(filename) = request_path.strip_prefix("import-preview/") {
         let Some(cache_key) = filename.strip_suffix(".jpg") else {

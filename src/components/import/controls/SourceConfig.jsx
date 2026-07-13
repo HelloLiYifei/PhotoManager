@@ -36,7 +36,6 @@ export default function SourceConfig({
         <span className={styles.sectionIcon}><FolderOpen aria-hidden="true" /></span>
         <div>
           <h3 id="import-source-heading">选择导入源</h3>
-          <p>选择相机存储卡或本地文件夹。</p>
         </div>
       </div>
 
@@ -125,7 +124,7 @@ export default function SourceConfig({
         {scanning ? (
           <>
             <LoaderCircle className={styles.spinner} aria-hidden="true" />
-            <span><strong>正在扫描照片</strong><small>正在读取来源目录中的照片树…</small></span>
+            <span><strong>正在扫描照片</strong><small>读取来源目录…</small></span>
           </>
         ) : scanError ? (
           <>
@@ -140,7 +139,7 @@ export default function SourceConfig({
         ) : (
           <>
             <ScanSearch aria-hidden="true" />
-            <span><strong>等待选择来源</strong><small>输入路径后点击扫描，或选择存储设备。</small></span>
+            <span><strong>等待选择来源</strong><small>输入路径或选择设备</small></span>
           </>
         )}
       </div>

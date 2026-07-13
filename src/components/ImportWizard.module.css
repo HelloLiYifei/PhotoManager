@@ -125,6 +125,18 @@
   overflow: auto;
 }
 
+.previewScroller[data-view-mode="gallery"] {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.previewScroller[data-view-mode="gallery"] > header,
+.previewScroller[data-view-mode="gallery"] > .duplicateNotice,
+.previewScroller[data-view-mode="gallery"] > .inlineError {
+  flex: 0 0 auto;
+}
+
 .previewScroller > header {
   position: sticky;
   z-index: 20;
@@ -134,6 +146,17 @@
 .previewContent {
   min-height: 300px;
   margin-top: var(--space-3);
+}
+
+.previewContent[data-view-mode="gallery"] {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.previewContent[data-view-mode="gallery"] > * {
+  width: 100%;
 }
 
 .brushActive [role="gridcell"],

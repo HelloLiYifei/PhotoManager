@@ -26,14 +26,26 @@ describe("timeline photo media", () => {
 
   it("loads a thumbnail and preserves its accessible name", async () => {
     loaderMocks.loadPhotoThumbnail.mockResolvedValue("photo-thumb.jpg");
-    render(<ThumbnailImage id={7} alt="山景.jpg" fit="cover" />);
+    render(
+      <ThumbnailImage
+        id={7}
+        alt="山景.jpg"
+        fit="cover"
+        aspectRatio="3 / 2"
+      />,
+    );
 
-    expect(screen.getByRole("status", { name: "正在加载山景.jpg" })).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "正在加载山景.jpg" })).toHaveStyle({
+      aspectRatio: "3 / 2",
+    });
     await waitFor(() => {
       expect(screen.getByRole("img", { name: "山景.jpg" })).toHaveAttribute(
         "src",
         "photo-thumb.jpg",
       );
+    });
+    expect(screen.getByRole("img", { name: "山景.jpg" })).toHaveStyle({
+      aspectRatio: "3 / 2",
     });
     expect(loaderMocks.loadPhotoThumbnail).toHaveBeenCalledWith(7, 0);
   });

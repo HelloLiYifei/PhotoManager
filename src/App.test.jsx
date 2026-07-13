@@ -86,7 +86,8 @@ describe("App phase-two shell", () => {
 
     render(<App />);
 
-    expect(await screen.findByRole("heading", { name: "相册" })).toBeInTheDocument();
+    expect(await screen.findByRole("main", { name: "相册" })).toBeInTheDocument();
+    expect(screen.queryByRole("banner")).not.toBeInTheDocument();
     await waitFor(() => expect(getAlbumSummaries).toHaveBeenCalledTimes(1));
 
     fireEvent.click(
@@ -100,12 +101,12 @@ describe("App phase-two shell", () => {
 
   it("uses a collapsed rail at compact widths and opens it as an overlay", async () => {
     render(<App />);
-    await screen.findByRole("heading", { name: "相册" });
+    await screen.findByRole("main", { name: "相册" });
 
     const shell = document.querySelector(".app-shell");
     expect(shell).toHaveAttribute("data-sidebar-mode", "collapsed");
 
-    fireEvent.click(document.querySelector(".page-header__sidebar-toggle"));
+    fireEvent.click(screen.getByRole("button", { name: "展开侧边栏" }));
     expect(shell).toHaveAttribute("data-sidebar-mode", "overlay");
 
     fireEvent.click(document.querySelector(".app-shell__scrim"));
@@ -115,12 +116,12 @@ describe("App phase-two shell", () => {
   it("uses the full sidebar on wide windows and allows manual collapsing", async () => {
     installMatchMedia(true);
     render(<App />);
-    await screen.findByRole("heading", { name: "相册" });
+    await screen.findByRole("main", { name: "相册" });
 
     const shell = document.querySelector(".app-shell");
     expect(shell).toHaveAttribute("data-sidebar-mode", "expanded");
 
-    fireEvent.click(document.querySelector(".page-header__sidebar-toggle"));
+    fireEvent.click(screen.getByRole("button", { name: "折叠侧边栏" }));
     expect(shell).toHaveAttribute("data-sidebar-mode", "collapsed");
   });
 
@@ -133,10 +134,8 @@ describe("App phase-two shell", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("读取相册失败");
     fireEvent.click(screen.getByRole("button", { name: "重试" }));
-    expect(await screen.findByRole("button", { name: "创建相册" })).toBeInTheDocument();
-
-    const header = screen.getByRole("banner");
-    fireEvent.click(within(header).getByRole("button", { name: "新建相册" }));
+    const createAlbumButton = await screen.findByRole("button", { name: "创建相册" });
+    fireEvent.click(createAlbumButton);
     const dialog = screen.getByRole("dialog", { name: "创建新相册" });
     fireEvent.change(within(dialog).getByRole("textbox", { name: "相册名称" }), {
       target: { value: "杭州之旅" },
@@ -153,7 +152,7 @@ describe("App phase-two shell", () => {
 
   it("shows semantic workspace information instead of a settings alert", async () => {
     render(<App />);
-    await screen.findByRole("heading", { name: "相册" });
+    await screen.findByRole("main", { name: "相册" });
 
     fireEvent.click(screen.getByRole("button", { name: "工作区信息" }));
     const dialog = screen.getByRole("dialog", { name: "工作区信息" });

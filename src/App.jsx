@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Plus } from "lucide-react";
 import "./App.css";
 
 import AlbumsPage from "./components/AlbumsPage";
@@ -7,9 +6,8 @@ import CreateAlbumDialog from "./components/CreateAlbumDialog";
 import ImportWizard from "./components/ImportWizard";
 import LightboxViewer from "./components/LightboxViewer";
 import MapView from "./components/MapView";
-import { AppShell, PageHeader, Sidebar } from "./components/shell";
+import { AppShell, Sidebar } from "./components/shell";
 import TimelineGrid from "./components/TimelineGrid";
-import { Button } from "./components/ui";
 import WorkspaceInfoDialog from "./components/WorkspaceInfoDialog";
 import WorkspaceSelector from "./components/WorkspaceSelector";
 import { createAlbum, getAlbumSummaries } from "./services/albumService";
@@ -26,26 +24,20 @@ function getInitialWideViewport() {
   return window.innerWidth >= 1200;
 }
 
-function getViewMeta(currentView, activeAlbumName, albumCount) {
+function getViewTitle(currentView, activeAlbumName) {
   switch (currentView) {
     case "albums":
-      return {
-        title: "相册",
-        description: albumCount > 0 ? `${albumCount} 个相册` : "整理和浏览工作区中的照片",
-      };
+      return "相册";
     case "favorites":
-      return { title: "我的喜欢", description: "集中浏览已标记喜欢的照片" };
+      return "我的喜欢";
     case "trash":
-      return { title: "垃圾桶", description: "恢复照片或将其移入系统回收站" };
+      return "垃圾桶";
     case "map":
-      return { title: "照片地图", description: "按照拍摄位置浏览照片" };
+      return "照片地图";
     case "album":
-      return {
-        title: activeAlbumName || "相册",
-        description: "浏览和管理这个相册中的照片",
-      };
+      return activeAlbumName || "相册";
     default:
-      return { title: "图库", description: "浏览工作区中的照片" };
+      return "图库";
   }
 }
 
@@ -272,17 +264,7 @@ function App() {
     return <WorkspaceSelector onSelectWorkspace={handleSelectWorkspace} />;
   }
 
-  const viewMeta = getViewMeta(currentView, activeAlbumName, albums.length);
-  const pageActions = currentView === "albums" ? (
-    <Button
-      variant="primary"
-      className="page-header__primary-action"
-      onClick={handleOpenCreateAlbum}
-    >
-      <Plus size={17} aria-hidden="true" />
-      <span>新建相册</span>
-    </Button>
-  ) : null;
+  const viewTitle = getViewTitle(currentView, activeAlbumName);
 
   const sidebar = (
     <Sidebar
@@ -292,7 +274,7 @@ function App() {
       albums={albums}
       detectedCard={detectedCard}
       mode={sidebarMode}
-      currentTitle={viewMeta.title}
+      currentTitle={viewTitle}
       onNavigate={handleNavigate}
       onOpenAlbum={handleOpenAlbum}
       onCreateAlbum={handleOpenCreateAlbum}
@@ -309,25 +291,13 @@ function App() {
     />
   );
 
-  const header = currentView === "album" ? null : (
-    <PageHeader
-      title={viewMeta.title}
-      description={viewMeta.description}
-      workspaceName={activeWorkspace.name}
-      sidebarMode={sidebarMode}
-      onToggleSidebar={() => handleToggleSidebar()}
-      actions={pageActions}
-    />
-  );
-
   return (
     <>
       <AppShell
         sidebar={sidebar}
-        header={header}
         sidebarMode={sidebarMode}
         onRequestSidebarClose={closeCompactSidebar}
-        contentLabel={viewMeta.title}
+        contentLabel={viewTitle}
       >
         {currentView === "map" ? (
           <MapView

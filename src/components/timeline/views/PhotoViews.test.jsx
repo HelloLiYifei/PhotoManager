@@ -3,7 +3,9 @@ import { GalleryView, ListView, MasonryView } from ".";
 
 vi.mock("../media", () => ({
   GalleryPreviewImage: ({ alt }) => <img alt={alt} src="gallery-preview.jpg" />,
-  ThumbnailImage: ({ alt }) => <img alt={alt} src="thumbnail.jpg" />,
+  ThumbnailImage: ({ alt, aspectRatio }) => (
+    <img alt={alt} src="thumbnail.jpg" style={{ aspectRatio }} />
+  ),
 }));
 
 const photos = [
@@ -60,6 +62,9 @@ describe("MasonryView", () => {
     const first = screen.getByRole("gridcell", { name: "海边.jpg" });
     expect(first).toHaveAttribute("aria-selected", "true");
     expect(first).toHaveAttribute("data-compare-base", "true");
+    expect(screen.getByRole("img", { name: "海边.jpg" })).toHaveStyle({
+      aspectRatio: "4000 / 3000",
+    });
     expect(screen.getByText("对比基准")).toBeInTheDocument();
 
     fireEvent.click(first, { ctrlKey: true, detail: 1 });

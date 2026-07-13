@@ -2,7 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import { loadPhotoThumbnail } from "../../../lib/thumbnailLoader";
 import { loadPhotoPreview } from "../../../lib/previewLoader";
 
-export function ThumbnailImage({ id, alt, scrollRoot, fit = "natural" }) {
+export function ThumbnailImage({
+  id,
+  alt,
+  scrollRoot,
+  fit = "natural",
+  aspectRatio,
+}) {
   return (
     <LazyThumbnail
       sourceKey={`photo:${id}`}
@@ -10,6 +16,7 @@ export function ThumbnailImage({ id, alt, scrollRoot, fit = "natural" }) {
       alt={alt}
       scrollRoot={scrollRoot}
       fit={fit}
+      aspectRatio={aspectRatio}
       className="photo-thumbnail"
       loadingClassName="photo-card-img"
     />
@@ -22,6 +29,7 @@ export function LazyThumbnail({
   sourceKey = alt,
   scrollRoot,
   fit = "natural",
+  aspectRatio,
   className = "",
   loadingClassName = className,
   onLoad,
@@ -86,12 +94,14 @@ export function LazyThumbnail({
   }, [scrollRoot, sourceKey]);
 
   const fitClassName = `thumbnail-${fit}`;
+  const stableSizeStyle = aspectRatio ? { aspectRatio } : undefined;
 
   if (loading) {
     return (
       <div
         ref={imageRef}
         className={`${loadingClassName} ${fitClassName}`.trim()}
+        style={stableSizeStyle}
         role="status"
         aria-label={`正在加载${alt || "照片"}`}
       />
@@ -104,6 +114,7 @@ export function LazyThumbnail({
       src={src || "/placeholder.svg"}
       alt={alt}
       className={`${className} ${fitClassName}`.trim()}
+      style={stableSizeStyle}
       loading="lazy"
       decoding="async"
       data-fit={fit}

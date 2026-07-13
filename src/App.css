@@ -682,6 +682,13 @@ body {
 
 .photo-thumbnail.thumbnail-natural {
   height: auto;
+  object-fit: cover;
+}
+
+.photo-card-img.thumbnail-natural {
+  height: auto;
+  min-height: 0;
+  object-fit: cover;
 }
 
 .photo-thumbnail.thumbnail-cover,
@@ -1369,12 +1376,11 @@ body {
   border-radius: 8px;
   overflow: hidden;
   border: 2px solid transparent;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
   background: rgba(255, 255, 255, 0.02);
 }
 
 .masonry-item:hover {
-  transform: translateY(-2px);
   background: rgba(255, 255, 255, 0.05);
 }
 

@@ -2,6 +2,12 @@ import { ThumbnailImage } from "../media";
 import { handlePhotoItemKeyDown } from "./photoItemKeyboard";
 import styles from "./PhotoViews.module.css";
 
+function getStableAspectRatio(photo) {
+  const width = Number(photo.width);
+  const height = Number(photo.height);
+  return width > 0 && height > 0 ? `${width} / ${height}` : "4 / 3";
+}
+
 export default function MasonryView({
   photos,
   selectedIds = [],
@@ -47,6 +53,7 @@ export default function MasonryView({
               id={photo.id}
               alt={photo.filename}
               scrollRoot={scrollRoot}
+              aspectRatio={getStableAspectRatio(photo)}
             />
 
             {photo.fileType && !["JPG", "JPEG"].includes(photo.fileType.toUpperCase()) && (

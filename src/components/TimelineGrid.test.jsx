@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -98,6 +99,20 @@ function renderTimeline(props = {}) {
       onPhotosUpdated={vi.fn()}
       {...props}
     />,
+  );
+}
+
+function RefreshingTimeline() {
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  return (
+    <TimelineGrid
+      currentView="album"
+      albumId="album-1"
+      refreshTrigger={refreshTrigger}
+      onPhotoClick={vi.fn()}
+      onPhotosUpdated={() => setRefreshTrigger((value) => value + 1)}
+    />
   );
 }
 
@@ -228,6 +243,21 @@ describe("TimelineGrid phase-three integration", () => {
       id: "photo-1",
       isDeleted: true,
     }));
+  });
+
+  it("keeps the photo inspector open when rating triggers a refresh", async () => {
+    render(<RefreshingTimeline />);
+    fireEvent.click(await screen.findByRole("gridcell", { name: "海边.jpg" }), { detail: 1 });
+
+    fireEvent.click(screen.getByRole("button", { name: "设为 5 星" }));
+
+    await waitFor(() => expect(mocks.updateRating).toHaveBeenCalledWith({
+      id: "photo-1",
+      rating: 5,
+    }));
+    await waitFor(() => expect(mocks.getPhotos).toHaveBeenCalledTimes(3));
+    expect(screen.getByRole("complementary", { name: "照片属性面板" })).toBeInTheDocument();
+    expect(screen.getByText("已选择 1 张照片")).toBeInTheDocument();
   });
 
   it("keeps narrow-window selection usable until the property drawer is requested", async () => {

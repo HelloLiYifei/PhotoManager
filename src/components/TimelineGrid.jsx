@@ -131,7 +131,6 @@ export default function TimelineGrid({
     currentView,
     debouncedSearchQuery,
     ratingFilter,
-    refreshTrigger,
     tagFilter,
   ]);
 

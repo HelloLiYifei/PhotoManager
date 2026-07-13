@@ -149,4 +149,17 @@ describe("App phase-two shell", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(getAlbumSummaries).toHaveBeenCalledTimes(3);
   });
+
+  it("shows semantic workspace information instead of a settings alert", async () => {
+    render(<App />);
+    await screen.findByRole("heading", { name: "相册" });
+
+    fireEvent.click(screen.getByRole("button", { name: "工作区信息" }));
+    const dialog = screen.getByRole("dialog", { name: "工作区信息" });
+    expect(within(dialog).getByText("D:/Photos")).toBeInTheDocument();
+    expect(within(dialog).getByText("物理目录直接映射")).toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "知道了" }));
+    expect(screen.queryByRole("dialog", { name: "工作区信息" })).not.toBeInTheDocument();
+  });
 });

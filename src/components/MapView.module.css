@@ -1,0 +1,218 @@
+.page {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.centeredState {
+  width: 100%;
+  min-width: 0;
+  min-height: 280px;
+  height: 100%;
+  padding: var(--space-6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.summary {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+}
+
+.map {
+  width: 100%;
+  min-width: 0;
+  min-height: 280px;
+  flex: 1;
+  overflow: hidden;
+  background: #111116;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+}
+
+.networkWarning {
+  padding: var(--space-3) var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: #fcd34d;
+  font-size: var(--font-size-sm);
+  line-height: 1.4;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: var(--radius-md);
+}
+
+.networkWarning svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+}
+
+.markerShell {
+  background: transparent;
+  border: 0;
+}
+
+.marker {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #60a5fa, #7c3aed);
+  border: 3px solid #fff;
+  border-radius: 50% 50% 50% 0;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  transform: rotate(-45deg);
+}
+
+.markerFocused {
+  background: linear-gradient(135deg, #f59e0b, #ef4444);
+  box-shadow:
+    0 0 0 5px rgba(245, 158, 11, 0.25),
+    0 4px 14px rgba(0, 0, 0, 0.45);
+}
+
+.markerDot {
+  width: 8px;
+  height: 8px;
+  background: #fff;
+  border-radius: 50%;
+}
+
+.markerCount {
+  position: absolute;
+  top: -10px;
+  right: -12px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 14px;
+  text-align: center;
+  background: #111827;
+  border: 2px solid #fff;
+  border-radius: 10px;
+  transform: rotate(45deg);
+}
+
+.popup {
+  color: #333;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.popupTitle {
+  margin-bottom: 2px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.popupCoordinates {
+  margin-bottom: 7px;
+  color: #6b7280;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+}
+
+.popupGallery {
+  max-height: 290px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  overflow-y: auto;
+}
+
+.popupGallery:has(.popupPhoto:only-child) {
+  grid-template-columns: 1fr;
+}
+
+.popupPhoto {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  color: #111827;
+  text-align: left;
+  background: #eceff3;
+  border: 0;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.popupPhoto:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.popupPlaceholder,
+.popupImage {
+  width: 140px;
+  max-width: 100%;
+  height: 96px;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6b7280;
+  font-size: 11px;
+  object-fit: cover;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.popupFilename {
+  padding: 5px 7px;
+  display: block;
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.popupPhotoLoaded {
+  background: #fff;
+}
+
+@media (max-width: 900px) {
+  .page {
+    padding: var(--space-3);
+    gap: var(--space-2);
+  }
+
+  .summary {
+    font-size: var(--font-size-xs);
+  }
+
+  .networkWarning {
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--font-size-xs);
+  }
+}
+
+@media (max-height: 600px) {
+  .map {
+    min-height: 220px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marker,
+  .popupImage {
+    transition: none;
+  }
+}

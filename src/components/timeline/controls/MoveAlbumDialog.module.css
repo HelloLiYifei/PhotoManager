@@ -229,3 +229,6 @@
     animation-duration: 1.8s;
   }
 }
+.sharedDialog {
+  width: min(390px, 100%);
+}

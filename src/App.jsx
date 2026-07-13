@@ -9,6 +9,8 @@ import LightboxViewer from "./components/LightboxViewer";
 import MapView from "./components/MapView";
 import { AppShell, PageHeader, Sidebar } from "./components/shell";
 import TimelineGrid from "./components/TimelineGrid";
+import { Button } from "./components/ui";
+import WorkspaceInfoDialog from "./components/WorkspaceInfoDialog";
 import WorkspaceSelector from "./components/WorkspaceSelector";
 import { createAlbum, getAlbumSummaries } from "./services/albumService";
 import { detectCards } from "./services/importService";
@@ -65,6 +67,7 @@ function App() {
   const [showImportWizard, setShowImportWizard] = useState(false);
   const [lightboxData, setLightboxData] = useState(null);
   const [mapFocusedPhotoId, setMapFocusedPhotoId] = useState(null);
+  const [workspaceInfoOpen, setWorkspaceInfoOpen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const [showCreateAlbum, setShowCreateAlbum] = useState(false);
@@ -207,6 +210,7 @@ function App() {
     setActiveAlbumId(null);
     setActiveAlbumName("");
     setDetectedCard(null);
+    setWorkspaceInfoOpen(false);
     closeCompactSidebar();
   };
 
@@ -270,14 +274,14 @@ function App() {
 
   const viewMeta = getViewMeta(currentView, activeAlbumName, albums.length);
   const pageActions = currentView === "albums" ? (
-    <button
-      type="button"
+    <Button
+      variant="primary"
       className="page-header__primary-action"
       onClick={handleOpenCreateAlbum}
     >
       <Plus size={17} aria-hidden="true" />
       <span>新建相册</span>
-    </button>
+    </Button>
   ) : null;
 
   const sidebar = (
@@ -298,11 +302,10 @@ function App() {
       }}
       onSwitchWorkspace={handleSwitchWorkspace}
       onToggleMode={handleToggleSidebar}
-      onShowWorkspaceInfo={() =>
-        alert(
-          `工作区信息\n\n路径：${activeWorkspace.path}\n存储格式：物理目录直接映射`,
-        )
-      }
+      onShowWorkspaceInfo={() => {
+        setWorkspaceInfoOpen(true);
+        closeCompactSidebar();
+      }}
     />
   );
 
@@ -362,6 +365,12 @@ function App() {
         onDescriptionChange={setNewAlbumDesc}
         onSubmit={handleCreateAlbumSubmit}
         onClose={handleCloseCreateAlbum}
+      />
+
+      <WorkspaceInfoDialog
+        open={workspaceInfoOpen}
+        workspace={activeWorkspace}
+        onClose={() => setWorkspaceInfoOpen(false)}
       />
 
       {showImportWizard && (

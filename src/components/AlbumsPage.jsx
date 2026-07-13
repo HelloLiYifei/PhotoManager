@@ -3,11 +3,11 @@ import {
   AlertCircle,
   FolderOpen,
   Image as ImageIcon,
-  LoaderCircle,
   Plus,
   RefreshCw,
 } from "lucide-react";
 import { loadPhotoThumbnail } from "../lib/thumbnailLoader";
+import { Button, EmptyState, Spinner } from "./ui";
 import styles from "./AlbumsPage.module.css";
 
 function AlbumCover({ album }) {
@@ -50,7 +50,7 @@ function AlbumCover({ album }) {
   if (state.status === "loading") {
     return (
       <span className={styles.coverStatus} role="status">
-        <LoaderCircle className={styles.spinner} aria-hidden="true" />
+        <Spinner label={`正在加载${album.name}的封面`} size="sm" />
         <span className={styles.srOnly}>正在加载{album.name}的封面</span>
       </span>
     );
@@ -85,8 +85,7 @@ export default function AlbumsPage({
   if (loading) {
     return (
       <section className={styles.centeredState} aria-label="相册" aria-busy="true">
-        <LoaderCircle className={styles.stateSpinner} aria-hidden="true" />
-        <p>正在加载相册…</p>
+        <Spinner label="正在加载相册…" size="lg" showLabel />
       </section>
     );
   }
@@ -94,15 +93,18 @@ export default function AlbumsPage({
   if (error) {
     return (
       <section className={styles.centeredState} aria-label="相册加载失败">
-        <AlertCircle className={styles.errorIcon} aria-hidden="true" />
-        <div>
-          <h2>相册加载失败</h2>
-          <p role="alert">{getErrorMessage(error)}</p>
-        </div>
-        <button className={styles.secondaryButton} type="button" onClick={onRetry}>
-          <RefreshCw size={16} aria-hidden="true" />
-          重试
-        </button>
+        <EmptyState
+          icon={AlertCircle}
+          title="相册加载失败"
+          description={getErrorMessage(error)}
+          role="alert"
+          actions={(
+            <Button variant="secondary" onClick={onRetry}>
+              <RefreshCw size={16} aria-hidden="true" />
+              重试
+            </Button>
+          )}
+        />
       </section>
     );
   }
@@ -110,17 +112,17 @@ export default function AlbumsPage({
   if (albums.length === 0) {
     return (
       <section className={styles.centeredState} aria-label="相册为空">
-        <span className={styles.emptyIcon}>
-          <FolderOpen aria-hidden="true" />
-        </span>
-        <div>
-          <h2>还没有相册</h2>
-          <p>创建一个相册，开始整理你的照片。</p>
-        </div>
-        <button className={styles.primaryButton} type="button" onClick={onCreateAlbum}>
-          <Plus size={17} aria-hidden="true" />
-          创建相册
-        </button>
+        <EmptyState
+          icon={FolderOpen}
+          title="还没有相册"
+          description="创建一个相册，开始整理你的照片。"
+          actions={(
+            <Button variant="primary" onClick={onCreateAlbum}>
+              <Plus size={17} aria-hidden="true" />
+              创建相册
+            </Button>
+          )}
+        />
       </section>
     );
   }

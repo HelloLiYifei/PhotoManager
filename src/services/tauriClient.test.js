@@ -88,7 +88,6 @@ describe("Tauri service client", () => {
     invoke.mockResolvedValueOnce(1);
     const args = {
       imports: [{ absolute_path: "D:/DCIM/IMG_0001.JPG", album_name: "默认相册" }],
-      namingRule: "original",
     };
 
     await importPhotos(args);

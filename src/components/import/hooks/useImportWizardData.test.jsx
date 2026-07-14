@@ -149,7 +149,7 @@ describe("useImportWizardData", () => {
     expect(unlisten).toHaveBeenCalledTimes(1);
   });
 
-  it("submits snake_case photo DTOs, preserves options, and attaches GPS", async () => {
+  it("submits snake_case photo DTOs, preserves import options, and attaches GPS", async () => {
     detectCards.mockResolvedValue([{ path: "D:/DCIM" }]);
     scanCard.mockResolvedValue([freshPhoto, importedPhoto]);
     importPhotos.mockResolvedValue(1);
@@ -180,7 +180,6 @@ describe("useImportWizardData", () => {
         [freshPhoto.absolutePath]: "Shanghai",
         [importedPhoto.absolutePath]: "Forbidden",
       });
-      result.current.setNameTemplate("{original}");
       result.current.setBackupPath("  E:/Photo Backup  ");
     });
 
@@ -195,7 +194,6 @@ describe("useImportWizardData", () => {
         absolute_path: freshPhoto.absolutePath,
         album_name: "Shanghai",
       }],
-      nameTemplate: "{original}",
       backupPath: "E:/Photo Backup",
       currentLocation: { latitude: 31.2304, longitude: 121.4737 },
     });

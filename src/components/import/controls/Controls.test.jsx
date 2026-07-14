@@ -85,10 +85,9 @@ describe("import controls", () => {
     expect(onCreateAlbum).toHaveBeenCalledOnce();
   });
 
-  it("controls GPS, naming and backup options", () => {
+  it("controls GPS and backup options without exposing file renaming", () => {
     const onAttachCurrentLocationChange = vi.fn();
     const onRequestLocation = vi.fn();
-    const onNameTemplateChange = vi.fn();
     const onBackupPathChange = vi.fn();
     const onBrowseBackup = vi.fn();
 
@@ -97,11 +96,9 @@ describe("import controls", () => {
         attachCurrentLocation
         locationStatus="ready"
         currentLocation={{ latitude: 31.230416, longitude: 121.473701 }}
-        nameTemplate="{original}"
         backupPath="D:/Backup"
         onAttachCurrentLocationChange={onAttachCurrentLocationChange}
         onRequestLocation={onRequestLocation}
-        onNameTemplateChange={onNameTemplateChange}
         onBackupPathChange={onBackupPathChange}
         onBrowseBackup={onBrowseBackup}
       />,
@@ -109,9 +106,6 @@ describe("import controls", () => {
 
     fireEvent.click(screen.getByRole("checkbox", { name: /补充当前位置/ }));
     fireEvent.click(screen.getByRole("button", { name: "刷新" }));
-    fireEvent.change(screen.getByRole("combobox", { name: "重命名规则" }), {
-      target: { value: "{date}_{time}" },
-    });
     fireEvent.change(screen.getByRole("textbox", { name: /备份目录/ }), {
       target: { value: "C:/Copies" },
     });
@@ -120,7 +114,7 @@ describe("import controls", () => {
     expect(screen.getByText("31.23042, 121.47370")).toBeInTheDocument();
     expect(onAttachCurrentLocationChange).toHaveBeenCalledWith(false);
     expect(onRequestLocation).toHaveBeenCalledOnce();
-    expect(onNameTemplateChange).toHaveBeenCalledWith("{date}_{time}");
+    expect(screen.queryByRole("combobox", { name: "重命名规则" })).not.toBeInTheDocument();
     expect(onBackupPathChange).toHaveBeenCalledWith("C:/Copies");
     expect(onBrowseBackup).toHaveBeenCalledOnce();
   });

@@ -10,7 +10,6 @@ import {
 import { selectDirectory } from "../../../services/workspaceService";
 
 export const DEFAULT_IMPORT_ALBUM_NAME = "默认相册";
-export const DEFAULT_IMPORT_NAME_TEMPLATE = "{time}_{original}";
 
 const NOOP = () => {};
 
@@ -72,7 +71,6 @@ export default function useImportWizardData({
   const [albumsLoading, setAlbumsLoading] = useState(true);
   const [albumsError, setAlbumsError] = useState(null);
 
-  const [nameTemplate, setNameTemplate] = useState(DEFAULT_IMPORT_NAME_TEMPLATE);
   const [backupPath, setBackupPath] = useState("");
   const [attachCurrentLocationState, setAttachCurrentLocationState] = useState(true);
   const [currentLocation, setCurrentLocation] = useState(null);
@@ -441,7 +439,6 @@ export default function useImportWizardData({
       }));
       const count = await importPhotos({
         imports,
-        nameTemplate,
         backupPath: backupPath.trim() || null,
         currentLocation: attachCurrentLocationState ? importLocation : null,
       });
@@ -471,7 +468,6 @@ export default function useImportWizardData({
     attachCurrentLocationState,
     backupPath,
     confirmAction,
-    nameTemplate,
     notify,
     onClose,
     onImportComplete,
@@ -502,8 +498,6 @@ export default function useImportWizardData({
     createAlbumAndReload,
     selectSource,
     browseSource,
-    nameTemplate,
-    setNameTemplate,
     backupPath,
     setBackupPath,
     browseBackup,

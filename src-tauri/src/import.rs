@@ -96,6 +96,27 @@ fn normalized_import_identity(filename: &str, size: i64) -> (String, i64) {
     (filename.to_lowercase(), size)
 }
 
+fn destination_filename(src_path: &Path, collision_index: usize) -> String {
+    let original_name = src_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("unknown");
+    if collision_index == 0 {
+        return original_name.to_string();
+    }
+
+    let stem = src_path
+        .file_stem()
+        .and_then(|name| name.to_str())
+        .unwrap_or(original_name);
+    match src_path.extension().and_then(|extension| extension.to_str()) {
+        Some(extension) if !extension.is_empty() => {
+            format!("{}_{}.{}", stem, collision_index, extension)
+        }
+        _ => format!("{}_{}", stem, collision_index),
+    }
+}
+
 fn metadata_fingerprint(metadata: &fs::Metadata) -> String {
     let modified = metadata
         .modified()
@@ -380,7 +401,6 @@ pub fn execute_import(
     app_handle: &tauri::AppHandle,
     state: &tauri::State<'_, DbState>,
     imports: Vec<PhotoImportInfo>,
-    name_template: &str,
     backup_path: Option<String>,
     import_location: Option<ImportLocation>,
 ) -> Result<i32, String> {
@@ -472,33 +492,15 @@ pub fn execute_import(
             datetime.format("%Y-%m-%d %H:%M:%S").to_string()
         });
 
-        // Parse date for template substitution
-        let dt_parsed = chrono::NaiveDateTime::parse_from_str(&date_taken_str, "%Y-%m-%d %H:%M:%S")
-            .unwrap_or_else(|_| chrono::NaiveDateTime::from_timestamp_opt(0, 0).unwrap());
-
-        let date_str = dt_parsed.format("%Y-%m-%d").to_string();
-        let time_str = dt_parsed.format("%H%M%S").to_string();
-
-        // Resolve destination file name
-        let mut resolved_filename = name_template.to_string();
-        let base_name = src_path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or(&filename);
-        resolved_filename = resolved_filename.replace("{time}", &time_str);
-        resolved_filename = resolved_filename.replace("{date}", &date_str);
-        resolved_filename = resolved_filename.replace("{original}", base_name);
-
-        // Add extension
-        let final_filename = format!("{}.{}", resolved_filename, file_ext);
-        let dest_file_path = dest_folder_path.join(&final_filename);
+        // Preserve the source filename. A numeric suffix is added only when
+        // necessary to avoid overwriting an existing file in the album.
+        let dest_file_path = dest_folder_path.join(destination_filename(src_path, 0));
 
         // Avoid overwriting by appending index if file exists
         let mut final_dest_path = dest_file_path.clone();
         let mut idx = 1;
         while final_dest_path.exists() {
-            let index_filename = format!("{}_{}.{}", resolved_filename, idx, &file_ext);
-            final_dest_path = dest_folder_path.join(index_filename);
+            final_dest_path = dest_folder_path.join(destination_filename(src_path, idx));
             idx += 1;
         }
 
@@ -596,10 +598,17 @@ pub fn execute_import(
 #[cfg(test)]
 mod tests {
     use super::{
-        card_photo_dimensions, load_imported_file_index, normalized_import_identity,
-        resolve_import_coordinates, scan_card_files, ImportLocation,
+        card_photo_dimensions, destination_filename, load_imported_file_index,
+        normalized_import_identity, resolve_import_coordinates, scan_card_files, ImportLocation,
     };
     use rusqlite::Connection;
+
+    #[test]
+    fn preserves_source_filename_and_only_suffixes_collisions() {
+        let source = std::path::Path::new("D:/DCIM/IMG_0001.JPG");
+        assert_eq!(destination_filename(source, 0), "IMG_0001.JPG");
+        assert_eq!(destination_filename(source, 2), "IMG_0001_2.JPG");
+    }
 
     #[test]
     fn reads_card_dimensions_before_thumbnail_loading() {

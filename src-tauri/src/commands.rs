@@ -537,7 +537,6 @@ pub async fn import_photos(
     app_handle: AppHandle,
     state: State<'_, DbState>,
     imports: Vec<PhotoImportInfo>,
-    name_template: String,
     backup_path: Option<String>,
     current_location: Option<ImportLocation>,
 ) -> Result<i32, String> {
@@ -545,7 +544,6 @@ pub async fn import_photos(
         &app_handle,
         &state,
         imports,
-        &name_template,
         backup_path,
         current_location,
     )

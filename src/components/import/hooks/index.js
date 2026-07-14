@@ -10,7 +10,6 @@ export {
 
 export {
   DEFAULT_IMPORT_ALBUM_NAME,
-  DEFAULT_IMPORT_NAME_TEMPLATE,
   default as useImportWizardData,
 } from "./useImportWizardData";
 

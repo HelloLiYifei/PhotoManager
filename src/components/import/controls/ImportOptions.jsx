@@ -3,12 +3,6 @@ import { Crosshair, FolderOpen, LoaderCircle, Settings2 } from "lucide-react";
 
 import styles from "./ImportControls.module.css";
 
-const DEFAULT_NAME_OPTIONS = [
-  { value: "{time}_{original}", label: "时间_原始文件名" },
-  { value: "{date}_{time}", label: "日期_时间" },
-  { value: "{original}", label: "保持原始文件名" },
-];
-
 const LOCATION_LABELS = {
   idle: "将在导入时获取",
   locating: "正在获取位置…",
@@ -21,13 +15,10 @@ export default function ImportOptions({
   locationStatus = "idle",
   currentLocation = null,
   locationError = "",
-  nameTemplate = "{time}_{original}",
-  nameTemplateOptions = DEFAULT_NAME_OPTIONS,
   backupPath = "",
   disabled = false,
   onAttachCurrentLocationChange,
   onRequestLocation,
-  onNameTemplateChange,
   onBackupPathChange,
   onBrowseBackup,
 }) {
@@ -80,19 +71,6 @@ export default function ImportOptions({
           ) : null}
         </div>
       ) : null}
-
-      <label className={styles.field}>
-        <span>重命名规则</span>
-        <select
-          value={nameTemplate}
-          onChange={(event) => onNameTemplateChange?.(event.target.value)}
-          disabled={disabled}
-        >
-          {nameTemplateOptions.map((option) => (
-            <option key={option.value} value={option.value}>{option.label}</option>
-          ))}
-        </select>
-      </label>
 
       <div className={styles.field}>
         <label htmlFor={backupPathId}>备份目录（可选）</label>

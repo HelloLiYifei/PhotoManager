@@ -332,12 +332,10 @@ export default function ImportWizard({ onClose, onImportComplete }) {
               locationStatus={data.locationStatus}
               currentLocation={data.currentLocation}
               locationError={data.locationError}
-              nameTemplate={data.nameTemplate}
               backupPath={data.backupPath}
               disabled={importBusy}
               onAttachCurrentLocationChange={data.setAttachCurrentLocation}
               onRequestLocation={() => data.requestCurrentLocation().catch(() => {})}
-              onNameTemplateChange={data.setNameTemplate}
               onBackupPathChange={data.setBackupPath}
               onBrowseBackup={data.browseBackup}
             />

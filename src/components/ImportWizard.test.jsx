@@ -237,7 +237,7 @@ describe("ImportWizard phase-four integration", () => {
     }));
   });
 
-  it("submits GPS, naming, backup and progress without changing import semantics", async () => {
+  it("submits GPS, backup and progress while preserving original filenames", async () => {
     const pendingImport = deferred();
     const onClose = vi.fn();
     const onImportComplete = vi.fn();
@@ -245,9 +245,7 @@ describe("ImportWizard phase-four integration", () => {
     renderWizard({ onClose, onImportComplete });
     await screen.findByRole("gridcell", { name: "IMG_0001.JPG" });
 
-    fireEvent.change(screen.getByRole("combobox", { name: "重命名规则" }), {
-      target: { value: "{original}" },
-    });
+    expect(screen.queryByRole("combobox", { name: "重命名规则" })).not.toBeInTheDocument();
     fireEvent.change(screen.getByRole("textbox", { name: "备份目录（可选）" }), {
       target: { value: "E:/Backup" },
     });
@@ -258,7 +256,6 @@ describe("ImportWizard phase-four integration", () => {
         { absolute_path: freshOne.absolutePath, album_name: "默认相册" },
         { absolute_path: freshTwo.absolutePath, album_name: "默认相册" },
       ],
-      nameTemplate: "{original}",
       backupPath: "E:/Backup",
       currentLocation: { latitude: 31.2304, longitude: 121.4737 },
     }));

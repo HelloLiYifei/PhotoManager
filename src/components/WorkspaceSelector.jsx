@@ -15,7 +15,7 @@ import {
   openWorkspace,
   selectDirectory,
 } from "../services/workspaceService";
-import { Button, EmptyState, Field, Spinner } from "./ui";
+import { Button, EmptyState, Field, Spinner, useGlobalDialog } from "./ui";
 import styles from "./WorkspaceSelector.module.css";
 
 const getErrorMessage = (error) =>
@@ -32,6 +32,7 @@ function getFolderName(path) {
 }
 
 export default function WorkspaceSelector({ onSelectWorkspace }) {
+  const { confirm: showConfirm } = useGlobalDialog();
   const [workspaces, setWorkspaces] = useState([]);
   const [newWorkspaceName, setNewWorkspaceName] = useState("");
   const [workspacePath, setWorkspacePath] = useState("");
@@ -139,8 +140,13 @@ export default function WorkspaceSelector({ onSelectWorkspace }) {
   };
 
   const handleDeleteWorkspace = async (workspace) => {
-    const confirmed = window.confirm(
+    const confirmed = await showConfirm(
       `确定从最近工作区中移除“${workspace.name}”吗？\n磁盘上的照片文件不会被删除。`,
+      {
+        title: "移除最近工作区",
+        tone: "danger",
+        confirmText: "确认移除",
+      },
     );
     if (!confirmed || !beginOperation(`delete:${workspace.id}`)) return;
 

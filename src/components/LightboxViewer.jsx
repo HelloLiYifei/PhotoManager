@@ -10,7 +10,7 @@ import {
   toggleFavorite,
   updateRating,
 } from "../services/photoService";
-import { Drawer } from "./ui";
+import { Drawer, useGlobalDialog } from "./ui";
 import {
   LightboxCanvas,
   LightboxInfoPanel,
@@ -43,6 +43,7 @@ export default function LightboxViewer({
   getImportPhotoState,
   onSetImportAlbum,
 }) {
+  const { alert: showAlert, confirm: showConfirm } = useGlobalDialog();
   const safeInitialIndex = Math.min(Math.max(initialIndex ?? 0, 0), Math.max(photosList.length - 1, 0));
   const [currentIndex, setCurrentIndex] = useState(safeInitialIndex);
   const currentPhoto = photosList[currentIndex];
@@ -311,10 +312,13 @@ export default function LightboxViewer({
     setPendingAction("delete");
     try {
       await deletePhoto({ id: currentPhoto.id, isDeleted: !isTrash });
-      window.alert(isTrash ? "照片已恢复" : "照片已移动到回收站");
+      await showAlert(isTrash ? "照片已恢复" : "照片已移动到回收站", {
+        title: isTrash ? "恢复完成" : "已移入回收站",
+        tone: "success",
+      });
       advanceAfterRemoval();
     } catch (error) {
-      window.alert(`操作失败: ${error}`);
+      await showAlert(`操作失败: ${error}`, { title: "操作失败", tone: "danger" });
     } finally {
       setPendingAction("");
     }
@@ -322,14 +326,22 @@ export default function LightboxViewer({
 
   const handlePermanentDelete = async () => {
     if (!currentPhoto || pendingAction) return;
-    if (!window.confirm("此操作将永久从磁盘删除照片文件，且不可恢复！确定吗？")) return;
+    const confirmed = await showConfirm(
+      "此操作将永久从磁盘删除照片文件，且不可恢复！确定吗？",
+      {
+        title: "永久删除照片",
+        tone: "danger",
+        confirmText: "永久删除",
+      },
+    );
+    if (!confirmed) return;
     setPendingAction("delete");
     try {
       await permanentlyDeletePhoto({ id: currentPhoto.id });
-      window.alert("照片已永久删除");
+      await showAlert("照片已永久删除", { title: "删除完成", tone: "success" });
       advanceAfterRemoval();
     } catch (error) {
-      window.alert(`删除失败: ${error}`);
+      await showAlert(`删除失败: ${error}`, { title: "删除失败", tone: "danger" });
     } finally {
       setPendingAction("");
     }

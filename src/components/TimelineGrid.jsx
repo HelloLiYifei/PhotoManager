@@ -17,6 +17,7 @@ import {
 } from "./timeline/hooks";
 import { ComparePreviewImage } from "./timeline/media";
 import { GalleryView, ListView, MasonryView } from "./timeline/views";
+import { useGlobalDialog } from "./ui";
 import styles from "./TimelineGrid.module.css";
 
 const NARROW_TIMELINE_QUERY = "(max-width: 900px)";
@@ -53,6 +54,7 @@ export default function TimelineGrid({
   onPhotosUpdated,
   refreshTrigger,
 }) {
+  const { alert: showAlert } = useGlobalDialog();
   const [searchQuery, setSearchQuery] = useState("");
   const [ratingFilter, setRatingFilter] = useState(0);
   const [tagFilter, setTagFilter] = useState("");
@@ -173,31 +175,40 @@ export default function TimelineGrid({
     }
 
     if (selectedIds.length === 0) {
-      window.alert("请先选择一张照片作为对比基准。");
+      void showAlert("请先选择一张照片作为对比基准。", {
+        title: "尚未选择照片",
+        tone: "warning",
+      });
       return;
     }
 
     setViewMode("masonry");
     setCompareLockedId(selectedIds.at(-1));
     setCompareMode(true);
-  }, [compareMode, selectedIds, setViewMode]);
+  }, [compareMode, selectedIds, setViewMode, showAlert]);
 
   const addTag = useCallback(async () => {
     try {
       const added = await addPrimaryTag(newTagInput);
       if (added) setNewTagInput("");
     } catch (caught) {
-      window.alert(`添加标签失败：${errorMessage(caught)}`);
+      void showAlert(`添加标签失败：${errorMessage(caught)}`, {
+        title: "添加标签失败",
+        tone: "danger",
+      });
     }
-  }, [addPrimaryTag, newTagInput]);
+  }, [addPrimaryTag, newTagInput, showAlert]);
 
   const removeTag = useCallback(async (tagName) => {
     try {
       await removePrimaryTag(tagName);
     } catch (caught) {
-      window.alert(`删除标签失败：${errorMessage(caught)}`);
+      void showAlert(`删除标签失败：${errorMessage(caught)}`, {
+        title: "删除标签失败",
+        tone: "danger",
+      });
     }
-  }, [removePrimaryTag]);
+  }, [removePrimaryTag, showAlert]);
 
   const openMoveDialog = useCallback(async () => {
     setMoveError(null);
@@ -206,9 +217,12 @@ export default function TimelineGrid({
       setMoveAlbums(albums);
       setMoveDialogOpen(true);
     } catch (caught) {
-      window.alert(`读取相册失败：${errorMessage(caught)}`);
+      void showAlert(`读取相册失败：${errorMessage(caught)}`, {
+        title: "无法读取相册",
+        tone: "danger",
+      });
     }
-  }, []);
+  }, [showAlert]);
 
   const moveToAlbum = useCallback(async (targetAlbumId) => {
     setMoveBusy(true);

@@ -14,11 +14,12 @@ export const DEFAULT_IMPORT_ALBUM_NAME = "默认相册";
 const NOOP = () => {};
 
 function defaultConfirm(message) {
-  return globalThis.confirm(message);
+  return Promise.resolve(globalThis.confirm(message));
 }
 
 function defaultNotify(message) {
   globalThis.alert(message);
+  return Promise.resolve();
 }
 
 function toErrorMessage(error, fallback) {
@@ -397,7 +398,7 @@ export default function useImportWizardData({
       );
 
       if (safePaths.length === 0) {
-        notify("请至少选择一张照片进行导入！");
+        await notify("请至少选择一张照片进行导入！");
         return { status: "empty" };
       }
 
@@ -408,7 +409,7 @@ export default function useImportWizardData({
           if (submissionCancelled()) return { status: "cancelled" };
         } catch (error) {
           if (submissionCancelled()) return { status: "cancelled" };
-          const continueWithoutLocation = confirmAction(
+          const continueWithoutLocation = await confirmAction(
             `${error.message}\n\n是否继续导入，但不为缺少 GPS 的照片添加位置？`,
           );
           if (!continueWithoutLocation) return { status: "cancelled-location" };
@@ -417,7 +418,7 @@ export default function useImportWizardData({
 
       if (submissionCancelled()) return { status: "cancelled" };
 
-      const confirmed = confirmAction(
+      const confirmed = await confirmAction(
         "【导入提示】\n在导入期间，请保持电脑开机、挂载设备连接稳定。确定开始导入吗？",
       );
       if (!confirmed) return { status: "cancelled" };
@@ -445,14 +446,15 @@ export default function useImportWizardData({
 
       if (submissionCancelled()) return { status: "complete", count };
 
-      notify(`导入成功！共复制并注册了 ${count} 张照片。`);
+      await notify(`导入成功！共复制并注册了 ${count} 张照片。`);
+      if (submissionCancelled()) return { status: "complete", count };
       onImportComplete(count);
       onClose();
       return { status: "complete", count };
     } catch (error) {
       if (submissionCancelled()) return { status: "cancelled" };
       if (mountedRef.current) setImportError(error);
-      notify(`导入失败: ${toErrorMessage(error, "未知错误")}`);
+      await notify(`导入失败: ${toErrorMessage(error, "未知错误")}`);
       return { status: "error", error };
     } finally {
       submissionLockRef.current = false;

@@ -10,6 +10,7 @@ import { AppShell, Sidebar } from "./components/shell";
 import TimelineGrid from "./components/TimelineGrid";
 import WorkspaceInfoDialog from "./components/WorkspaceInfoDialog";
 import WorkspaceSelector from "./components/WorkspaceSelector";
+import { useGlobalDialog } from "./components/ui";
 import { createAlbum, getAlbumSummaries } from "./services/albumService";
 import { detectCards } from "./services/importService";
 import { getActiveWorkspace, getWorkspaces } from "./services/workspaceService";
@@ -42,6 +43,7 @@ function getViewTitle(currentView, activeAlbumName) {
 }
 
 function App() {
+  const { confirm: showConfirm } = useGlobalDialog();
   const [activeWorkspace, setActiveWorkspace] = useState(null);
   const [currentView, setCurrentView] = useState("albums");
   const [activeAlbumId, setActiveAlbumId] = useState(null);
@@ -194,8 +196,12 @@ function App() {
     closeCompactSidebar();
   };
 
-  const handleSwitchWorkspace = () => {
-    if (!confirm("确定要返回选择仓库界面吗？")) return;
+  const handleSwitchWorkspace = async () => {
+    const confirmed = await showConfirm("确定要返回选择仓库界面吗？", {
+      title: "切换工作区",
+      confirmText: "返回选择界面",
+    });
+    if (!confirmed) return;
 
     albumsRequestIdRef.current += 1;
     setActiveWorkspace(null);

@@ -24,6 +24,7 @@ import {
   ImportListView,
   ImportMasonryView,
 } from "./import/views";
+import { useGlobalDialog } from "./ui";
 import styles from "./ImportWizard.module.css";
 
 const INITIAL_VISIBLE_PHOTOS = 64;
@@ -35,7 +36,17 @@ function getErrorMessage(error, fallback = "操作失败，请重试。") {
 }
 
 export default function ImportWizard({ onClose, onImportComplete }) {
-  const data = useImportWizardData({ onClose, onImportComplete });
+  const { alert: showAlert, confirm: showConfirm } = useGlobalDialog();
+  const notify = useCallback((message) => showAlert(message, {
+    title: message.includes("失败") ? "导入失败" : "导入提示",
+    tone: message.includes("失败") ? "danger" : "success",
+  }), [showAlert]);
+  const data = useImportWizardData({
+    onClose,
+    onImportComplete,
+    confirmAction: showConfirm,
+    notify,
+  });
   const [viewMode, setViewMode] = useImportViewPreference();
   const [sourceDraft, setSourceDraft] = useState("");
   const [configurationOpen, setConfigurationOpen] = useState(false);

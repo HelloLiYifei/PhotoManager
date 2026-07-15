@@ -27,7 +27,7 @@ import {
   scanWorkspace,
 } from "../services/settingsService";
 import { selectDirectory } from "../services/workspaceService";
-import { useSettings } from "../settings";
+import { CACHE_LIMITS, useSettings } from "../settings";
 import { PageHeader } from "./shell";
 import { Button, Select, useGlobalDialog } from "./ui";
 import styles from "./SettingsPage.module.css";
@@ -77,6 +77,46 @@ function SettingRow({ icon: Icon, title, description, children, danger = false }
       </div>
       <div className={styles.settingControl}>{children}</div>
     </div>
+  );
+}
+
+function CacheLimitInput({ label, value, minimum, maximum, suffix, onCommit }) {
+  const [draft, setDraft] = useState(String(value));
+
+  useEffect(() => {
+    setDraft(String(value));
+  }, [value]);
+
+  const commit = () => {
+    const parsed = Number(draft);
+    const normalized = Number.isFinite(parsed)
+      ? Math.min(maximum, Math.max(minimum, Math.round(parsed)))
+      : value;
+    setDraft(String(normalized));
+    if (normalized !== value) onCommit(normalized);
+  };
+
+  return (
+    <label className={styles.limitControl}>
+      <input
+        type="number"
+        value={draft}
+        min={minimum}
+        max={maximum}
+        step="1"
+        aria-label={label}
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={commit}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") event.currentTarget.blur();
+          if (event.key === "Escape") {
+            setDraft(String(value));
+            event.preventDefault();
+          }
+        }}
+      />
+      <span>{suffix}</span>
+    </label>
   );
 }
 
@@ -414,6 +454,26 @@ export default function SettingsPage({
                     <small>{t("settings.scanning", { scanned: formatNumber(scanProgress.scanned), total: formatNumber(scanProgress.total) })}</small>
                   </div>
                 ) : null}
+                <SettingRow icon={HardDrive} title={t("settings.cacheSizeLimit")} description={t("settings.cacheSizeLimitDescription")}>
+                  <CacheLimitInput
+                    label={t("settings.cacheSizeLimit")}
+                    value={workspaceSettings.cacheMaxMb}
+                    minimum={CACHE_LIMITS.minSizeMb}
+                    maximum={CACHE_LIMITS.maxSizeMb}
+                    suffix={t("settings.megabytes")}
+                    onCommit={(cacheMaxMb) => changeWorkspace({ cacheMaxMb })}
+                  />
+                </SettingRow>
+                <SettingRow icon={Images} title={t("settings.cacheImageLimit")} description={t("settings.cacheImageLimitDescription")}>
+                  <CacheLimitInput
+                    label={t("settings.cacheImageLimit")}
+                    value={workspaceSettings.cacheMaxImages}
+                    minimum={CACHE_LIMITS.minImages}
+                    maximum={CACHE_LIMITS.maxImages}
+                    suffix={t("settings.imagesUnit")}
+                    onCommit={(cacheMaxImages) => changeWorkspace({ cacheMaxImages })}
+                  />
+                </SettingRow>
                 <SettingRow icon={Trash2} title={t("settings.clearThumbnails")} description={t("settings.clearCacheDescription")}>
                   <Button variant="secondary" onClick={() => handleClearCache("thumbnails")} disabled={Boolean(operation)}>
                     {operation === "thumbnails" ? <LoaderCircle className={styles.spin} aria-hidden="true" /> : <Trash2 aria-hidden="true" />}

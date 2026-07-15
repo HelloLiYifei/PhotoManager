@@ -6,6 +6,7 @@ pub mod import;
 pub mod commands;
 pub mod media;
 pub mod shell_thumbnail;
+pub mod thumbnail_cache;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -39,6 +40,7 @@ pub fn run() {
             commands::scan_workspace,
             commands::get_workspace_storage_stats,
             commands::clear_workspace_cache,
+            commands::set_workspace_cache_limits,
             commands::detect_cards,
             commands::scan_card,
             commands::import_photos,

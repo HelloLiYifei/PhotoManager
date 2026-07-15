@@ -17,6 +17,12 @@ export const THEMES = Object.freeze(["system", "dark", "light"]);
 export const LOCALES = Object.freeze(["zh-CN", "en-US"]);
 export const DENSITIES = Object.freeze(["comfortable", "compact"]);
 export const MOTION_MODES = Object.freeze(["system", "full", "reduced"]);
+export const CACHE_LIMITS = Object.freeze({
+  minSizeMb: 1,
+  maxSizeMb: 16_384,
+  minImages: 1,
+  maxImages: 100_000,
+});
 
 export const DEFAULT_GLOBAL_SETTINGS = Object.freeze({
   locale: "zh-CN",
@@ -31,6 +37,8 @@ export const DEFAULT_WORKSPACE_SETTINGS = Object.freeze({
   autoSelectDetectedSource: true,
   attachCurrentLocation: true,
   backupPath: "",
+  cacheMaxMb: 512,
+  cacheMaxImages: 5_000,
 });
 
 const DEFAULT_SETTINGS = Object.freeze({
@@ -42,6 +50,12 @@ const DEFAULT_SETTINGS = Object.freeze({
 
 function pickEnum(value, allowed, fallback) {
   return allowed.includes(value) ? value : fallback;
+}
+
+function pickInteger(value, minimum, maximum, fallback) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(maximum, Math.max(minimum, Math.round(parsed)));
 }
 
 function normalizeGlobal(value = {}) {
@@ -66,6 +80,18 @@ function normalizeWorkspace(value = {}, fallback = DEFAULT_WORKSPACE_SETTINGS) {
         ? value.attachCurrentLocation
         : fallback.attachCurrentLocation,
     backupPath: typeof value.backupPath === "string" ? value.backupPath : fallback.backupPath,
+    cacheMaxMb: pickInteger(
+      value.cacheMaxMb,
+      CACHE_LIMITS.minSizeMb,
+      CACHE_LIMITS.maxSizeMb,
+      fallback.cacheMaxMb,
+    ),
+    cacheMaxImages: pickInteger(
+      value.cacheMaxImages,
+      CACHE_LIMITS.minImages,
+      CACHE_LIMITS.maxImages,
+      fallback.cacheMaxImages,
+    ),
   };
 }
 

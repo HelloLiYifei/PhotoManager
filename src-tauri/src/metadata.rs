@@ -1,5 +1,5 @@
 use std::fs::File;
-use std::io::{BufReader, Read, Seek, SeekFrom};
+use std::io::{BufReader, Cursor, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use exif::{In, Tag, Value};
 use image::codecs::jpeg::JpegEncoder;
@@ -328,6 +328,45 @@ pub fn read_exif_metadata<P: AsRef<Path>>(path: P) -> ImageMetadata {
     }
 
     meta
+}
+
+/// Read metadata needed by the photo list without decoding the full image.
+/// EXIF dimensions are preferred; image headers or an embedded RAW preview
+/// are consulted only when the camera did not provide dimensions.
+pub fn read_image_metadata<P: AsRef<Path>>(path: P, is_raw: bool) -> ImageMetadata {
+    let path = path.as_ref();
+    let mut metadata = read_exif_metadata(path);
+    if metadata.width.is_some_and(|width| width > 0)
+        && metadata.height.is_some_and(|height| height > 0)
+    {
+        return metadata;
+    }
+
+    let dimensions = if is_raw {
+        extract_raw_preview(path).ok().and_then(|bytes| {
+            image::ImageReader::new(Cursor::new(bytes))
+                .with_guessed_format()
+                .ok()?
+                .into_dimensions()
+                .ok()
+        })
+    } else {
+        image::image_dimensions(path).ok()
+    };
+
+    if let Some((width, height)) = dimensions.filter(|(width, height)| *width > 0 && *height > 0) {
+        let (Ok(width), Ok(height)) = (i32::try_from(width), i32::try_from(height)) else {
+            return metadata;
+        };
+        let (width, height) = match get_orientation(path) {
+            5 | 6 | 7 | 8 => (height, width),
+            _ => (width, height),
+        };
+        metadata.width = Some(width);
+        metadata.height = Some(height);
+    }
+
+    metadata
 }
 
 // Helper to get orientation from EXIF

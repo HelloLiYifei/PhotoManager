@@ -21,7 +21,8 @@ fn remove_thumbnail_cache(workspace_root: &Path, photo_id: &str) {
 
     for thumbnail_path in thumbnail_paths {
         if thumbnail_path.exists() {
-            let _ = fs::remove_file(thumbnail_path);
+            let _ = fs::remove_file(&thumbnail_path);
+            crate::thumbnail_cache::forget(&thumbnail_path);
         }
     }
 }
@@ -411,7 +412,9 @@ pub async fn get_photo_thumbnail_url(state: State<'_, DbState>, id: String) -> R
         let workspace_path = Path::new(&workspace_root);
         let thumbnail_path = crate::metadata::thumbnail_cache_path(workspace_path, &id);
 
-        if !thumbnail_path.exists() {
+        if thumbnail_path.exists() {
+            crate::thumbnail_cache::record_access(&thumbnail_path);
+        } else {
             let photo_path = workspace_path.join(&relative_path);
             let is_raw = matches!(file_type.to_lowercase().as_str(), "arw" | "cr2" | "nef");
             let _ = fs::create_dir_all(
@@ -420,7 +423,22 @@ pub async fn get_photo_thumbnail_url(state: State<'_, DbState>, id: String) -> R
                     .ok_or("无法确定缩略图缓存目录")?,
             );
 
-            if let Err(error) = crate::metadata::generate_thumbnail(&photo_path, &thumbnail_path, is_raw) {
+            let generated = if let Some(shell_image) = crate::shell_thumbnail::load(
+                &photo_path,
+                crate::metadata::THUMBNAIL_MAX_DIMENSION,
+            ) {
+                let thumb = shell_image.thumbnail(
+                    crate::metadata::THUMBNAIL_MAX_DIMENSION,
+                    crate::metadata::THUMBNAIL_MAX_DIMENSION,
+                );
+                crate::metadata::encode_thumbnail_jpeg(&thumb)
+                    .and_then(|bytes| fs::write(&thumbnail_path, bytes).map_err(|e| e.to_string()))
+            } else {
+                crate::metadata::generate_thumbnail(&photo_path, &thumbnail_path, is_raw)
+                    .map(|_| ())
+            };
+
+            if let Err(error) = generated {
                 // Preserve access to a pre-upgrade cache if a damaged or
                 // unsupported original cannot be regenerated.
                 let legacy_path = workspace_path
@@ -428,10 +446,13 @@ pub async fn get_photo_thumbnail_url(state: State<'_, DbState>, id: String) -> R
                     .join("thumbnails")
                     .join(format!("{}.jpg", id));
                 if legacy_path.exists() {
+                    crate::thumbnail_cache::record_access(&legacy_path);
                     return Ok(crate::media::photo_thumbnail_url(&id));
                 }
                 return Err(error);
             }
+
+            crate::thumbnail_cache::record_write(&thumbnail_path);
         }
 
         Ok(crate::media::photo_thumbnail_url(&id))
@@ -687,7 +708,36 @@ pub fn clear_workspace_cache(
     let cache_root = Path::new(&workspace_root)
         .join(".photomanager")
         .join(cache_name);
-    Ok(clear_cache_files(&cache_root))
+    let result = clear_cache_files(&cache_root);
+    if kind == "thumbnails" {
+        crate::thumbnail_cache::invalidate(&cache_root);
+    }
+    Ok(result)
+}
+
+#[tauri::command]
+pub fn set_workspace_cache_limits(
+    state: State<'_, DbState>,
+    max_bytes: u64,
+    max_files: usize,
+) -> Result<CacheClearResult, String> {
+    if max_bytes == 0 || max_files == 0 {
+        return Err("缓存空间和图片数量上限必须大于 0".to_string());
+    }
+
+    let workspace_root = {
+        let current_path_guard = state.current_path.lock().unwrap();
+        current_path_guard
+            .as_ref()
+            .ok_or("没有打开的工作空间")?
+            .clone()
+    };
+    let metadata_root = Path::new(&workspace_root).join(".photomanager");
+    let result = crate::thumbnail_cache::set_limits(&metadata_root, max_bytes, max_files);
+    Ok(CacheClearResult {
+        files_removed: result.files_removed,
+        bytes_freed: result.bytes_freed,
+    })
 }
 
 #[tauri::command]
@@ -771,9 +821,11 @@ pub async fn get_image_thumbnail_url(
 
         if cache_path.exists() {
             if image::image_dimensions(&cache_path).is_ok() {
+                crate::thumbnail_cache::record_access(&cache_path);
                 return Ok(crate::media::import_preview_url(&cache_key));
             }
             let _ = fs::remove_file(&cache_path);
+            crate::thumbnail_cache::forget(&cache_path);
         }
 
         fs::create_dir_all(
@@ -794,6 +846,7 @@ pub async fn get_image_thumbnail_url(
             );
             let bytes = crate::metadata::encode_thumbnail_jpeg(&thumb)?;
             fs::write(&cache_path, bytes).map_err(|e| e.to_string())?;
+            crate::thumbnail_cache::record_write(&cache_path);
             return Ok(crate::media::import_preview_url(&cache_key));
         }
 
@@ -853,7 +906,8 @@ pub async fn get_image_thumbnail_url(
         };
         
         let bytes = crate::metadata::encode_thumbnail_jpeg(&thumb)?;
-        fs::write(cache_path, bytes).map_err(|e| e.to_string())?;
+        fs::write(&cache_path, bytes).map_err(|e| e.to_string())?;
+        crate::thumbnail_cache::record_write(&cache_path);
 
         Ok(crate::media::import_preview_url(&cache_key))
     })

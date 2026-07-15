@@ -1,7 +1,9 @@
 import { getImageThumbnailUrl } from "../services/importService";
 import { getPhotoThumbnailUrl } from "../services/photoService";
 
-const MAX_CONCURRENT_REQUESTS = 6;
+// Keep the frontend queue aligned with the four-worker Rust decoder pool so
+// invisible work cannot accumulate ahead of newly visible photo cards.
+const MAX_CONCURRENT_REQUESTS = 4;
 const MAX_CACHE_ENTRIES = 180;
 
 const cache = new Map();

@@ -1,6 +1,8 @@
 import { useEffect, useId } from "react";
 import { Search, SlidersHorizontal, X } from "lucide-react";
+import { useI18n } from "../../../i18n";
 import ViewSwitcher from "../../shared/ViewSwitcher";
+import { Select } from "../../ui";
 import styles from "./TimelineToolbar.module.css";
 
 function FilterFields({
@@ -9,35 +11,40 @@ function FilterFields({
   ratingFilter,
   onTagFilterChange,
   onRatingFilterChange,
+  t,
 }) {
   return (
     <div className={styles.filterFields}>
       <label className={styles.filterField}>
-        <span>标签</span>
-        <select
+        <span>{t("timeline.tag")}</span>
+        <Select
+          wrapperClassName={styles.filterSelectRoot}
+          className={styles.filterSelect}
           value={tagFilter}
-          onChange={(event) => onTagFilterChange?.(event.target.value)}
-          aria-label="按标签筛选"
-        >
-          <option value="">全部标签</option>
-          {allTags.map((tag) => (
-            <option key={tag} value={tag}>{tag}</option>
-          ))}
-        </select>
+          onChange={(value) => onTagFilterChange?.(value)}
+          aria-label={t("timeline.filterTag")}
+          options={[
+            { value: "", label: t("timeline.allTags") },
+            ...allTags.map((tag) => ({ value: tag, label: tag })),
+          ]}
+        />
       </label>
 
       <label className={styles.filterField}>
-        <span>评分</span>
-        <select
+        <span>{t("timeline.rating")}</span>
+        <Select
+          wrapperClassName={styles.filterSelectRoot}
+          className={styles.filterSelect}
           value={ratingFilter}
-          onChange={(event) => onRatingFilterChange?.(Number(event.target.value))}
-          aria-label="按评分筛选"
-        >
-          <option value={0}>全部评分</option>
-          <option value={1}>1 星及以上</option>
-          <option value={3}>3 星及以上</option>
-          <option value={5}>仅 5 星</option>
-        </select>
+          onChange={(value) => onRatingFilterChange?.(Number(value))}
+          aria-label={t("timeline.filterRating")}
+          options={[
+            { value: 0, label: t("timeline.allRatings") },
+            { value: 1, label: t("timeline.ratingOne") },
+            { value: 3, label: t("timeline.ratingThree") },
+            { value: 5, label: t("timeline.ratingFive") },
+          ]}
+        />
       </label>
     </div>
   );
@@ -56,6 +63,7 @@ export default function TimelineToolbar({
   filtersOpen = false,
   onFiltersOpenChange,
 }) {
+  const { t } = useI18n();
   const filtersId = useId();
   const activeFilterCount = Number(Boolean(tagFilter)) + Number(Number(ratingFilter) > 0);
 
@@ -76,18 +84,19 @@ export default function TimelineToolbar({
     ratingFilter,
     onTagFilterChange,
     onRatingFilterChange,
+    t,
   };
 
   return (
-    <header className={styles.toolbar} aria-label="照片浏览工具栏">
+    <header className={styles.toolbar} aria-label={t("timeline.photoView")}>
       <label className={styles.searchField}>
-        <span className={styles.visuallyHidden}>搜索照片</span>
+        <span className={styles.visuallyHidden}>{t("timeline.search")}</span>
         <Search aria-hidden="true" />
         <input
           type="search"
           value={searchQuery}
           onChange={(event) => onSearchChange?.(event.target.value)}
-          placeholder="搜索文件名、相机或参数…"
+          placeholder={t("timeline.searchPlaceholder")}
           autoComplete="off"
         />
       </label>
@@ -100,19 +109,19 @@ export default function TimelineToolbar({
         className={styles.mobileFilterButton}
         type="button"
         onClick={() => onFiltersOpenChange?.(!filtersOpen)}
-        aria-label={activeFilterCount ? `筛选，已启用 ${activeFilterCount} 项` : "筛选照片"}
+        aria-label={activeFilterCount ? t("timeline.activeFiltersLabel", { count: activeFilterCount }) : t("timeline.filterPhotos")}
         aria-expanded={filtersOpen}
         aria-controls={filtersId}
       >
         <SlidersHorizontal aria-hidden="true" />
-        <span>筛选</span>
+        <span>{t("timeline.filter")}</span>
         {activeFilterCount ? <strong aria-hidden="true">{activeFilterCount}</strong> : null}
       </button>
 
       <ViewSwitcher
         value={viewMode}
         onChange={onViewModeChange}
-        ariaLabel="照片视图"
+        ariaLabel={t("timeline.photoView")}
       />
 
       {filtersOpen ? (
@@ -131,13 +140,13 @@ export default function TimelineToolbar({
           >
             <header>
               <div>
-                <h2 id={`${filtersId}-title`}>筛选照片</h2>
-                <p>{activeFilterCount ? `已启用 ${activeFilterCount} 项筛选` : "缩小当前照片范围"}</p>
+                <h2 id={`${filtersId}-title`}>{t("timeline.filterPhotos")}</h2>
+                <p>{activeFilterCount ? t("timeline.activeFilters", { count: activeFilterCount }) : t("timeline.narrowRange")}</p>
               </div>
               <button
                 type="button"
                 onClick={() => onFiltersOpenChange?.(false)}
-                aria-label="关闭筛选面板"
+                aria-label={t("timeline.closeFilters")}
               >
                 <X aria-hidden="true" />
               </button>

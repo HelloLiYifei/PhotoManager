@@ -15,7 +15,8 @@ import {
   openWorkspace,
   selectDirectory,
 } from "../services/workspaceService";
-import { Button, EmptyState, Field, Spinner } from "./ui";
+import { useI18n } from "../i18n";
+import { Button, EmptyState, Field, Spinner, useGlobalDialog } from "./ui";
 import styles from "./WorkspaceSelector.module.css";
 
 const getErrorMessage = (error) =>
@@ -26,12 +27,14 @@ const sortWorkspaces = (workspaces) =>
     String(right.lastOpened ?? "").localeCompare(String(left.lastOpened ?? "")),
   );
 
-function getFolderName(path) {
+function getFolderName(path, fallback) {
   const parts = path.split(/[/\\]/).filter(Boolean);
-  return parts.at(-1) || "本地图库";
+  return parts.at(-1) || fallback;
 }
 
 export default function WorkspaceSelector({ onSelectWorkspace }) {
+  const { confirm: showConfirm } = useGlobalDialog();
+  const { t } = useI18n();
   const [workspaces, setWorkspaces] = useState([]);
   const [newWorkspaceName, setNewWorkspaceName] = useState("");
   const [workspacePath, setWorkspacePath] = useState("");
@@ -101,7 +104,7 @@ export default function WorkspaceSelector({ onSelectWorkspace }) {
     const path = workspacePath.trim();
 
     if (!name || !path) {
-      setActionError("请填写工作区名称并选择本地文件夹。");
+      setActionError(t("workspace.missingCreateFields"));
       return;
     }
     if (!beginOperation("create")) return;
@@ -132,15 +135,20 @@ export default function WorkspaceSelector({ onSelectWorkspace }) {
   const handleOpenExistingPath = async () => {
     const path = workspacePath.trim();
     if (!path) {
-      setActionError("请选择或输入已有工作区的文件夹路径。");
+      setActionError(t("workspace.missingOpenPath"));
       return;
     }
     await handleOpenWorkspace(path);
   };
 
   const handleDeleteWorkspace = async (workspace) => {
-    const confirmed = window.confirm(
-      `确定从最近工作区中移除“${workspace.name}”吗？\n磁盘上的照片文件不会被删除。`,
+    const confirmed = await showConfirm(
+      t("workspace.removeConfirm", { name: workspace.name }),
+      {
+        title: t("workspace.removeTitle"),
+        tone: "danger",
+        confirmText: t("workspace.remove"),
+      },
     );
     if (!confirmed || !beginOperation(`delete:${workspace.id}`)) return;
 
@@ -162,7 +170,7 @@ export default function WorkspaceSelector({ onSelectWorkspace }) {
       if (mountedRef.current && selectedPath) {
         setWorkspacePath(selectedPath);
         setNewWorkspaceName((currentName) =>
-          currentName.trim() ? currentName : getFolderName(selectedPath),
+          currentName.trim() ? currentName : getFolderName(selectedPath, t("nav.albums")),
         );
       }
     } catch (error) {
@@ -183,23 +191,23 @@ export default function WorkspaceSelector({ onSelectWorkspace }) {
           </span>
           <div>
             <p className={styles.eyebrow}>PhotoManager</p>
-            <h1 id="workspace-welcome-title">选择照片工作区</h1>
-            <p>照片保留在本地物理目录中，选择一个文件夹即可开始整理。</p>
+            <h1 id="workspace-welcome-title">{t("workspace.selectTitle")}</h1>
+            <p>{t("workspace.selectDescription")}</p>
           </div>
         </header>
 
         {actionError ? (
           <div className={styles.actionError} role="alert">
-            <strong>操作未完成</strong>
+            <strong>{t("workspace.actionFailed")}</strong>
             <span>{actionError}</span>
           </div>
         ) : null}
 
         <form className={styles.form} onSubmit={handleCreateWorkspace}>
           <Field
-            label="本地文件夹"
+            label={t("workspace.localFolder")}
             htmlFor="workspace-path"
-            hint="新建工作区时请选择空文件夹；也可以输入已有工作区路径。"
+            hint={t("workspace.folderHint")}
           >
             <div className={styles.pathControl}>
               <input
@@ -208,7 +216,7 @@ export default function WorkspaceSelector({ onSelectWorkspace }) {
                 type="text"
                 value={workspacePath}
                 onChange={(event) => setWorkspacePath(event.target.value)}
-                placeholder="例如 D:\\Photos"
+                placeholder={t("workspace.pathPlaceholder")}
                 autoComplete="off"
                 disabled={controlsDisabled}
               />
@@ -220,23 +228,23 @@ export default function WorkspaceSelector({ onSelectWorkspace }) {
                 disabled={controlsDisabled}
               >
                 {busyAction === "select-directory" ? (
-                  <Spinner label="正在选择目录" size="small" />
+                  <Spinner label={t("workspace.selectingFolder")} size="small" />
                 ) : (
                   <FolderOpen size={16} aria-hidden="true" />
                 )}
-                选择目录
+                {t("workspace.selectFolder")}
               </Button>
             </div>
           </Field>
 
-          <Field label="工作区名称" htmlFor="workspace-name">
+          <Field label={t("workspace.name")} htmlFor="workspace-name">
             <input
               id="workspace-name"
               className={styles.input}
               type="text"
               value={newWorkspaceName}
               onChange={(event) => setNewWorkspaceName(event.target.value)}
-              placeholder="例如：我的摄影图库"
+              placeholder={t("workspace.namePlaceholder")}
               autoComplete="off"
               disabled={controlsDisabled}
             />
@@ -245,11 +253,11 @@ export default function WorkspaceSelector({ onSelectWorkspace }) {
           <div className={styles.formActions}>
             <Button type="submit" variant="primary" disabled={controlsDisabled}>
               {busyAction === "create" ? (
-                <Spinner label="正在创建工作区" size="small" />
+                <Spinner label={t("workspace.creating")} size="small" />
               ) : (
                 <Plus size={17} aria-hidden="true" />
               )}
-              创建并进入
+              {t("workspace.create")}
             </Button>
             <Button
               type="button"
@@ -258,11 +266,11 @@ export default function WorkspaceSelector({ onSelectWorkspace }) {
               disabled={controlsDisabled}
             >
               {busyAction === `open:${workspacePath.trim()}` ? (
-                <Spinner label="正在打开工作区" size="small" />
+                <Spinner label={t("workspace.opening")} size="small" />
               ) : (
                 <HardDrive size={17} aria-hidden="true" />
               )}
-              打开已有工作区
+              {t("workspace.openExisting")}
             </Button>
           </div>
         </form>
@@ -270,8 +278,8 @@ export default function WorkspaceSelector({ onSelectWorkspace }) {
         <section className={styles.recents} aria-labelledby="recent-workspaces-title">
           <div className={styles.sectionHeading}>
             <div>
-              <h2 id="recent-workspaces-title">最近工作区</h2>
-              <p>快速回到最近整理过的照片目录。</p>
+              <h2 id="recent-workspaces-title">{t("workspace.recents")}</h2>
+              <p>{t("workspace.recentsDescription")}</p>
             </div>
             {!listLoading && listError ? (
               <Button
@@ -282,27 +290,27 @@ export default function WorkspaceSelector({ onSelectWorkspace }) {
                 disabled={controlsDisabled}
               >
                 <RefreshCw size={15} aria-hidden="true" />
-                重试
+                {t("common.retry")}
               </Button>
             ) : null}
           </div>
 
           {listLoading ? (
             <div className={styles.listStatus} role="status">
-              <Spinner label="正在加载最近工作区" />
+              <Spinner label={t("workspace.loadingRecents")} />
             </div>
           ) : listError ? (
             <EmptyState
               icon={<HardDrive size={24} />}
-              title="无法加载最近工作区"
+              title={t("workspace.loadFailed")}
               description={listError}
               role="alert"
             />
           ) : workspaces.length === 0 ? (
             <EmptyState
               icon={<HardDrive size={24} />}
-              title="还没有最近工作区"
-              description="创建新工作区或打开已有目录后，它会显示在这里。"
+              title={t("workspace.empty")}
+              description={t("workspace.emptyDescription")}
             />
           ) : (
             <ul className={styles.recentList}>
@@ -316,11 +324,11 @@ export default function WorkspaceSelector({ onSelectWorkspace }) {
                       className={styles.recentOpen}
                       onClick={() => handleOpenWorkspace(workspace.path)}
                       disabled={controlsDisabled}
-                      aria-label={`打开工作区 ${workspace.name}`}
+                      aria-label={t("workspace.openLabel", { name: workspace.name })}
                     >
                       <span className={styles.recentIcon} aria-hidden="true">
                         {opening ? (
-                          <Spinner label="正在打开" size="small" />
+                          <Spinner label={t("workspace.opening")} size="small" />
                         ) : (
                           <FolderOpen size={18} />
                         )}
@@ -340,11 +348,11 @@ export default function WorkspaceSelector({ onSelectWorkspace }) {
                       className={styles.deleteButton}
                       onClick={() => handleDeleteWorkspace(workspace)}
                       disabled={controlsDisabled}
-                      aria-label={`从记录中移除 ${workspace.name}`}
-                      title="仅从最近记录中移除，不删除照片文件"
+                      aria-label={t("workspace.removeLabel", { name: workspace.name })}
+                      title={t("workspace.removeHint")}
                     >
                       {deleting ? (
-                        <Spinner label="正在移除" size="small" />
+                        <Spinner label={t("workspace.removing")} size="small" />
                       ) : (
                         <Trash2 size={16} aria-hidden="true" />
                       )}

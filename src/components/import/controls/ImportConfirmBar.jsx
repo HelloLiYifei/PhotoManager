@@ -1,12 +1,13 @@
 import { Brush, Download, Eraser } from "lucide-react";
 
+import { useI18n } from "../../../i18n";
 import styles from "./ImportControls.module.css";
 
 export default function ImportConfirmBar({
   selectedCount = 0,
   totalCount = 0,
   importedCount = 0,
-  activeBrush = "默认相册",
+  activeBrush = "",
   brushColor = "#4f8cff",
   importing = false,
   scanning = false,
@@ -15,16 +16,20 @@ export default function ImportConfirmBar({
   onClearColors,
   onImport,
 }) {
+  const { formatNumber, t } = useI18n();
   const importDisabled = disabled || importing || scanning || selectedCount === 0;
 
   return (
-    <section className={styles.confirmBar} aria-label="确认导入">
+    <section className={styles.confirmBar} aria-label={t("import.confirmImport")}>
       <div className={styles.confirmStats} role="status">
-        <strong>{selectedCount} 张待导入</strong>
-        <span>共 {totalCount} 张{importedCount ? `，${importedCount} 张已导入` : ""}</span>
+        <strong>{t("import.pendingCount", { count: formatNumber(selectedCount) })}</strong>
+        <span>{t("import.totalCount", {
+          count: formatNumber(totalCount),
+          imported: importedCount ? t("import.importedSuffix", { count: formatNumber(importedCount) }) : "",
+        })}</span>
       </div>
 
-      <div className={styles.confirmShortcuts} role="toolbar" aria-label="染色快捷操作">
+      <div className={styles.confirmShortcuts} role="toolbar" aria-label={t("import.colorShortcuts")}>
         <button
           type="button"
           onClick={onColorAll}
@@ -33,7 +38,7 @@ export default function ImportConfirmBar({
         >
           <span className={styles.colorDot} aria-hidden="true" />
           <Brush aria-hidden="true" />
-          全部染为“{activeBrush || "默认相册"}”
+          {t("import.colorAll", { name: activeBrush || t("import.defaultAlbum") })}
         </button>
         <button
           type="button"
@@ -41,7 +46,7 @@ export default function ImportConfirmBar({
           disabled={disabled || scanning || selectedCount === 0}
         >
           <Eraser aria-hidden="true" />
-          全部取消
+          {t("import.clearAll")}
         </button>
       </div>
 
@@ -52,7 +57,7 @@ export default function ImportConfirmBar({
         disabled={importDisabled}
       >
         <Download aria-hidden="true" />
-        {importing ? "正在导入…" : `开始导入 ${selectedCount} 张`}
+        {importing ? t("import.importing") : t("import.startImport", { count: formatNumber(selectedCount) })}
       </button>
     </section>
   );

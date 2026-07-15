@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useI18n } from "../i18n";
 import { loadPathThumbnail, loadPhotoThumbnail } from "../lib/thumbnailLoader";
 import { loadPathPreview, loadPhotoPreview, prefetchPhotoPreview } from "../lib/previewLoader";
 import {
@@ -10,7 +11,7 @@ import {
   toggleFavorite,
   updateRating,
 } from "../services/photoService";
-import { Drawer } from "./ui";
+import { Drawer, useGlobalDialog } from "./ui";
 import {
   LightboxCanvas,
   LightboxInfoPanel,
@@ -43,6 +44,8 @@ export default function LightboxViewer({
   getImportPhotoState,
   onSetImportAlbum,
 }) {
+  const { t } = useI18n();
+  const { alert: showAlert, confirm: showConfirm } = useGlobalDialog();
   const safeInitialIndex = Math.min(Math.max(initialIndex ?? 0, 0), Math.max(photosList.length - 1, 0));
   const [currentIndex, setCurrentIndex] = useState(safeInitialIndex);
   const currentPhoto = photosList[currentIndex];
@@ -131,7 +134,7 @@ export default function LightboxViewer({
       .catch((error) => {
         if (!active) return;
         console.error(error);
-        setPreviewError("无法载入这张照片的预览");
+        setPreviewError(t("lightbox.previewLoadError"));
         setLoading(false);
       });
 
@@ -143,7 +146,7 @@ export default function LightboxViewer({
     return () => {
       active = false;
     };
-  }, [currentIndex, currentPhoto, isImportMode, loadRevision, photosList, resetTransform]);
+  }, [currentIndex, currentPhoto, isImportMode, loadRevision, photosList, resetTransform, t]);
 
   useEffect(() => {
     if (!currentPhoto) return undefined;
@@ -311,10 +314,13 @@ export default function LightboxViewer({
     setPendingAction("delete");
     try {
       await deletePhoto({ id: currentPhoto.id, isDeleted: !isTrash });
-      window.alert(isTrash ? "照片已恢复" : "照片已移动到回收站");
+      await showAlert(isTrash ? t("photo.restored") : t("photo.movedToTrash"), {
+        title: isTrash ? t("photo.restoreDone") : t("photo.movedToTrashTitle"),
+        tone: "success",
+      });
       advanceAfterRemoval();
     } catch (error) {
-      window.alert(`操作失败: ${error}`);
+      await showAlert(t("common.operationFailedMessage", { message: error }), { title: t("common.operationFailed"), tone: "danger" });
     } finally {
       setPendingAction("");
     }
@@ -322,14 +328,22 @@ export default function LightboxViewer({
 
   const handlePermanentDelete = async () => {
     if (!currentPhoto || pendingAction) return;
-    if (!window.confirm("此操作将永久从磁盘删除照片文件，且不可恢复！确定吗？")) return;
+    const confirmed = await showConfirm(
+      t("photo.permanentDeleteConfirm"),
+      {
+        title: t("photo.permanentDeleteTitle"),
+        tone: "danger",
+        confirmText: t("common.deletePermanently"),
+      },
+    );
+    if (!confirmed) return;
     setPendingAction("delete");
     try {
       await permanentlyDeletePhoto({ id: currentPhoto.id });
-      window.alert("照片已永久删除");
+      await showAlert(t("photo.permanentlyDeleted"), { title: t("photo.deleteDone"), tone: "success" });
       advanceAfterRemoval();
     } catch (error) {
-      window.alert(`删除失败: ${error}`);
+      await showAlert(t("photo.deleteFailedMessage", { message: error }), { title: t("photo.deleteFailed"), tone: "danger" });
     } finally {
       setPendingAction("");
     }
@@ -362,7 +376,7 @@ export default function LightboxViewer({
       className={`${styles.overlay} ${isImportMode ? styles.importOverlay : ""}`}
       role="dialog"
       aria-modal="true"
-      aria-label={isImportMode ? "导入照片详细预览" : "照片预览"}
+      aria-label={isImportMode ? t("lightbox.importPreview") : t("lightbox.photoPreview")}
     >
       <main className={styles.main}>
         <LightboxCanvas
@@ -414,7 +428,7 @@ export default function LightboxViewer({
       </main>
 
       {!isNarrow && detailsOpen && (
-        <aside className={styles.detailsDock} aria-label="照片信息">
+        <aside className={styles.detailsDock} aria-label={t("lightbox.photoInfo")}>
           {infoPanel}
         </aside>
       )}
@@ -423,8 +437,8 @@ export default function LightboxViewer({
         <Drawer
           open={detailsOpen}
           onClose={() => setDetailsOpen(false)}
-          title="照片信息"
-          description={isImportMode ? "查看拍摄参数与来源文件信息" : "查看拍摄参数、文件信息与标签"}
+          title={t("lightbox.photoInfo")}
+          description={isImportMode ? t("lightbox.importInfoDescription") : t("lightbox.infoDescription")}
           side="right"
           closeDisabled={Boolean(pendingAction)}
         >

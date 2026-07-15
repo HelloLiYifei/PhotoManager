@@ -1,4 +1,5 @@
 import { ThumbnailImage } from "../media";
+import { useI18n } from "../../../i18n";
 import { handlePhotoItemKeyDown } from "./photoItemKeyboard";
 import styles from "./PhotoViews.module.css";
 
@@ -14,14 +15,15 @@ export default function ListView({
   onSelect,
   onOpen,
 }) {
+  const { t } = useI18n();
   return (
-    <div className="finder-list" role="table" aria-label="照片列表">
+    <div className="finder-list" role="table" aria-label={t("timeline.photoList")}>
       <div className="finder-list-header" role="row">
-        <span role="columnheader">名称</span>
-        <span role="columnheader">拍摄日期</span>
-        <span role="columnheader">类型</span>
-        <span role="columnheader">大小</span>
-        <span role="columnheader">尺寸</span>
+        <span role="columnheader">{t("photo.name")}</span>
+        <span role="columnheader">{t("photo.dateTaken")}</span>
+        <span role="columnheader">{t("import.type")}</span>
+        <span role="columnheader">{t("import.size")}</span>
+        <span role="columnheader">{t("photo.dimensions")}</span>
       </div>
 
       {photos.map((photo, index) => {

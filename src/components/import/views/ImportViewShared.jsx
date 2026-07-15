@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useI18n } from "../../../i18n";
 import { loadPathThumbnail } from "../../../lib/thumbnailLoader";
 import { loadPathPreview } from "../../../lib/previewLoader";
 import { LazyThumbnail } from "../../timeline/media";
@@ -11,6 +12,7 @@ export function ImportThumbnail({
   aspectRatio,
   className = "",
 }) {
+  const { t } = useI18n();
   const load = useCallback(
     (priority) => loadPathThumbnail(photo.absolutePath, Boolean(photo.isRaw), priority),
     [photo.absolutePath, photo.isRaw],
@@ -20,7 +22,7 @@ export function ImportThumbnail({
     <LazyThumbnail
       sourceKey={photo.absolutePath}
       load={load}
-      alt={photo.relativePath || "导入照片预览"}
+      alt={photo.relativePath || t("import.photoPreview")}
       scrollRoot={scrollRoot}
       fit={fit}
       aspectRatio={aspectRatio}
@@ -30,6 +32,7 @@ export function ImportThumbnail({
 }
 
 export function ImportGalleryPreview({ photo }) {
+  const { t } = useI18n();
   const [src, setSrc] = useState("");
 
   useEffect(() => {
@@ -51,8 +54,8 @@ export function ImportGalleryPreview({ photo }) {
 
   if (!src) {
     return (
-      <div className={styles.galleryPreviewLoading} role="status" aria-label="正在读取高清导入预览">
-        正在读取高清预览…
+      <div className={styles.galleryPreviewLoading} role="status" aria-label={t("import.readingHdImportPreview")}>
+        {t("import.readingHdPreview")}
       </div>
     );
   }
@@ -60,7 +63,7 @@ export function ImportGalleryPreview({ photo }) {
   return (
     <img
       src={src}
-      alt={photo.relativePath || "导入照片预览"}
+      alt={photo.relativePath || t("import.photoPreview")}
       className={`${styles.thumbnail} ${styles.galleryPreview}`}
       decoding="async"
       data-fit="contain"
@@ -69,18 +72,19 @@ export function ImportGalleryPreview({ photo }) {
 }
 
 export function ImportPhotoMarkers({ photo, state }) {
+  const { t } = useI18n();
   return (
     <>
       {photo.alreadyImported && (
-        <span className={styles.importedBadge}>已存在</span>
+        <span className={styles.importedBadge}>{t("import.alreadyExists")}</span>
       )}
       {state.targetAlbum && (
         <span
           className={styles.albumOverlay}
           style={{ backgroundColor: state.albumColor }}
-          title={`导入到 ${state.targetAlbum}`}
+          title={t("import.importToAlbum", { name: state.targetAlbum })}
         >
-          相册 · {state.targetAlbum}
+          {t("import.albumMarker", { name: state.targetAlbum })}
         </span>
       )}
       {photo.isRaw && <span className={styles.rawBadge}>RAW</span>}

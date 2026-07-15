@@ -12,7 +12,7 @@
   align-items: center;
   gap: var(--space-3);
   color: var(--text-main);
-  background: rgba(16, 19, 24, 0.96);
+  background: color-mix(in srgb, var(--bg-elevated) 96%, transparent);
   border: 1px solid var(--border-hover);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-elevated);
@@ -73,9 +73,9 @@
 }
 
 .actionButton.success {
-  color: #d1fae5;
-  background: rgba(16, 185, 129, 0.14);
-  border-color: rgba(16, 185, 129, 0.3);
+  color: var(--success-text);
+  background: var(--success-bg);
+  border-color: var(--success-border);
 }
 
 .actionButton.danger {
@@ -85,9 +85,9 @@
 }
 
 .actionButton.dangerSubtle {
-  color: #fecaca;
-  background: rgba(127, 29, 29, 0.34);
-  border-color: rgba(239, 68, 68, 0.3);
+  color: var(--danger-color);
+  background: var(--danger-bg-strong);
+  border-color: var(--danger-border);
 }
 
 .actionButton:disabled {

@@ -7,30 +7,33 @@ import {
   Heart,
   Images,
   Import,
-  Info,
   LogOut,
   MapPinned,
   Plus,
+  Settings,
   Trash2,
   X,
 } from "lucide-react";
+import { useI18n } from "../../i18n";
 import "./Shell.css";
 
 const NAVIGATION_ITEMS = [
-  { id: "albums", label: "相册", Icon: Images },
-  { id: "favorites", label: "我的喜欢", Icon: Heart },
-  { id: "map", label: "地图", Icon: MapPinned },
-  { id: "trash", label: "垃圾桶", Icon: Trash2 },
+  { id: "albums", labelKey: "nav.albums", Icon: Images },
+  { id: "favorites", labelKey: "nav.favorites", Icon: Heart },
+  { id: "map", labelKey: "nav.map", Icon: MapPinned },
+  { id: "trash", labelKey: "nav.trash", Icon: Trash2 },
 ];
 
-function getCurrentTitle(currentView, activeAlbumId, albums) {
+function getCurrentTitle(currentView, activeAlbumId, albums, t) {
   if (currentView === "album") {
     const album = albums.find((item) => item.id === activeAlbumId);
-    return album?.name ?? "相册";
+    return album?.name ?? t("nav.albums");
   }
 
   return (
-    NAVIGATION_ITEMS.find((item) => item.id === currentView)?.label ?? "图库"
+    (currentView === "settings"
+      ? t("nav.settings")
+      : t(NAVIGATION_ITEMS.find((item) => item.id === currentView)?.labelKey ?? "nav.albums"))
   );
 }
 
@@ -48,18 +51,19 @@ function Sidebar({
   onImport,
   onSwitchWorkspace,
   onToggleMode,
-  onShowWorkspaceInfo,
+  onShowSettings,
   className = "",
 }) {
+  const { t } = useI18n();
   const isCollapsed = mode === "collapsed";
   const isOverlay = mode === "overlay";
   const resolvedTitle =
-    currentTitle ?? getCurrentTitle(currentView, activeAlbumId, albums);
+    currentTitle ?? getCurrentTitle(currentView, activeAlbumId, albums, t);
   const cardName = detectedCard?.label || detectedCard?.driveLetter;
-  const importLabel = detectedCard ? "检测到存储卡 · 导入" : "导入新照片";
+  const importLabel = detectedCard ? t("nav.detectedCard") : t("nav.import");
   const importDescription = detectedCard
-    ? `检测到存储卡${cardName ? ` ${cardName}` : ""}，点击导入`
-    : "导入新照片";
+    ? t("nav.detectedCardDescription", { name: cardName ? ` ${cardName}` : "" })
+    : t("nav.import");
   const sidebarClassName = ["sidebar", `sidebar--${mode}`, className]
     .filter(Boolean)
     .join(" ");
@@ -68,7 +72,7 @@ function Sidebar({
     <aside
       id="primary-sidebar"
       className={sidebarClassName}
-      aria-label="PhotoManager 主导航"
+      aria-label={t("nav.mainNavigation")}
     >
       <div className="sidebar__brand-row">
         <div className="sidebar__brand" aria-label="PhotoManager">
@@ -83,8 +87,8 @@ function Sidebar({
             type="button"
             className="sidebar__icon-button sidebar__workspace-switch"
             onClick={onSwitchWorkspace}
-            aria-label="切换工作区"
-            title="返回选择工作区"
+            aria-label={t("nav.switchWorkspace")}
+            title={t("nav.returnWorkspace")}
           >
             <LogOut size={16} aria-hidden="true" />
           </button>
@@ -93,8 +97,8 @@ function Sidebar({
               type="button"
               className="sidebar__icon-button sidebar__overlay-close"
               onClick={() => onToggleMode?.("collapsed")}
-              aria-label="关闭侧边栏"
-              title="关闭侧边栏"
+              aria-label={t("nav.closeSidebar")}
+              title={t("nav.closeSidebar")}
             >
               <X size={17} aria-hidden="true" />
             </button>
@@ -104,11 +108,12 @@ function Sidebar({
 
       <div className="sidebar__context sidebar__label">
         <strong title={resolvedTitle}>{resolvedTitle}</strong>
-        <span title={workspace?.path}>{workspace?.name ?? "当前工作区"}</span>
+        <span title={workspace?.path}>{workspace?.name ?? t("nav.workspace")}</span>
       </div>
 
-      <nav className="sidebar__nav" aria-label="照片库">
-        {NAVIGATION_ITEMS.map(({ id, label, Icon }) => {
+      <nav className="sidebar__nav" aria-label={t("nav.photoLibrary")}>
+        {NAVIGATION_ITEMS.map(({ id, labelKey, Icon }) => {
+          const label = t(labelKey);
           const isActive = currentView === id;
           return (
             <button
@@ -138,15 +143,15 @@ function Sidebar({
             id="sidebar-albums-heading"
             className="sidebar__section-title sidebar__label"
           >
-            快捷相册
+            {t("nav.quickAlbums")}
           </span>
           <div className="sidebar__section-actions">
             <button
               type="button"
               className="sidebar__icon-button"
               onClick={onCreateAlbum}
-              aria-label="新建相册"
-              title="新建相册"
+              aria-label={t("nav.createAlbum")}
+              title={t("nav.createAlbum")}
             >
               <Plus size={17} aria-hidden="true" />
             </button>
@@ -156,10 +161,10 @@ function Sidebar({
               onClick={() =>
                 onToggleMode?.(isCollapsed ? "expanded" : "collapsed")
               }
-              aria-label={isCollapsed ? "展开侧边栏" : "折叠侧边栏"}
+              aria-label={isCollapsed ? t("nav.expandSidebar") : t("nav.collapseSidebar")}
               aria-expanded={!isCollapsed}
               aria-controls="primary-sidebar"
-              title={isCollapsed ? "展开侧边栏" : "折叠侧边栏"}
+              title={isCollapsed ? t("nav.expandSidebar") : t("nav.collapseSidebar")}
             >
               {isCollapsed ? (
                 <ChevronRight size={17} aria-hidden="true" />
@@ -187,7 +192,7 @@ function Sidebar({
                   <span className="sidebar__album-name">{album.name}</span>
                   <span
                     className="sidebar__album-count"
-                    aria-label={`${album.photoCount || 0} 张照片`}
+                    aria-label={t("common.photoCount", { count: album.photoCount || 0 })}
                   >
                     {album.photoCount || 0}
                   </span>
@@ -217,16 +222,17 @@ function Sidebar({
           )}
         </button>
 
-        {onShowWorkspaceInfo && (
+        {onShowSettings && (
           <button
             type="button"
-            className="sidebar__info-button"
-            onClick={onShowWorkspaceInfo}
-            aria-label="工作区信息"
-            title="工作区信息"
+            className={`sidebar__info-button${currentView === "settings" ? " is-active" : ""}`}
+            onClick={onShowSettings}
+            aria-label={t("nav.settings")}
+            aria-current={currentView === "settings" ? "page" : undefined}
+            title={t("nav.settings")}
           >
-            <Info size={17} aria-hidden="true" />
-            <span className="sidebar__label">工作区信息</span>
+            <Settings size={17} aria-hidden="true" />
+            <span className="sidebar__label">{t("nav.settings")}</span>
           </button>
         )}
       </div>

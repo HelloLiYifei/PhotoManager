@@ -9,6 +9,7 @@ import {
   Tag,
   Trash2,
 } from "lucide-react";
+import { useI18n } from "../../../i18n";
 import styles from "./BatchActionBar.module.css";
 
 function ActionButton({ Icon, label, variant = "default", active = false, ...props }) {
@@ -42,15 +43,18 @@ export default function BatchActionBar({
   onPermanentDelete,
   onEmptyTrash,
 }) {
+  const { t } = useI18n();
   const isTrash = currentView === "trash";
   const hasSelection = selectedCount > 0;
 
   if ((!isTrash && !hasSelection) || (isTrash && totalCount === 0)) return null;
 
   return (
-    <section className={styles.bar} aria-label="批量操作" aria-live="polite">
+    <section className={styles.bar} aria-label={t("batch.actions")} aria-live="polite">
       <strong className={styles.summary}>
-        {hasSelection ? `已选择 ${selectedCount} 张照片` : `垃圾桶共 ${totalCount} 张照片`}
+        {hasSelection
+          ? t("batch.selected", { count: selectedCount })
+          : t("batch.trashTotal", { count: totalCount })}
       </strong>
 
       <div className={styles.actions}>
@@ -58,52 +62,52 @@ export default function BatchActionBar({
           <>
             <ActionButton
               Icon={Info}
-              label="属性"
+              label={t("batch.inspect")}
               onClick={onInspect}
               disabled={!hasSelection}
-              title="查看所选照片的属性"
+              title={t("batch.inspectTitle")}
             />
             <ActionButton
               Icon={RotateCcw}
-              label="还原"
+              label={t("batch.restore")}
               variant="success"
               onClick={onRestore}
               disabled={!hasSelection}
-              title="将所选照片还原到图库"
+              title={t("batch.restoreTitle")}
             />
             <ActionButton
               Icon={Trash2}
-              label="永久删除"
+              label={t("common.deletePermanently")}
               variant="danger"
               onClick={onPermanentDelete}
               disabled={!hasSelection}
-              title="永久删除所选照片"
+              title={t("batch.permanentDeleteTitle")}
             />
             <span className={styles.separator} aria-hidden="true" />
             <ActionButton
               Icon={Eraser}
-              label="清空垃圾桶"
+              label={t("batch.emptyTrash")}
               variant="dangerSubtle"
               onClick={onEmptyTrash}
-              title="永久删除垃圾桶内的全部照片"
+              title={t("batch.emptyTrashTitle")}
             />
           </>
         ) : (
           <>
-            <ActionButton Icon={Info} label="属性" onClick={onInspect} title="查看所选照片的属性" />
-            <ActionButton Icon={Heart} label="收藏" onClick={onFavorite} title="切换所选照片的收藏状态" />
+            <ActionButton Icon={Info} label={t("batch.inspect")} onClick={onInspect} title={t("batch.inspectTitle")} />
+            <ActionButton Icon={Heart} label={t("batch.favorite")} onClick={onFavorite} title={t("batch.favoriteTitle")} />
             <ActionButton
               Icon={Columns2}
-              label="对比"
+              label={t("batch.compare")}
               active={compareActive}
               onClick={onCompare}
               aria-pressed={compareActive}
-              title={compareActive ? "退出照片对比" : "以所选照片作为对比基准"}
+              title={compareActive ? t("timeline.exitCompare") : t("batch.compareTitle")}
             />
-            <ActionButton Icon={FolderInput} label="移动" onClick={onMove} title="移动到其他相册" />
-            <ActionButton Icon={Tag} label="贴标" onClick={onAddTag} title="为所选照片添加标签" />
-            <ActionButton Icon={Download} label="导出" onClick={onExport} title="导出到外部文件夹" />
-            <ActionButton Icon={Trash2} label="删除" variant="danger" onClick={onDelete} title="移入垃圾桶" />
+            <ActionButton Icon={FolderInput} label={t("batch.move")} onClick={onMove} title={t("batch.moveTitle")} />
+            <ActionButton Icon={Tag} label={t("batch.tag")} onClick={onAddTag} title={t("batch.tagTitle")} />
+            <ActionButton Icon={Download} label={t("batch.export")} onClick={onExport} title={t("batch.exportTitle")} />
+            <ActionButton Icon={Trash2} label={t("common.delete")} variant="danger" onClick={onDelete} title={t("photo.moveToTrash")} />
           </>
         )}
       </div>

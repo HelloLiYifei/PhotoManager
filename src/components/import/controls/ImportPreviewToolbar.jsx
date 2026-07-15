@@ -1,5 +1,6 @@
 import { EyeOff, GalleryHorizontal, Grid3X3, List, Palette } from "lucide-react";
 
+import { useI18n } from "../../../i18n";
 import ViewSwitcher from "../../shared/ViewSwitcher";
 import styles from "./ImportControls.module.css";
 
@@ -22,15 +23,20 @@ export default function ImportPreviewToolbar({
   onHideImportedChange,
   onHideColoredChange,
 }) {
+  const { formatNumber, t } = useI18n();
+  const localizedViewOptions = IMPORT_VIEW_OPTIONS.map((option) => ({
+    ...option,
+    label: t(`settings.view.${option.value}`),
+  }));
   return (
-    <header className={styles.previewToolbar} aria-label="导入预览工具栏">
+    <header className={styles.previewToolbar} aria-label={t("import.previewToolbar")}>
       <div className={styles.previewStats} role="status">
-        <strong>显示 {visibleCount} / {totalCount} 张照片</strong>
-        <span>已染色并准备导入 {selectedCount} 张</span>
+        <strong>{t("import.visiblePhotos", { visible: formatNumber(visibleCount), total: formatNumber(totalCount) })}</strong>
+        <span>{t("import.readyCount", { count: formatNumber(selectedCount) })}</span>
       </div>
 
       <div className={styles.previewControls}>
-        <div className={styles.filterButtons} role="group" aria-label="导入预览筛选">
+        <div className={styles.filterButtons} role="group" aria-label={t("import.previewFilters")}>
           <button
             type="button"
             className={hideImported ? styles.pressedButton : undefined}
@@ -39,7 +45,7 @@ export default function ImportPreviewToolbar({
             aria-pressed={hideImported}
           >
             <EyeOff aria-hidden="true" />
-            隐藏已导入 <small>{importedCount}</small>
+            {t("import.hideImported")} <small>{formatNumber(importedCount)}</small>
           </button>
           <button
             type="button"
@@ -49,15 +55,15 @@ export default function ImportPreviewToolbar({
             aria-pressed={hideColored}
           >
             <Palette aria-hidden="true" />
-            隐藏已染色 <small>{selectedCount}</small>
+            {t("import.hideColored")} <small>{formatNumber(selectedCount)}</small>
           </button>
         </div>
 
         <ViewSwitcher
           value={viewMode}
           onChange={onViewModeChange}
-          options={IMPORT_VIEW_OPTIONS}
-          ariaLabel="导入图片预览方式"
+          options={localizedViewOptions}
+          ariaLabel={t("import.previewView")}
         />
       </div>
     </header>

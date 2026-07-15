@@ -1,4 +1,6 @@
 import { useCallback, useState } from "react";
+import { useEffect } from "react";
+import { useSettings } from "../../../settings";
 
 export const PHOTO_VIEW_STORAGE_KEY = "photomanager-photo-view";
 export const PHOTO_VIEW_MODES = Object.freeze(["masonry", "list", "gallery"]);
@@ -51,17 +53,24 @@ export function writePhotoViewPreference(mode, storage = getBrowserStorage()) {
   return normalizedMode;
 }
 
-export function usePhotoViewPreference(storage = getBrowserStorage()) {
+export function usePhotoViewPreference(workspace = null, storage = getBrowserStorage()) {
+  const { getWorkspaceSettings, updateWorkspace } = useSettings();
+  const workspaceMode = workspace ? getWorkspaceSettings(workspace).photoView : null;
   const [viewMode, setStoredViewMode] = useState(() =>
-    readPhotoViewPreference(storage),
+    workspace ? normalizePhotoViewMode(workspaceMode) : readPhotoViewPreference(storage),
   );
+
+  useEffect(() => {
+    if (workspace) setStoredViewMode(normalizePhotoViewMode(workspaceMode));
+  }, [workspace, workspaceMode]);
 
   const setViewMode = useCallback(
     (mode) => {
       const normalizedMode = writePhotoViewPreference(mode, storage);
+      if (workspace) updateWorkspace(workspace, { photoView: normalizedMode });
       setStoredViewMode(normalizedMode);
     },
-    [storage],
+    [storage, updateWorkspace, workspace],
   );
 
   return [viewMode, setViewMode];

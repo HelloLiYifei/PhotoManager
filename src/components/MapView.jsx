@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import "leaflet.markercluster/dist/MarkerCluster.css";
 import { MapPinned, TriangleAlert } from "lucide-react";
 import { loadPhotoThumbnail } from "../lib/thumbnailLoader";
+import { ensureLeafletMarkerCluster } from "../lib/loadLeafletMarkerCluster";
+import { useI18n } from "../i18n";
 import { Button, EmptyState, Spinner } from "./ui";
-import createPhotoPopup from "./map/createPhotoPopup";
 import MapStatusBanner from "./map/MapStatusBanner";
 import { groupPhotosByLocation } from "./map/mapPhotoUtils";
 import useMapPhotos from "./map/useMapPhotos";
@@ -13,33 +15,83 @@ import styles from "./MapView.module.css";
 const DEFAULT_ZOOM = 13;
 const FOCUSED_ZOOM = 15;
 
-function createMarkerIcon(count, focused) {
+function escapeAttribute(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+function thumbnailMarkup(src) {
+  return src
+    ? `<img src="${escapeAttribute(src)}" alt="" draggable="false" />`
+    : `<span class="${styles.markerThumbnailPlaceholder}" aria-hidden="true"></span>`;
+}
+
+function createMarkerIcon(count, focused, thumbnailSrc = "") {
   const markerClassName = [styles.marker, focused ? styles.markerFocused : ""]
     .filter(Boolean)
     .join(" ");
 
   return L.divIcon({
     className: styles.markerShell,
-    html: `<span class="${markerClassName}"><span class="${styles.markerDot}"></span>${
+    html: `<span class="${styles.markerVisual}"><span class="${styles.markerThumbnail}">${thumbnailMarkup(thumbnailSrc)}</span><span class="${markerClassName}"><span class="${styles.markerDot}"></span>${
       count > 1 ? `<span class="${styles.markerCount}">${count}</span>` : ""
-    }</span>`,
-    iconSize: [34, 42],
-    iconAnchor: [17, 40],
-    popupAnchor: [0, -36],
+    }</span></span>`,
+    iconSize: [82, 94],
+    iconAnchor: [41, 92],
   });
 }
 
-export default function MapView({ onShowPhoto, focusedPhotoId = null }) {
+function createClusterIcon(cluster) {
+  const childMarkers = cluster.getAllChildMarkers();
+  const photoCount = childMarkers
+    .reduce((total, marker) => total + (marker.options.photoCount || 1), 0);
+  const thumbnailSrc = childMarkers.find((marker) => marker.options.thumbnailSrc)
+    ?.options.thumbnailSrc;
+
+  return L.divIcon({
+    className: styles.clusterShell,
+    html: `<span class="${styles.clusterVisual}"><span class="${styles.markerThumbnail}">${thumbnailMarkup(thumbnailSrc)}</span><span class="${styles.clusterMarker}"><span class="${styles.clusterCount}">${photoCount}</span></span></span>`,
+    iconSize: [82, 102],
+    iconAnchor: [41, 98],
+  });
+}
+
+function temporaryAlbumFromCluster(cluster) {
+  const coordinates = cluster.getLatLng();
+  const photoIds = new Set();
+
+  cluster.getAllChildMarkers().forEach((marker) => {
+    marker.options.photoGroup?.photos.forEach((photo) => {
+      photoIds.add(photo.id);
+    });
+  });
+
+  return {
+    photoIds: [...photoIds],
+    latitude: coordinates.lat,
+    longitude: coordinates.lng,
+  };
+}
+
+export default function MapView({ onOpenTemporaryAlbum, focusedPhotoId = null }) {
+  const { t, formatNumber } = useI18n();
   const mapElementRef = useRef(null);
   const mapRef = useRef(null);
+  const markerClusterRef = useRef(null);
   const markerGroupsRef = useRef([]);
   const markersByPhotoIdRef = useRef(new Map());
-  const onShowPhotoRef = useRef(onShowPhoto);
+  const onOpenTemporaryAlbumRef = useRef(onOpenTemporaryAlbum);
   const focusedPhotoIdRef = useRef(focusedPhotoId);
   const [tilesUnavailable, setTilesUnavailable] = useState(false);
+  const [clusterPluginReady, setClusterPluginReady] = useState(
+    () => typeof L.markerClusterGroup === "function",
+  );
   const { photos: gpsPhotos, loading, error, reload } = useMapPhotos();
 
-  onShowPhotoRef.current = onShowPhoto;
+  onOpenTemporaryAlbumRef.current = onOpenTemporaryAlbum;
   focusedPhotoIdRef.current = focusedPhotoId;
 
   const locationGroups = useMemo(
@@ -48,7 +100,31 @@ export default function MapView({ onShowPhoto, focusedPhotoId = null }) {
   );
 
   useEffect(() => {
-    if (loading || error || gpsPhotos.length === 0 || !mapElementRef.current) {
+    if (clusterPluginReady) return undefined;
+    let active = true;
+
+    ensureLeafletMarkerCluster()
+      .catch((pluginError) => {
+        console.error("Unable to load map clustering:", pluginError);
+        return false;
+      })
+      .finally(() => {
+        if (active) setClusterPluginReady(true);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [clusterPluginReady]);
+
+  useEffect(() => {
+    if (
+      loading ||
+      !clusterPluginReady ||
+      error ||
+      gpsPhotos.length === 0 ||
+      !mapElementRef.current
+    ) {
       return undefined;
     }
 
@@ -58,8 +134,30 @@ export default function MapView({ onShowPhoto, focusedPhotoId = null }) {
       preferCanvas: true,
     });
     mapRef.current = map;
+    let disposed = false;
     markerGroupsRef.current = [];
     markersByPhotoIdRef.current = new Map();
+
+    const markerCluster = typeof L.markerClusterGroup === "function"
+      ? L.markerClusterGroup({
+          maxClusterRadius: 68,
+          disableClusteringAtZoom: 18,
+          showCoverageOnHover: false,
+          zoomToBoundsOnClick: false,
+          spiderfyOnMaxZoom: false,
+          removeOutsideVisibleBounds: true,
+          chunkedLoading: true,
+          iconCreateFunction: createClusterIcon,
+        })
+      : L.layerGroup();
+    markerClusterRef.current = markerCluster;
+
+    markerCluster.on?.("clusterclick", (event) => {
+      const album = temporaryAlbumFromCluster(event.layer);
+      if (album.photoIds.length > 0) {
+        onOpenTemporaryAlbumRef.current?.(album);
+      }
+    });
 
     let tileErrorCount = 0;
     const tiles = L.tileLayer(
@@ -82,27 +180,36 @@ export default function MapView({ onShowPhoto, focusedPhotoId = null }) {
       );
       const marker = L.marker([group.latitude, group.longitude], {
         icon: createMarkerIcon(group.photos.length, containsFocus),
+        photoCount: group.photos.length,
+        photoGroup: group,
+        thumbnailSrc: "",
         title: group.photos.length > 1
-          ? `${group.photos.length} 张照片`
+          ? t("common.photoCount", { count: formatNumber(group.photos.length) })
           : group.photos[0].filename,
         alt: group.photos.length > 1
-          ? `${group.photos.length} 张照片的位置`
+          ? t("map.photoCountLocation", { count: formatNumber(group.photos.length) })
           : group.photos[0].filename,
-      }).addTo(map);
+      }).addTo(markerCluster);
 
-      const popup = createPhotoPopup({
-        group,
-        onShowPhoto: (photo) => onShowPhotoRef.current?.(photo),
-        loadThumbnail: loadPhotoThumbnail,
-        styles,
+      marker.on("click", () => {
+        onOpenTemporaryAlbumRef.current?.({
+          photoIds: group.photos.map((photo) => photo.id),
+          latitude: group.latitude,
+          longitude: group.longitude,
+        });
       });
-      let popupLoaded = false;
-      marker.bindPopup(popup.root, { maxWidth: 360, minWidth: 180 });
-      marker.on("popupopen", () => {
-        if (popupLoaded) return;
-        popupLoaded = true;
-        popup.loadThumbnails();
-      });
+
+      loadPhotoThumbnail(group.photos[0].id, 2)
+        .then((thumbnailSrc) => {
+          if (disposed) return;
+          marker.options.thumbnailSrc = thumbnailSrc;
+          const isFocused = group.photos.some(
+            (photo) => photo.id === focusedPhotoIdRef.current,
+          );
+          marker.setIcon(createMarkerIcon(group.photos.length, isFocused, thumbnailSrc));
+          markerCluster.refreshClusters?.(marker);
+        })
+        .catch(() => {});
 
       markerGroupsRef.current.push({ marker, group });
       group.photos.forEach((photo) => {
@@ -110,6 +217,8 @@ export default function MapView({ onShowPhoto, focusedPhotoId = null }) {
       });
       bounds.extend([group.latitude, group.longitude]);
     });
+
+    markerCluster.addTo(map);
 
     if (gpsPhotos.length === 1) {
       map.setView(
@@ -123,13 +232,15 @@ export default function MapView({ onShowPhoto, focusedPhotoId = null }) {
     const animationFrame = requestAnimationFrame(() => map.invalidateSize());
 
     return () => {
+      disposed = true;
       cancelAnimationFrame(animationFrame);
       markerGroupsRef.current = [];
       markersByPhotoIdRef.current.clear();
+      markerClusterRef.current = null;
       map.remove();
       mapRef.current = null;
     };
-  }, [error, gpsPhotos, loading, locationGroups]);
+  }, [clusterPluginReady, error, formatNumber, gpsPhotos, loading, locationGroups, t]);
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -138,20 +249,38 @@ export default function MapView({ onShowPhoto, focusedPhotoId = null }) {
       const containsFocus = group.photos.some(
         (photo) => photo.id === focusedPhotoId,
       );
-      marker.setIcon(createMarkerIcon(group.photos.length, containsFocus));
+      marker.setIcon(createMarkerIcon(
+        group.photos.length,
+        containsFocus,
+        marker.options.thumbnailSrc,
+      ));
     });
 
     const focusedMarker = markersByPhotoIdRef.current.get(focusedPhotoId);
     if (!focusedMarker) return;
 
-    mapRef.current.setView(focusedMarker.getLatLng(), FOCUSED_ZOOM);
-    focusedMarker.openPopup();
+    const map = mapRef.current;
+    const markerCluster = markerClusterRef.current;
+    map.setView(focusedMarker.getLatLng(), FOCUSED_ZOOM);
+
+    if (typeof markerCluster?.zoomToShowLayer === "function") {
+      markerCluster.refreshClusters?.();
+      markerCluster.zoomToShowLayer(focusedMarker, () => {
+        if (mapRef.current === map) {
+          focusedMarker.setIcon(createMarkerIcon(
+            focusedMarker.options.photoCount,
+            true,
+            focusedMarker.options.thumbnailSrc,
+          ));
+        }
+      });
+    }
   }, [focusedPhotoId, gpsPhotos]);
 
-  if (loading) {
+  if (loading || !clusterPluginReady) {
     return (
       <div className={styles.centeredState}>
-        <Spinner label="正在读取 GPS 元数据…" showLabel />
+        <Spinner label={t("map.loading")} showLabel />
       </div>
     );
   }
@@ -161,9 +290,9 @@ export default function MapView({ onShowPhoto, focusedPhotoId = null }) {
       <div className={styles.centeredState}>
         <EmptyState
           icon={<TriangleAlert aria-hidden="true" />}
-          title="无法加载照片位置"
+          title={t("map.loadFailed")}
           description={error}
-          action={<Button onClick={reload}>重试</Button>}
+          action={<Button onClick={reload}>{t("common.retry")}</Button>}
         />
       </div>
     );
@@ -174,23 +303,23 @@ export default function MapView({ onShowPhoto, focusedPhotoId = null }) {
       <div className={styles.centeredState}>
         <EmptyState
           icon={<MapPinned aria-hidden="true" />}
-          title="暂无带位置信息的照片"
-          description="导入包含 GPS 经纬度的手机或相机照片后，它们会自动显示在地图上。"
+          title={t("map.empty")}
+          description={t("map.emptyDescription")}
         />
       </div>
     );
   }
 
   return (
-    <section className={styles.page} aria-label="照片地图">
+    <section className={styles.page} aria-label={t("map.label")}>
       <p className={styles.summary} role="status">
-        {gpsPhotos.length} 张照片，分布在 {locationGroups.length} 个位置。点击标记可查看照片。
+        {t("map.summary", { photos: formatNumber(gpsPhotos.length), locations: formatNumber(locationGroups.length) })}
       </p>
       {tilesUnavailable && <MapStatusBanner />}
       <div
         ref={mapElementRef}
         className={styles.map}
-        aria-label="照片位置地图"
+        aria-label={t("map.mapLabel")}
       />
     </section>
   );

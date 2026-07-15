@@ -168,7 +168,10 @@ describe("TimelineGrid phase-three integration", () => {
 
     const first = await screen.findByRole("gridcell", { name: "海边.jpg" });
     const second = screen.getByRole("gridcell", { name: "树林.raw" });
+    const tagFilter = await screen.findByRole("combobox", { name: "按标签筛选" });
+    fireEvent.click(tagFilter);
     await screen.findByRole("option", { name: "旅行" });
+    fireEvent.keyDown(tagFilter, { key: "Escape" });
     expect(localStorage.getItem("photomanager-photo-view")).toBe("masonry");
     expect(screen.getAllByRole("button", { name: /视图$/ })).toHaveLength(3);
     expect(screen.queryByRole("button", { name: "图标视图" })).not.toBeInTheDocument();
@@ -280,6 +283,23 @@ describe("TimelineGrid phase-three integration", () => {
     expect(await screen.findByRole("complementary", { name: "照片属性面板" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "关闭照片属性面板" }));
     expect(screen.getByText("已选择 1 张照片")).toBeInTheDocument();
+  });
+
+  it("limits a temporary map album to its in-memory photo ID index", async () => {
+    renderTimeline({
+      currentView: "map-album",
+      albumId: null,
+      indexedPhotoIds: ["photo-2"],
+    });
+
+    expect(await screen.findByRole("gridcell", { name: "树林.raw" }))
+      .toBeInTheDocument();
+    expect(screen.queryByRole("gridcell", { name: "海边.jpg" }))
+      .not.toBeInTheDocument();
+    expect(mocks.getPhotos).toHaveBeenCalledWith(expect.objectContaining({
+      albumId: null,
+      deletedOnly: false,
+    }));
   });
 
   it("wires trash restore, permanent deletion, and empty-trash flows", async () => {

@@ -70,3 +70,14 @@ export function loadPathThumbnail(path, isRaw, priority) {
     priority,
   );
 }
+
+export function clearThumbnailMemoryCache(kind) {
+  const prefix = kind === "importPreviews" ? "path:" : kind === "thumbnails" ? "photo:" : "";
+  for (const key of cache.keys()) {
+    if (!prefix || key.startsWith(prefix)) cache.delete(key);
+  }
+}
+
+globalThis.addEventListener?.("photomanager-cache-cleared", (event) => {
+  clearThumbnailMemoryCache(event.detail?.kind);
+});

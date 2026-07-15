@@ -1,5 +1,6 @@
 import { Brush, FolderPlus } from "lucide-react";
 
+import { useI18n } from "../../../i18n";
 import styles from "./ImportControls.module.css";
 
 function brushColor(album, getAlbumColor) {
@@ -14,28 +15,29 @@ export default function AlbumBrushPanel({
   onBrushChange,
   onCreateAlbum,
 }) {
+  const { t } = useI18n();
   return (
     <section className={`${styles.section} ${styles.growingSection}`} aria-labelledby="album-brush-heading">
       <div className={styles.sectionHeadingRow}>
         <div className={styles.sectionHeading}>
           <span className={styles.sectionIcon}><Brush aria-hidden="true" /></span>
           <div>
-            <h3 id="album-brush-heading">相册染色刷</h3>
+            <h3 id="album-brush-heading">{t("import.albumBrush")}</h3>
           </div>
         </div>
         <button type="button" className={styles.iconTextButton} onClick={onCreateAlbum} disabled={disabled}>
           <FolderPlus aria-hidden="true" />
-          新建
+          {t("common.create")}
         </button>
       </div>
 
       <p className={styles.compactHint}>
-        选中相册后点击或拖过照片；默认相册再次刷色可取消导入。
+        {t("import.brushHint")}
       </p>
 
-      <div className={styles.brushList} role="listbox" aria-label="选择相册染色刷">
+      <div className={styles.brushList} role="listbox" aria-label={t("import.chooseAlbumBrush")}>
         {albums.length === 0 ? (
-          <p className={styles.mutedStatus}>暂无可用相册。</p>
+          <p className={styles.mutedStatus}>{t("import.noAlbumsSentence")}</p>
         ) : albums.map((album) => {
           const active = activeAlbum === album.name;
           const color = brushColor(album, getAlbumColor);
@@ -55,7 +57,7 @@ export default function AlbumBrushPanel({
                 <span className={styles.colorDot} aria-hidden="true" />
                 {album.name}
               </span>
-              {active ? <small><Brush aria-hidden="true" />刷子激活</small> : null}
+              {active ? <small><Brush aria-hidden="true" />{t("import.brushActive")}</small> : null}
             </button>
           );
         })}

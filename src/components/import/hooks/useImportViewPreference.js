@@ -1,4 +1,5 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useSettings } from "../../../settings";
 
 export const IMPORT_VIEW_STORAGE_KEY = "photomanager-import-view";
 export const IMPORT_VIEW_MODES = Object.freeze(["masonry", "list", "gallery"]);
@@ -52,17 +53,24 @@ export function writeImportViewPreference(mode, storage = getBrowserStorage()) {
   return normalizedMode;
 }
 
-export function useImportViewPreference(storage = getBrowserStorage()) {
+export function useImportViewPreference(workspace = null, storage = getBrowserStorage()) {
+  const { getWorkspaceSettings, updateWorkspace } = useSettings();
+  const workspaceMode = workspace ? getWorkspaceSettings(workspace).importView : null;
   const [viewMode, setStoredViewMode] = useState(() =>
-    readImportViewPreference(storage),
+    workspace ? normalizeImportViewMode(workspaceMode) : readImportViewPreference(storage),
   );
+
+  useEffect(() => {
+    if (workspace) setStoredViewMode(normalizeImportViewMode(workspaceMode));
+  }, [workspace, workspaceMode]);
 
   const setViewMode = useCallback(
     (mode) => {
       const normalizedMode = writeImportViewPreference(mode, storage);
+      if (workspace) updateWorkspace(workspace, { importView: normalizedMode });
       setStoredViewMode(normalizedMode);
     },
-    [storage],
+    [storage, updateWorkspace, workspace],
   );
 
   return [viewMode, setViewMode];

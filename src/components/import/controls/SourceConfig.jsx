@@ -7,6 +7,7 @@ import {
   ScanSearch,
 } from "lucide-react";
 
+import { useI18n } from "../../../i18n";
 import styles from "./ImportControls.module.css";
 
 export default function SourceConfig({
@@ -23,6 +24,7 @@ export default function SourceConfig({
   onSelectCard,
   onDetectCards,
 }) {
+  const { formatNumber, t } = useI18n();
   const controlsDisabled = disabled || scanning;
   const sourcePathId = useId();
   const hasScannedCount =
@@ -35,12 +37,12 @@ export default function SourceConfig({
       <div className={styles.sectionHeading}>
         <span className={styles.sectionIcon}><FolderOpen aria-hidden="true" /></span>
         <div>
-          <h3 id="import-source-heading">选择导入源</h3>
+          <h3 id="import-source-heading">{t("import.chooseSource")}</h3>
         </div>
       </div>
 
       <div className={styles.field}>
-        <label htmlFor={sourcePathId}>来源路径</label>
+        <label htmlFor={sourcePathId}>{t("import.sourcePath")}</label>
         <form
           className={styles.inputActionRow}
           onSubmit={(event) => {
@@ -54,27 +56,27 @@ export default function SourceConfig({
             type="text"
             value={sourcePath}
             onChange={(event) => onSourcePathChange?.(event.target.value)}
-            placeholder="导入来源文件夹路径"
+            placeholder={t("import.sourcePathPlaceholder")}
             disabled={controlsDisabled}
             autoComplete="off"
           />
           <button
             type="submit"
             disabled={controlsDisabled || !sourcePath.trim()}
-            aria-label="扫描来源路径"
-            title="扫描来源路径"
+            aria-label={t("import.scanSourcePath")}
+            title={t("import.scanSourcePath")}
           >
             <ScanSearch aria-hidden="true" />
           </button>
           <button type="button" onClick={onBrowse} disabled={controlsDisabled}>
             <FolderOpen aria-hidden="true" />
-            浏览
+            {t("common.browse")}
           </button>
         </form>
       </div>
 
       <div className={styles.subheadingRow}>
-        <span>已连接的外部存储</span>
+        <span>{t("import.connectedStorage")}</span>
         {onDetectCards ? (
           <button
             type="button"
@@ -87,15 +89,15 @@ export default function SourceConfig({
             ) : (
               <RefreshCw aria-hidden="true" />
             )}
-            检测设备
+            {t("import.detectDevices")}
           </button>
         ) : null}
       </div>
 
       {detectingCards ? (
-        <p className={styles.mutedStatus} role="status">正在检测存储卡…</p>
+        <p className={styles.mutedStatus} role="status">{t("import.detectingCards")}</p>
       ) : cards.length > 0 ? (
-        <div className={styles.choiceList} aria-label="检测到的外部存储">
+        <div className={styles.choiceList} aria-label={t("import.detectedStorage")}>
           {cards.map((card) => (
             <button
               type="button"
@@ -107,14 +109,14 @@ export default function SourceConfig({
             >
               <HardDrive aria-hidden="true" />
               <span>
-                <strong>{card.label || "移动磁盘"}</strong>
+                <strong>{card.label || t("import.removableDisk")}</strong>
                 <small>{card.driveLetter ? `[${card.driveLetter}] ` : ""}{card.path}</small>
               </span>
             </button>
           ))}
         </div>
       ) : (
-        <p className={styles.mutedStatus}>暂未检测到外部存储。</p>
+        <p className={styles.mutedStatus}>{t("import.noExternalStorage")}</p>
       )}
 
       <div
@@ -124,22 +126,22 @@ export default function SourceConfig({
         {scanning ? (
           <>
             <LoaderCircle className={styles.spinner} aria-hidden="true" />
-            <span><strong>正在扫描照片</strong><small>读取来源目录…</small></span>
+            <span><strong>{t("import.scanningPhotos")}</strong><small>{t("import.readingSource")}</small></span>
           </>
         ) : scanError ? (
           <>
             <ScanSearch aria-hidden="true" />
-            <span><strong>扫描失败</strong><small>{scanError}</small></span>
+            <span><strong>{t("import.scanFailed")}</strong><small>{scanError}</small></span>
           </>
         ) : hasScannedCount ? (
           <>
             <ScanSearch aria-hidden="true" />
-            <span><strong>扫描完成</strong><small>发现 {Number(scannedCount)} 张照片</small></span>
+            <span><strong>{t("import.scanComplete")}</strong><small>{t("import.photosFound", { count: formatNumber(scannedCount) })}</small></span>
           </>
         ) : (
           <>
             <ScanSearch aria-hidden="true" />
-            <span><strong>等待选择来源</strong><small>输入路径或选择设备</small></span>
+            <span><strong>{t("import.awaitingSource")}</strong><small>{t("import.enterPathOrDevice")}</small></span>
           </>
         )}
       </div>

@@ -37,6 +37,8 @@ pub fn run() {
             commands::add_photos_to_album,
             commands::remove_photos_from_album,
             commands::scan_workspace,
+            commands::get_workspace_storage_stats,
+            commands::clear_workspace_cache,
             commands::detect_cards,
             commands::scan_card,
             commands::import_photos,

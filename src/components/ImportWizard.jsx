@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, Camera, FolderOpen, LoaderCircle, X } from "lucide-react";
 
+import { useI18n } from "../i18n";
 import CreateAlbumDialog from "./CreateAlbumDialog";
 import LightboxViewer from "./LightboxViewer";
 import {
@@ -24,19 +25,37 @@ import {
   ImportListView,
   ImportMasonryView,
 } from "./import/views";
+import { useGlobalDialog } from "./ui";
 import styles from "./ImportWizard.module.css";
 
 const INITIAL_VISIBLE_PHOTOS = 64;
 
-function getErrorMessage(error, fallback = "操作失败，请重试。") {
+function getErrorMessage(error, fallback) {
   if (error instanceof Error && error.message) return error.message;
   if (typeof error === "string" && error) return error;
   return fallback;
 }
 
-export default function ImportWizard({ onClose, onImportComplete }) {
-  const data = useImportWizardData({ onClose, onImportComplete });
-  const [viewMode, setViewMode] = useImportViewPreference();
+export default function ImportWizard({ onClose, onImportComplete, workspace, preferences = {} }) {
+  const { formatNumber, t } = useI18n();
+  const { alert: showAlert, confirm: showConfirm } = useGlobalDialog();
+  const notify = useCallback((message) => {
+    const failed = message.includes("失败") || /fail|error/i.test(message);
+    return showAlert(message, {
+      title: failed ? t("import.failed") : t("import.notice"),
+      tone: failed ? "danger" : "success",
+    });
+  }, [showAlert, t]);
+  const data = useImportWizardData({
+    onClose,
+    onImportComplete,
+    confirmAction: showConfirm,
+    notify,
+    autoSelectDetectedSource: preferences.autoSelectDetectedSource ?? true,
+    initialBackupPath: preferences.backupPath ?? "",
+    initialAttachCurrentLocation: preferences.attachCurrentLocation ?? true,
+  });
+  const [viewMode, setViewMode] = useImportViewPreference(workspace);
   const [sourceDraft, setSourceDraft] = useState("");
   const [configurationOpen, setConfigurationOpen] = useState(false);
   const [hideImported, setHideImported] = useState(false);
@@ -261,25 +280,25 @@ export default function ImportWizard({ onClose, onImportComplete }) {
   const progress = data.importProgress || {
     copied: 0,
     total: data.selectedImportPaths.length,
-    currentFile: "准备导入中…",
+    currentFile: t("import.preparing"),
   };
 
   return (
     <>
-    <div className={styles.overlay} role="dialog" aria-modal="true" aria-label="照片导入向导">
+    <div className={styles.overlay} role="dialog" aria-modal="true" aria-label={t("import.wizardLabel")}>
       <section className={styles.wizard} aria-busy={importBusy}>
         <header className={styles.header}>
           <span className={styles.headerIcon}><Camera aria-hidden="true" /></span>
           <div>
-            <h1>照片导入</h1>
-            <p>扫描来源、分配相册并安全复制到当前工作区。</p>
+            <h1>{t("import.title")}</h1>
+            <p>{t("import.description")}</p>
           </div>
           <button
             type="button"
             className={styles.closeButton}
             onClick={onClose}
             disabled={importBusy}
-            aria-label="关闭照片导入向导"
+            aria-label={t("import.closeWizard")}
           >
             <X aria-hidden="true" />
           </button>
@@ -298,7 +317,7 @@ export default function ImportWizard({ onClose, onImportComplete }) {
               scanning={data.scanning}
               detectingCards={data.detectingCards}
               scannedCount={data.sourcePath ? data.photos.length : null}
-              scanError={data.scanError ? getErrorMessage(data.scanError) : ""}
+              scanError={data.scanError ? getErrorMessage(data.scanError, t("common.unknownError")) : ""}
               disabled={importBusy}
               onSourcePathChange={handleSourceDraftChange}
               onScanSource={handleSelectSource}
@@ -308,7 +327,7 @@ export default function ImportWizard({ onClose, onImportComplete }) {
 
             {data.cardDetectionError ? (
               <p className={styles.configError} role="alert">
-                {getErrorMessage(data.cardDetectionError, "检测外部存储失败。")}
+                {getErrorMessage(data.cardDetectionError, t("import.detectStorageFailed"))}
               </p>
             ) : null}
 
@@ -323,7 +342,7 @@ export default function ImportWizard({ onClose, onImportComplete }) {
 
             {data.albumsError ? (
               <p className={styles.configError} role="alert">
-                {getErrorMessage(data.albumsError, "读取相册失败。")}
+                {getErrorMessage(data.albumsError, t("import.readAlbumsFailed"))}
               </p>
             ) : null}
 
@@ -365,21 +384,21 @@ export default function ImportWizard({ onClose, onImportComplete }) {
 
               {data.importedCount > 0 ? (
                 <div className={styles.duplicateNotice} role="status">
-                  已识别 {data.importedCount} 张重复照片，已取消选择并禁止再次刷色。
+                  {t("import.duplicatesDetected", { count: formatNumber(data.importedCount) })}
                 </div>
               ) : null}
 
               {data.progressListenerError ? (
                 <div className={styles.inlineError} role="alert">
                   <AlertCircle aria-hidden="true" />
-                  无法监听导入进度：{getErrorMessage(data.progressListenerError)}
+                  {t("import.progressListenerFailed", { message: getErrorMessage(data.progressListenerError, t("common.unknownError")) })}
                 </div>
               ) : null}
 
               {data.importError ? (
                 <div className={styles.inlineError} role="alert">
                   <AlertCircle aria-hidden="true" />
-                  {getErrorMessage(data.importError, "导入失败，请重试。")}
+                  {getErrorMessage(data.importError, t("import.failedRetry"))}
                 </div>
               ) : null}
 
@@ -387,33 +406,33 @@ export default function ImportWizard({ onClose, onImportComplete }) {
                 {data.scanning ? (
                   <div className={styles.emptyState} role="status">
                     <LoaderCircle className={styles.spinner} aria-hidden="true" />
-                    <strong>正在扫描照片</strong>
-                    <span>正在读取来源目录中的照片树…</span>
+                    <strong>{t("import.scanningPhotos")}</strong>
+                    <span>{t("import.readingPhotoTree")}</span>
                   </div>
                 ) : data.scanError ? (
                   <div className={styles.emptyState} role="alert">
                     <AlertCircle aria-hidden="true" />
-                    <strong>扫描失败</strong>
-                    <span>{getErrorMessage(data.scanError)}</span>
+                    <strong>{t("import.scanFailed")}</strong>
+                    <span>{getErrorMessage(data.scanError, t("common.unknownError"))}</span>
                   </div>
                 ) : data.photos.length === 0 ? (
                   <div className={styles.emptyState} role="status">
                     <FolderOpen aria-hidden="true" />
-                    <strong>选择导入来源</strong>
-                    <span>从配置面板选择存储卡或照片文件夹。</span>
+                    <strong>{t("import.chooseSource")}</strong>
+                    <span>{t("import.chooseSourceDescription")}</span>
                   </div>
                 ) : filteredPhotos.length === 0 ? (
                   <div className={styles.emptyState} role="status">
                     <FolderOpen aria-hidden="true" />
-                    <strong>当前筛选条件下没有照片</strong>
-                    <span>关闭隐藏选项，或重新为照片染色。</span>
+                    <strong>{t("import.noFilteredPhotos")}</strong>
+                    <span>{t("import.noFilteredPhotosDescription")}</span>
                   </div>
                 ) : preview}
               </div>
 
               {viewMode !== "gallery" && visibleLimit < filteredPhotos.length ? (
                 <div ref={sentinelRef} className={styles.sentinel} role="status">
-                  正在准备更多预览…
+                  {t("import.preparingMorePreviews")}
                 </div>
               ) : null}
             </div>
@@ -424,7 +443,7 @@ export default function ImportWizard({ onClose, onImportComplete }) {
           selectedCount={data.selectedImportPaths.length}
           totalCount={data.photos.length}
           importedCount={data.importedCount}
-          activeBrush={brush.brushAlbum || DEFAULT_IMPORT_ALBUM_NAME}
+          activeBrush={brush.brushAlbum || t("import.defaultAlbum")}
           brushColor={getImportAlbumColor(brush.brushAlbum || DEFAULT_IMPORT_ALBUM_NAME)}
           importing={data.importing}
           scanning={data.scanning}
@@ -455,7 +474,7 @@ export default function ImportWizard({ onClose, onImportComplete }) {
           copied={progress.copied}
           total={progress.total}
           currentFile={progress.currentFile}
-          title={data.preparingImport ? "正在准备导入" : undefined}
+          title={data.preparingImport ? t("import.preparingImport") : undefined}
         />
       </section>
     </div>

@@ -9,6 +9,7 @@ import {
   handleImportPhotoMouseDown,
   handleImportPhotoMouseEnter,
 } from "./importViewUtils";
+import { useI18n } from "../../../i18n";
 import styles from "./ImportViews.module.css";
 
 function getStableAspectRatio(photo) {
@@ -27,12 +28,13 @@ export default function ImportMasonryView({
   onBrushEnter,
   onOpenPhoto,
 }) {
+  const { t } = useI18n();
   if (photos.length === 0) {
-    return <div className={styles.empty} role="status">暂无可预览照片</div>;
+    return <div className={styles.empty} role="status">{t("import.noPreviewPhotos")}</div>;
   }
 
   return (
-    <div className={styles.masonry} role="grid" aria-label="导入照片瀑布流">
+    <div className={styles.masonry} role="grid" aria-label={t("import.photoMasonry")}>
       {photos.map((photo) => {
         const state = getImportPhotoState(photo, getPhotoVisualState);
         return (

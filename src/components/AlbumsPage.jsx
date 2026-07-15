@@ -7,10 +7,12 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { loadPhotoThumbnail } from "../lib/thumbnailLoader";
+import { useI18n } from "../i18n";
 import { Button, EmptyState, Spinner } from "./ui";
 import styles from "./AlbumsPage.module.css";
 
 function AlbumCover({ album }) {
+  const { t } = useI18n();
   const [state, setState] = useState({ status: "idle", src: "" });
 
   useEffect(() => {
@@ -42,7 +44,7 @@ function AlbumCover({ album }) {
       <img
         className={styles.coverImage}
         src={state.src}
-        alt={`${album.name}的封面`}
+        alt={t("albums.coverAlt", { name: album.name })}
       />
     );
   }
@@ -50,8 +52,8 @@ function AlbumCover({ album }) {
   if (state.status === "loading") {
     return (
       <span className={styles.coverStatus} role="status">
-        <Spinner label={`正在加载${album.name}的封面`} size="sm" />
-        <span className={styles.srOnly}>正在加载{album.name}的封面</span>
+        <Spinner label={t("albums.coverLoading", { name: album.name })} size="sm" />
+        <span className={styles.srOnly}>{t("albums.coverLoading", { name: album.name })}</span>
       </span>
     );
   }
@@ -59,19 +61,19 @@ function AlbumCover({ album }) {
   return (
     <span
       className={styles.coverStatus}
-      title={state.status === "error" ? "封面加载失败" : "相册暂无封面"}
+      title={state.status === "error" ? t("albums.coverFailed") : t("albums.noCover")}
     >
       <ImageIcon aria-hidden="true" />
       <span className={styles.srOnly}>
-        {state.status === "error" ? "封面加载失败" : "相册暂无封面"}
+        {state.status === "error" ? t("albums.coverFailed") : t("albums.noCover")}
       </span>
     </span>
   );
 }
 
-function getErrorMessage(error) {
+function getErrorMessage(error, fallback) {
   if (typeof error === "string") return error;
-  return error?.message || "无法加载相册，请稍后重试。";
+  return error?.message || fallback;
 }
 
 export default function AlbumsPage({
@@ -82,26 +84,27 @@ export default function AlbumsPage({
   onOpenAlbum,
   onCreateAlbum,
 }) {
+  const { t, formatNumber } = useI18n();
   if (loading) {
     return (
-      <section className={styles.centeredState} aria-label="相册" aria-busy="true">
-        <Spinner label="正在加载相册…" size="lg" showLabel />
+      <section className={styles.centeredState} aria-label={t("nav.albums")} aria-busy="true">
+        <Spinner label={t("albums.loading")} size="lg" showLabel />
       </section>
     );
   }
 
   if (error) {
     return (
-      <section className={styles.centeredState} aria-label="相册加载失败">
+      <section className={styles.centeredState} aria-label={t("albums.loadFailed")}>
         <EmptyState
           icon={AlertCircle}
-          title="相册加载失败"
-          description={getErrorMessage(error)}
+          title={t("albums.loadFailed")}
+          description={getErrorMessage(error, t("albums.loadFallback"))}
           role="alert"
           actions={(
             <Button variant="secondary" onClick={onRetry}>
               <RefreshCw size={16} aria-hidden="true" />
-              重试
+              {t("common.retry")}
             </Button>
           )}
         />
@@ -111,15 +114,15 @@ export default function AlbumsPage({
 
   if (albums.length === 0) {
     return (
-      <section className={styles.centeredState} aria-label="相册为空">
+      <section className={styles.centeredState} aria-label={t("albums.emptyLabel")}>
         <EmptyState
           icon={FolderOpen}
-          title="还没有相册"
-          description="创建一个相册，开始整理你的照片。"
+          title={t("albums.empty")}
+          description={t("albums.emptyDescription")}
           actions={(
             <Button variant="primary" onClick={onCreateAlbum}>
               <Plus size={17} aria-hidden="true" />
-              创建相册
+              {t("albums.create")}
             </Button>
           )}
         />
@@ -128,7 +131,7 @@ export default function AlbumsPage({
   }
 
   return (
-    <section className={styles.page} aria-label="相册">
+    <section className={styles.page} aria-label={t("nav.albums")}>
       <div className={styles.grid}>
         <button
           className={`${styles.card} ${styles.createCard}`}
@@ -138,8 +141,8 @@ export default function AlbumsPage({
           <span className={styles.createIcon}>
             <Plus aria-hidden="true" />
           </span>
-          <span className={styles.createTitle}>创建新相册</span>
-          <span className={styles.createHint}>整理一组新的照片</span>
+          <span className={styles.createTitle}>{t("albums.createNew")}</span>
+          <span className={styles.createHint}>{t("albums.createHint")}</span>
         </button>
 
         {albums.map((album) => (
@@ -148,7 +151,7 @@ export default function AlbumsPage({
             type="button"
             key={album.id}
             onClick={() => onOpenAlbum?.(album)}
-            aria-label={`打开相册${album.name}，${album.photoCount || 0}张照片`}
+            aria-label={t("albums.openLabel", { name: album.name, count: formatNumber(album.photoCount || 0) })}
           >
             <span className={styles.cover}>
               <AlbumCover album={album} />
@@ -162,7 +165,7 @@ export default function AlbumsPage({
                   {album.description}
                 </span>
               ) : null}
-              <span className={styles.photoCount}>{album.photoCount || 0} 张照片</span>
+              <span className={styles.photoCount}>{t("albums.photoCount", { count: formatNumber(album.photoCount || 0) })}</span>
             </span>
           </button>
         ))}

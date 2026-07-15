@@ -6,10 +6,14 @@ import CreateAlbumDialog from "./components/CreateAlbumDialog";
 import ImportWizard from "./components/ImportWizard";
 import LightboxViewer from "./components/LightboxViewer";
 import MapView from "./components/MapView";
+import MapTemporaryAlbum from "./components/MapTemporaryAlbum";
+import SettingsPage from "./components/SettingsPage";
 import { AppShell, Sidebar } from "./components/shell";
 import TimelineGrid from "./components/TimelineGrid";
-import WorkspaceInfoDialog from "./components/WorkspaceInfoDialog";
 import WorkspaceSelector from "./components/WorkspaceSelector";
+import { useGlobalDialog } from "./components/ui";
+import { useI18n } from "./i18n";
+import { useSettings } from "./settings";
 import { createAlbum, getAlbumSummaries } from "./services/albumService";
 import { detectCards } from "./services/importService";
 import { getActiveWorkspace, getWorkspaces } from "./services/workspaceService";
@@ -24,24 +28,31 @@ function getInitialWideViewport() {
   return window.innerWidth >= 1200;
 }
 
-function getViewTitle(currentView, activeAlbumName) {
+function getViewTitle(currentView, activeAlbumName, t) {
   switch (currentView) {
     case "albums":
-      return "相册";
+      return t("nav.albums");
     case "favorites":
-      return "我的喜欢";
+      return t("nav.favorites");
     case "trash":
-      return "垃圾桶";
+      return t("nav.trash");
     case "map":
-      return "照片地图";
+      return t("nav.map");
+    case "map-album":
+      return activeAlbumName || t("map.temporaryAlbumTitle");
+    case "settings":
+      return t("nav.settings");
     case "album":
-      return activeAlbumName || "相册";
+      return activeAlbumName || t("nav.albums");
     default:
-      return "图库";
+      return t("nav.albums");
   }
 }
 
 function App() {
+  const { confirm: showConfirm } = useGlobalDialog();
+  const { t } = useI18n();
+  const { getWorkspaceSettings } = useSettings();
   const [activeWorkspace, setActiveWorkspace] = useState(null);
   const [currentView, setCurrentView] = useState("albums");
   const [activeAlbumId, setActiveAlbumId] = useState(null);
@@ -59,7 +70,7 @@ function App() {
   const [showImportWizard, setShowImportWizard] = useState(false);
   const [lightboxData, setLightboxData] = useState(null);
   const [mapFocusedPhotoId, setMapFocusedPhotoId] = useState(null);
-  const [workspaceInfoOpen, setWorkspaceInfoOpen] = useState(false);
+  const [mapTemporaryAlbum, setMapTemporaryAlbum] = useState(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const [showCreateAlbum, setShowCreateAlbum] = useState(false);
@@ -93,13 +104,13 @@ function App() {
         return;
       }
 
-      const folderName = activePath.split(/[/\\]/).pop() || "本地相册";
+      const folderName = activePath.split(/[/\\]/).pop() || t("workspace.localAlbum");
       setAlbumsLoading(true);
       setActiveWorkspace({ name: folderName, path: activePath });
     } catch (error) {
       console.error(error);
     }
-  }, []);
+  }, [t]);
 
   const checkSDCards = useCallback(async () => {
     try {
@@ -191,18 +202,23 @@ function App() {
     setCurrentView("albums");
     setActiveAlbumId(null);
     setActiveAlbumName("");
+    setMapTemporaryAlbum(null);
     closeCompactSidebar();
   };
 
-  const handleSwitchWorkspace = () => {
-    if (!confirm("确定要返回选择仓库界面吗？")) return;
+  const handleSwitchWorkspace = async () => {
+    const confirmed = await showConfirm(t("nav.switchConfirm"), {
+      title: t("nav.switchConfirmTitle"),
+      confirmText: t("nav.switchConfirmAction"),
+    });
+    if (!confirmed) return;
 
     albumsRequestIdRef.current += 1;
     setActiveWorkspace(null);
     setActiveAlbumId(null);
     setActiveAlbumName("");
     setDetectedCard(null);
-    setWorkspaceInfoOpen(false);
+    setMapTemporaryAlbum(null);
     closeCompactSidebar();
   };
 
@@ -211,6 +227,7 @@ function App() {
     setActiveAlbumId(null);
     setActiveAlbumName("");
     if (view === "map") setMapFocusedPhotoId(null);
+    if (view !== "map-album") setMapTemporaryAlbum(null);
     closeCompactSidebar();
   };
 
@@ -218,6 +235,7 @@ function App() {
     setCurrentView("album");
     setActiveAlbumId(album.id);
     setActiveAlbumName(album.name);
+    setMapTemporaryAlbum(null);
     closeCompactSidebar();
   };
 
@@ -264,12 +282,13 @@ function App() {
     return <WorkspaceSelector onSelectWorkspace={handleSelectWorkspace} />;
   }
 
-  const viewTitle = getViewTitle(currentView, activeAlbumName);
+  const viewTitle = getViewTitle(currentView, activeAlbumName, t);
+  const workspaceSettings = getWorkspaceSettings(activeWorkspace);
 
   const sidebar = (
     <Sidebar
       workspace={activeWorkspace}
-      currentView={currentView}
+      currentView={currentView === "map-album" ? "map" : currentView}
       activeAlbumId={activeAlbumId}
       albums={albums}
       detectedCard={detectedCard}
@@ -284,8 +303,11 @@ function App() {
       }}
       onSwitchWorkspace={handleSwitchWorkspace}
       onToggleMode={handleToggleSidebar}
-      onShowWorkspaceInfo={() => {
-        setWorkspaceInfoOpen(true);
+      onShowSettings={() => {
+        setCurrentView("settings");
+        setActiveAlbumId(null);
+        setActiveAlbumName("");
+        setMapTemporaryAlbum(null);
         closeCompactSidebar();
       }}
     />
@@ -299,11 +321,40 @@ function App() {
         onRequestSidebarClose={closeCompactSidebar}
         contentLabel={viewTitle}
       >
-        {currentView === "map" ? (
+        {currentView === "settings" ? (
+          <SettingsPage
+            workspace={activeWorkspace}
+            sidebarMode={sidebarMode}
+            onToggleSidebar={handleToggleSidebar}
+            onWorkspaceChanged={() => {
+              triggerRefresh();
+              void loadAlbums();
+            }}
+          />
+        ) : currentView === "map" ? (
           <MapView
             key={`map-${refreshTrigger}`}
             focusedPhotoId={mapFocusedPhotoId}
-            onShowPhoto={(photo) => setLightboxData({ photosList: [photo], index: 0 })}
+            onOpenTemporaryAlbum={(album) => {
+              setMapTemporaryAlbum(album);
+              setActiveAlbumId(null);
+              setActiveAlbumName(t("map.temporaryAlbumTitle"));
+              setCurrentView("map-album");
+            }}
+          />
+        ) : currentView === "map-album" && mapTemporaryAlbum ? (
+          <MapTemporaryAlbum
+            workspace={activeWorkspace}
+            album={mapTemporaryAlbum}
+            refreshTrigger={refreshTrigger}
+            onBack={() => {
+              setCurrentView("map");
+              setActiveAlbumName("");
+              setMapFocusedPhotoId(null);
+              setMapTemporaryAlbum(null);
+            }}
+            onPhotosUpdated={triggerRefresh}
+            onPhotoClick={(list, index) => setLightboxData({ photosList: list, index })}
           />
         ) : currentView === "albums" ? (
           <AlbumsPage
@@ -316,6 +367,7 @@ function App() {
           />
         ) : (
           <TimelineGrid
+            workspace={activeWorkspace}
             currentView={currentView}
             albumId={activeAlbumId}
             refreshTrigger={refreshTrigger}
@@ -337,16 +389,12 @@ function App() {
         onClose={handleCloseCreateAlbum}
       />
 
-      <WorkspaceInfoDialog
-        open={workspaceInfoOpen}
-        workspace={activeWorkspace}
-        onClose={() => setWorkspaceInfoOpen(false)}
-      />
-
       {showImportWizard && (
         <ImportWizard
+          workspace={activeWorkspace}
           onClose={() => setShowImportWizard(false)}
           onImportComplete={triggerRefresh}
+          preferences={workspaceSettings}
         />
       )}
 
@@ -358,6 +406,7 @@ function App() {
           onShowOnMap={(photo) => {
             setMapFocusedPhotoId(photo.id);
             setLightboxData(null);
+            setMapTemporaryAlbum(null);
             setCurrentView("map");
           }}
           onPhotosUpdated={triggerRefresh}

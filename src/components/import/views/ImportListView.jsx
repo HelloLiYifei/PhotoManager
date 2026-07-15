@@ -10,6 +10,7 @@ import {
   handleImportPhotoMouseEnter,
   importFileType,
 } from "./importViewUtils";
+import { useI18n } from "../../../i18n";
 import styles from "./ImportViews.module.css";
 
 export default function ImportListView({
@@ -22,19 +23,20 @@ export default function ImportListView({
   onBrushEnter,
   onOpenPhoto,
 }) {
+  const { t } = useI18n();
   if (photos.length === 0) {
-    return <div className={styles.empty} role="status">暂无可预览照片</div>;
+    return <div className={styles.empty} role="status">{t("import.noPreviewPhotos")}</div>;
   }
 
   return (
     <div className={styles.listScroller}>
-      <div className={styles.list} role="table" aria-label="存储卡照片列表">
+      <div className={styles.list} role="table" aria-label={t("import.cardPhotoList")}>
         <div className={`${styles.listGrid} ${styles.listHeader}`} role="row">
-          <span role="columnheader">名称</span>
-          <span role="columnheader">拍摄日期</span>
-          <span role="columnheader">类型</span>
-          <span role="columnheader">大小</span>
-          <span role="columnheader">导入状态 / 相册</span>
+          <span role="columnheader">{t("photo.name")}</span>
+          <span role="columnheader">{t("photo.dateTaken")}</span>
+          <span role="columnheader">{t("import.type")}</span>
+          <span role="columnheader">{t("import.size")}</span>
+          <span role="columnheader">{t("import.statusAlbum")}</span>
         </div>
 
         {photos.map((photo) => {
@@ -90,11 +92,11 @@ export default function ImportListView({
               <span role="cell">{formatImportFileSize(photo.size)}</span>
               <span className={styles.listStatus} role="cell">
                 {photo.alreadyImported ? (
-                  <strong className={styles.importedText}>已导入</strong>
+                  <strong className={styles.importedText}>{t("import.imported")}</strong>
                 ) : state.isChecked ? (
                   <strong style={{ color: state.albumColor }}>● {state.targetAlbum}</strong>
                 ) : (
-                  <strong className={styles.skippedText}>不导入</strong>
+                  <strong className={styles.skippedText}>{t("import.skip")}</strong>
                 )}
               </span>
             </div>

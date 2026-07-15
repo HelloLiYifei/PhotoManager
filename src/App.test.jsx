@@ -20,6 +20,21 @@ vi.mock("./services/workspaceService", () => ({
   getWorkspaces: vi.fn(),
 }));
 
+vi.mock("./services/settingsService", () => ({
+  clearWorkspaceCache: vi.fn(),
+  getWorkspaceStorageStats: vi.fn().mockResolvedValue({
+    photoCount: 0,
+    trashCount: 0,
+    albumCount: 0,
+    originalBytes: 0,
+    databaseBytes: 0,
+    thumbnailCache: { fileCount: 0, bytes: 0 },
+    importPreviewCache: { fileCount: 0, bytes: 0 },
+  }),
+  listenToScanProgress: vi.fn().mockResolvedValue(() => {}),
+  scanWorkspace: vi.fn(),
+}));
+
 vi.mock("./lib/thumbnailLoader", () => ({
   loadPhotoThumbnail: vi.fn().mockResolvedValue("asset://cover"),
 }));
@@ -29,13 +44,29 @@ vi.mock("./components/WorkspaceSelector", () => ({
 }));
 
 vi.mock("./components/TimelineGrid", () => ({
-  default: ({ currentView, albumId }) => (
-    <div data-testid="timeline-view">{currentView}:{albumId || "all"}</div>
+  default: ({ currentView, albumId, indexedPhotoIds = [] }) => (
+    <div data-testid="timeline-view" data-photo-ids={indexedPhotoIds.join(",")}>
+      {currentView}:{albumId || "all"}
+    </div>
   ),
 }));
 
 vi.mock("./components/MapView", () => ({
-  default: () => <div>地图内容</div>,
+  default: ({ onOpenTemporaryAlbum }) => (
+    <div>
+      地图内容
+      <button
+        type="button"
+        onClick={() => onOpenTemporaryAlbum?.({
+          photoIds: ["map-photo-1", "map-photo-2"],
+          latitude: 30.25,
+          longitude: 120.16,
+        })}
+      >
+        打开地图临时相册
+      </button>
+    </div>
+  ),
 }));
 
 vi.mock("./components/ImportWizard", () => ({
@@ -125,6 +156,26 @@ describe("App phase-two shell", () => {
     expect(shell).toHaveAttribute("data-sidebar-mode", "collapsed");
   });
 
+  it("opens a temporary map album backed only by photo IDs", async () => {
+    render(<App />);
+    await screen.findByRole("main", { name: "相册" });
+    await waitFor(() => expect(getAlbumSummaries).toHaveBeenCalledOnce());
+
+    fireEvent.click(screen.getByRole("button", { name: "地图" }));
+    fireEvent.click(screen.getByRole("button", { name: "打开地图临时相册" }));
+
+    expect(screen.getByRole("main", { name: "地图临时相册" })).toBeInTheDocument();
+    expect(screen.getByText("此位置的 2 张照片")).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-view")).toHaveTextContent("map-album:all");
+    expect(screen.getByTestId("timeline-view")).toHaveAttribute(
+      "data-photo-ids",
+      "map-photo-1,map-photo-2",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "返回地图" }));
+    expect(screen.getByText("地图内容")).toBeInTheDocument();
+  });
+
   it("shows service errors, retries, and creates an album without duplicate submission", async () => {
     getAlbumSummaries
       .mockRejectedValueOnce(new Error("读取相册失败"))
@@ -150,16 +201,15 @@ describe("App phase-two shell", () => {
     expect(getAlbumSummaries).toHaveBeenCalledTimes(3);
   });
 
-  it("shows semantic workspace information instead of a settings alert", async () => {
+  it("opens the settings page with current workspace information", async () => {
     render(<App />);
     await screen.findByRole("main", { name: "相册" });
 
-    fireEvent.click(screen.getByRole("button", { name: "工作区信息" }));
-    const dialog = screen.getByRole("dialog", { name: "工作区信息" });
-    expect(within(dialog).getByText("D:/Photos")).toBeInTheDocument();
-    expect(within(dialog).getByText("物理目录直接映射")).toBeInTheDocument();
-
-    fireEvent.click(within(dialog).getByRole("button", { name: "知道了" }));
-    expect(screen.queryByRole("dialog", { name: "工作区信息" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "设置" }));
+    expect(screen.getByRole("heading", { name: "设置" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "工作区" }));
+    await screen.findAllByText("0 B");
+    expect(screen.getByText("D:/Photos")).toBeInTheDocument();
+    expect(screen.getByText("物理目录直接映射")).toBeInTheDocument();
   });
 });

@@ -3,25 +3,28 @@ import {
   PanelLeftOpen,
   X,
 } from "lucide-react";
+import { useI18n } from "../../i18n";
 import "./Shell.css";
 
-const TOGGLE_PRESENTATION = {
+function getTogglePresentation(t) {
+  return {
   expanded: {
     Icon: PanelLeftClose,
-    label: "折叠侧边栏",
+    label: t("nav.collapseSidebar"),
     expanded: true,
   },
   collapsed: {
     Icon: PanelLeftOpen,
-    label: "展开侧边栏",
+    label: t("nav.expandSidebar"),
     expanded: false,
   },
   overlay: {
     Icon: X,
-    label: "关闭侧边栏",
+    label: t("nav.closeSidebar"),
     expanded: true,
   },
-};
+  };
+}
 
 function PageHeader({
   title,
@@ -34,7 +37,9 @@ function PageHeader({
   titleId = "page-title",
   className = "",
 }) {
-  const toggle = TOGGLE_PRESENTATION[sidebarMode] ?? TOGGLE_PRESENTATION.expanded;
+  const { t } = useI18n();
+  const togglePresentation = getTogglePresentation(t);
+  const toggle = togglePresentation[sidebarMode] ?? togglePresentation.expanded;
   const ToggleIcon = toggle.Icon;
   const headerClassName = ["page-header", className].filter(Boolean).join(" ");
 

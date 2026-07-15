@@ -11,7 +11,7 @@ import {
   importFileType,
 } from "./importViewUtils";
 import { useI18n } from "../../../i18n";
-import styles from "./ImportViews.module.css";
+import { importViewsStyles as styles } from "../../../themes/classNames";
 
 export default function ImportListView({
   photos = [],

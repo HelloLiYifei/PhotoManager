@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../i18n";
 import { clearWorkspaceCache, getWorkspaceStorageStats } from "../services/settingsService";
 import { selectDirectory } from "../services/workspaceService";
-import { SettingsProvider } from "../settings";
+import { resetDisplayRuntimeForTests, SettingsProvider } from "../settings";
 import { GlobalDialogProvider } from "./ui";
 import SettingsPage from "./SettingsPage";
 
@@ -36,6 +36,7 @@ function renderPage() {
 describe("SettingsPage", () => {
   beforeEach(() => {
     localStorage.clear();
+    resetDisplayRuntimeForTests();
     vi.clearAllMocks();
     getWorkspaceStorageStats.mockResolvedValue({
       photoCount: 12,
@@ -53,8 +54,11 @@ describe("SettingsPage", () => {
   it("updates appearance and language immediately", async () => {
     renderPage();
     await waitFor(() => expect(getWorkspaceStorageStats).toHaveBeenCalled());
-    fireEvent.click(screen.getByRole("button", { name: "浅色" }));
-    expect(document.documentElement).toHaveAttribute("data-theme", "light");
+    fireEvent.click(screen.getByRole("combobox", { name: "主题" }));
+    fireEvent.click(screen.getByRole("option", { name: "浅色" }));
+    await waitFor(() => {
+      expect(document.documentElement).toHaveAttribute("data-theme", "light");
+    });
 
     fireEvent.click(screen.getByRole("combobox", { name: "界面语言" }));
     fireEvent.click(screen.getByRole("option", { name: "English" }));
@@ -112,5 +116,46 @@ describe("SettingsPage", () => {
       cacheMaxMb: 256,
       cacheMaxImages: 2000,
     });
+  });
+
+  it("previews, persists, and individually resets display scales", async () => {
+    renderPage();
+    await waitFor(() => expect(getWorkspaceStorageStats).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole("button", { name: "显示" }));
+
+    const appScale = screen.getByRole("slider", { name: "应用缩放" });
+    const contentScale = screen.getByRole("slider", { name: "照片内容信息文字" });
+    expect(appScale).toHaveAttribute("min", "75");
+    expect(appScale).toHaveAttribute("max", "200");
+    expect(appScale).toHaveAttribute("step", "5");
+
+    fireEvent.change(appScale, { target: { value: "135" } });
+    fireEvent.change(contentScale, { target: { value: "120" } });
+
+    expect(appScale).toHaveValue("135");
+    expect(document.documentElement.style.zoom).not.toBe("1.35");
+
+    await waitFor(() => {
+      expect(document.documentElement.style.getPropertyValue("--text-scale-content"))
+        .toBe("1.2");
+    });
+    let stored = JSON.parse(localStorage.getItem("photomanager-settings-v1"));
+    expect(stored.global.appScale).toBe(100);
+
+    fireEvent.pointerUp(appScale);
+
+    await waitFor(() => {
+      expect(document.documentElement.style.zoom).toBe("1.35");
+    });
+    stored = JSON.parse(localStorage.getItem("photomanager-settings-v1"));
+    expect(stored.global.appScale).toBe(135);
+    expect(stored.global.textScale.content).toBe(120);
+
+    fireEvent.click(screen.getByRole("button", {
+      name: "将照片内容信息文字恢复为 100%",
+    }));
+    await waitFor(() => expect(contentScale).toHaveValue("100"));
+    stored = JSON.parse(localStorage.getItem("photomanager-settings-v1"));
+    expect(stored.global.textScale.content).toBe(100);
   });
 });

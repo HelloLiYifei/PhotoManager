@@ -9,7 +9,7 @@ import {
 import { loadPhotoThumbnail } from "../lib/thumbnailLoader";
 import { useI18n } from "../i18n";
 import { Button, EmptyState, Spinner } from "./ui";
-import styles from "./AlbumsPage.module.css";
+import { albumsPageStyles as styles } from "../themes/classNames";
 
 function AlbumCover({ album }) {
   const { t } = useI18n();

@@ -1,6 +1,6 @@
 import { Image as ImageIcon, Plus, RotateCcw, Star, Tag, X } from "lucide-react";
 import { useI18n } from "../../../i18n";
-import styles from "./PhotoInspector.module.css";
+import { photoInspectorStyles as styles } from "../../../themes/classNames";
 
 function DetailRow({ label, children }) {
   if (children === undefined || children === null || children === "") return null;

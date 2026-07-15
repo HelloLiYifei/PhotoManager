@@ -1,7 +1,7 @@
 import { ThumbnailImage } from "../media";
 import { useI18n } from "../../../i18n";
 import { handlePhotoItemKeyDown } from "./photoItemKeyboard";
-import styles from "./PhotoViews.module.css";
+import { photoViewsStyles as styles } from "../../../themes/classNames";
 
 function getStableAspectRatio(photo) {
   const width = Number(photo.width);

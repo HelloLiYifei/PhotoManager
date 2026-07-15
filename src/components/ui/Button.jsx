@@ -1,6 +1,6 @@
 import { forwardRef } from "react";
 
-import styles from "./Ui.module.css";
+import { uiStyles as styles } from "../../themes/classNames";
 
 const Button = forwardRef(function Button({
   type = "button",

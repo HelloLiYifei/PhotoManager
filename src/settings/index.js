@@ -2,6 +2,7 @@ export {
   CACHE_LIMITS,
   DEFAULT_GLOBAL_SETTINGS,
   DEFAULT_WORKSPACE_SETTINGS,
+  DISPLAY_SCALE_LIMITS,
   DENSITIES,
   LEGACY_IMPORT_VIEW_KEY,
   LEGACY_PHOTO_VIEW_KEY,
@@ -9,6 +10,7 @@ export {
   MOTION_MODES,
   SETTINGS_STORAGE_KEY,
   SettingsProvider,
+  TEXT_SCALE_REGIONS,
   THEMES,
   VIEW_MODES,
   normalizeSettings,
@@ -16,3 +18,8 @@ export {
   useSettings,
   workspaceSettingsKey,
 } from "./SettingsContext";
+export {
+  activateAppScale,
+  applyTextScaleVariables,
+  resetDisplayRuntimeForTests,
+} from "./displayRuntime";

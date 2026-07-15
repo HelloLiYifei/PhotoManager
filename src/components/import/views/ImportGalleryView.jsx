@@ -12,7 +12,7 @@ import {
   handleImportPhotoMouseDown,
   handleImportPhotoMouseEnter,
 } from "./importViewUtils";
-import styles from "./ImportViews.module.css";
+import { importViewsStyles as styles } from "../../../themes/classNames";
 
 function findPhotoIndex(photos, activePath) {
   const index = photos.findIndex((photo) => photo.absolutePath === activePath);

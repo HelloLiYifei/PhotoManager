@@ -18,7 +18,7 @@ import {
   LightboxToolbar,
   useNarrowLightbox,
 } from "./lightbox";
-import styles from "./lightbox/Lightbox.module.css";
+import { lightboxStyles as styles } from "../themes/classNames";
 
 const clampZoom = (value) => Math.min(8, Math.max(0.25, value));
 

@@ -1,7 +1,7 @@
 import { Download, LoaderCircle } from "lucide-react";
 
 import { useI18n } from "../../../i18n";
-import styles from "./ImportControls.module.css";
+import { importControlsStyles as styles } from "../../../themes/classNames";
 
 function percent(copied, total) {
   const safeTotal = Math.max(0, Number(total) || 0);

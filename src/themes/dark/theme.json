@@ -1,0 +1,10 @@
+{
+  "id": "dark",
+  "labels": {
+    "zh-CN": "深色",
+    "en-US": "Dark"
+  },
+  "colorScheme": "dark",
+  "order": 10,
+  "systemDefault": true
+}

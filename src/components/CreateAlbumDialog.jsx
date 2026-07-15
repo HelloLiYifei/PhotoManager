@@ -2,7 +2,7 @@ import { FolderPlus } from "lucide-react";
 
 import { Button, Dialog, Field, Spinner } from "./ui";
 import { useI18n } from "../i18n";
-import styles from "./CreateAlbumDialog.module.css";
+import { createAlbumDialogStyles as styles } from "../themes/classNames";
 
 export default function CreateAlbumDialog({
   open,

@@ -1,7 +1,7 @@
 import { ThumbnailImage } from "../media";
 import { useI18n } from "../../../i18n";
 import { handlePhotoItemKeyDown } from "./photoItemKeyboard";
-import styles from "./PhotoViews.module.css";
+import { photoViewsStyles as styles } from "../../../themes/classNames";
 
 function formatFileSize(bytes) {
   const megabytes = Number(bytes || 0) / (1024 * 1024);

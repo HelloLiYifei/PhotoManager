@@ -18,7 +18,7 @@ import {
 import Button from "./Button";
 import { GlobalDialogContext } from "./globalDialogContext";
 import useOverlayFocus from "./useOverlayFocus";
-import styles from "./GlobalDialog.module.css";
+import { globalDialogStyles as styles } from "../../themes/classNames";
 import { useI18n } from "../../i18n";
 
 const TONE_ICONS = {

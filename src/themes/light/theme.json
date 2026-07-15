@@ -1,0 +1,10 @@
+{
+  "id": "light",
+  "labels": {
+    "zh-CN": "浅色",
+    "en-US": "Light"
+  },
+  "colorScheme": "light",
+  "order": 20,
+  "systemDefault": true
+}

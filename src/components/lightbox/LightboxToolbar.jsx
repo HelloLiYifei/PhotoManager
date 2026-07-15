@@ -15,7 +15,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "../../i18n";
 import { Button } from "../ui";
-import styles from "./Lightbox.module.css";
+import { lightboxStyles as styles } from "../../themes/classNames";
 
 function ImportColorMenu({ albums, targetAlbum, targetColor, disabled, onChange }) {
   const { t } = useI18n();

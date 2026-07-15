@@ -2,7 +2,7 @@ import { Folder, FolderInput } from "lucide-react";
 
 import { useI18n } from "../../../i18n";
 import { Button, Dialog, EmptyState, Spinner } from "../../ui";
-import styles from "./MoveAlbumDialog.module.css";
+import { moveAlbumDialogStyles as styles } from "../../../themes/classNames";
 
 export default function MoveAlbumDialog({
   open,

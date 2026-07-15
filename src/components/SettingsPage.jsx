@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AppWindow,
   Brush,
+  Captions,
   Check,
   Database,
   FolderOpen,
@@ -11,11 +12,14 @@ import {
   Languages,
   LoaderCircle,
   MapPin,
+  Monitor,
+  PanelLeft,
   RefreshCw,
   RotateCcw,
   ScanSearch,
   Settings2,
   Sparkles,
+  Type,
   Trash2,
 } from "lucide-react";
 
@@ -27,13 +31,15 @@ import {
   scanWorkspace,
 } from "../services/settingsService";
 import { selectDirectory } from "../services/workspaceService";
-import { CACHE_LIMITS, useSettings } from "../settings";
+import { CACHE_LIMITS, DISPLAY_SCALE_LIMITS, useSettings } from "../settings";
+import { listThemes } from "../themes";
 import { PageHeader } from "./shell";
 import { Button, Select, useGlobalDialog } from "./ui";
-import styles from "./SettingsPage.module.css";
+import { settingsPageStyles as styles } from "../themes/classNames";
 
 const SECTIONS = [
   { id: "general", labelKey: "settings.general", Icon: Brush },
+  { id: "display", labelKey: "settings.display", Icon: Monitor },
   { id: "library", labelKey: "settings.library", Icon: Images },
   { id: "workspace", labelKey: "settings.workspace", Icon: Database },
   { id: "about", labelKey: "settings.about", Icon: Info },
@@ -120,6 +126,89 @@ function CacheLimitInput({ label, value, minimum, maximum, suffix, onCommit }) {
   );
 }
 
+function ScaleControl({
+  label,
+  value,
+  limits,
+  resetLabel,
+  onChange,
+  commitOnRelease = false,
+}) {
+  const [draft, setDraft] = useState(value);
+  const requestIdRef = useRef(0);
+  const valueRef = useRef(value);
+  const pendingValueRef = useRef(value);
+
+  useEffect(() => {
+    valueRef.current = value;
+    pendingValueRef.current = value;
+    setDraft(value);
+  }, [value]);
+
+  const commitValue = (nextValue) => {
+    const normalized = Number(nextValue);
+    setDraft(normalized);
+
+    if (normalized === pendingValueRef.current) return;
+
+    pendingValueRef.current = normalized;
+    const requestId = ++requestIdRef.current;
+    Promise.resolve(onChange(normalized)).then((changed) => {
+      if (requestId === requestIdRef.current && changed === false) {
+        pendingValueRef.current = valueRef.current;
+        setDraft(valueRef.current);
+      }
+    });
+  };
+
+  const previewValue = (nextValue) => {
+    const normalized = Number(nextValue);
+    setDraft(normalized);
+    if (!commitOnRelease) commitValue(normalized);
+  };
+
+  const cancelPreview = () => {
+    pendingValueRef.current = valueRef.current;
+    setDraft(valueRef.current);
+  };
+
+  return (
+    <div className={styles.scaleControl}>
+      <input
+        type="range"
+        min={limits.minimum}
+        max={limits.maximum}
+        step={limits.step}
+        value={draft}
+        aria-label={label}
+        aria-valuetext={`${draft}%`}
+        onChange={(event) => previewValue(event.target.value)}
+        onPointerUp={commitOnRelease
+          ? (event) => commitValue(event.currentTarget.value)
+          : undefined}
+        onPointerCancel={commitOnRelease ? cancelPreview : undefined}
+        onKeyUp={commitOnRelease
+          ? (event) => commitValue(event.currentTarget.value)
+          : undefined}
+        onBlur={commitOnRelease
+          ? (event) => commitValue(event.currentTarget.value)
+          : undefined}
+      />
+      <output className={styles.scaleValue}>{draft}%</output>
+      <button
+        type="button"
+        className={styles.scaleReset}
+        disabled={draft === 100}
+        aria-label={resetLabel}
+        title={resetLabel}
+        onClick={() => commitValue(100)}
+      >
+        <RotateCcw aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
+
 function Switch({ checked, onChange, label }) {
   return (
     <button
@@ -160,6 +249,11 @@ export default function SettingsPage({
     globalSettings,
     getWorkspaceSettings,
     persistenceError,
+    setTheme,
+    themeError,
+    displayError,
+    setAppScale,
+    setTextScale,
     resetAll,
     updateGlobal,
     updateWorkspace,
@@ -284,14 +378,13 @@ export default function SettingsPage({
       cancelText: t("common.cancel"),
     });
     if (!confirmed) return;
-    resetAll();
-    announceSaved(t("settings.resetDone"));
+    if (await resetAll()) announceSaved(t("settings.resetDone"));
   };
 
-  const themeOptions = ["system", "dark", "light"].map((value) => ({
-    value,
-    label: t(`settings.theme.${value}`),
-  }));
+  const themeOptions = [
+    { value: "system", label: t("settings.theme.system") },
+    ...listThemes(globalSettings.locale),
+  ];
   const densityOptions = ["comfortable", "compact"].map((value) => ({
     value,
     label: t(`settings.density.${value}`),
@@ -343,6 +436,16 @@ export default function SettingsPage({
               {t("settings.persistenceError")}
             </div>
           ) : null}
+          {themeError ? (
+            <div className={styles.warning} role="alert">
+              {t("settings.themeLoadError", { message: themeError })}
+            </div>
+          ) : null}
+          {displayError ? (
+            <div className={styles.warning} role="alert">
+              {t("settings.displayApplyError", { message: displayError })}
+            </div>
+          ) : null}
 
           {activeSection === "general" ? (
             <section className={styles.card} aria-labelledby="settings-general-heading">
@@ -367,13 +470,117 @@ export default function SettingsPage({
                 />
               </SettingRow>
               <SettingRow icon={Brush} title={t("settings.theme")} description={t("settings.themeDescription")}>
-                <SegmentedControl label={t("settings.theme")} value={globalSettings.theme} options={themeOptions} onChange={(theme) => changeGlobal({ theme })} />
+                <Select
+                  wrapperClassName={styles.themeSelect}
+                  value={globalSettings.theme}
+                  options={themeOptions}
+                  aria-label={t("settings.theme")}
+                  onChange={(theme) => {
+                    void setTheme(theme).then((changed) => {
+                      if (changed) announceSaved();
+                    });
+                  }}
+                />
               </SettingRow>
               <SettingRow icon={AppWindow} title={t("settings.density")} description={t("settings.densityDescription")}>
                 <SegmentedControl label={t("settings.density")} value={globalSettings.density} options={densityOptions} onChange={(density) => changeGlobal({ density })} />
               </SettingRow>
               <SettingRow icon={Sparkles} title={t("settings.motion")} description={t("settings.motionDescription")}>
                 <SegmentedControl label={t("settings.motion")} value={globalSettings.motion} options={motionOptions} onChange={(motion) => changeGlobal({ motion })} />
+              </SettingRow>
+            </section>
+          ) : null}
+
+          {activeSection === "display" ? (
+            <section className={styles.card} aria-labelledby="settings-display-heading">
+              <header className={styles.cardHeader}>
+                <Monitor aria-hidden="true" />
+                <h2 id="settings-display-heading">{t("settings.display")}</h2>
+              </header>
+              <SettingRow
+                icon={Monitor}
+                title={t("settings.appScale")}
+                description={t("settings.appScaleDescription")}
+              >
+                <ScaleControl
+                  label={t("settings.appScale")}
+                  value={globalSettings.appScale}
+                  limits={DISPLAY_SCALE_LIMITS.app}
+                  resetLabel={t("settings.scaleReset", { name: t("settings.appScale") })}
+                  commitOnRelease
+                  onChange={(appScale) => setAppScale(appScale).then((changed) => {
+                    if (changed) announceSaved();
+                    return changed;
+                  })}
+                />
+              </SettingRow>
+              <SettingRow
+                icon={PanelLeft}
+                title={t("settings.textScale.navigation")}
+                description={t("settings.textScale.navigationDescription")}
+              >
+                <ScaleControl
+                  label={t("settings.textScale.navigation")}
+                  value={globalSettings.textScale.navigation}
+                  limits={DISPLAY_SCALE_LIMITS.text}
+                  resetLabel={t("settings.scaleReset", { name: t("settings.textScale.navigation") })}
+                  onChange={(value) => {
+                    const changed = setTextScale("navigation", value);
+                    if (changed) announceSaved();
+                    return changed;
+                  }}
+                />
+              </SettingRow>
+              <SettingRow
+                icon={Type}
+                title={t("settings.textScale.header")}
+                description={t("settings.textScale.headerDescription")}
+              >
+                <ScaleControl
+                  label={t("settings.textScale.header")}
+                  value={globalSettings.textScale.header}
+                  limits={DISPLAY_SCALE_LIMITS.text}
+                  resetLabel={t("settings.scaleReset", { name: t("settings.textScale.header") })}
+                  onChange={(value) => {
+                    const changed = setTextScale("header", value);
+                    if (changed) announceSaved();
+                    return changed;
+                  }}
+                />
+              </SettingRow>
+              <SettingRow
+                icon={Captions}
+                title={t("settings.textScale.content")}
+                description={t("settings.textScale.contentDescription")}
+              >
+                <ScaleControl
+                  label={t("settings.textScale.content")}
+                  value={globalSettings.textScale.content}
+                  limits={DISPLAY_SCALE_LIMITS.text}
+                  resetLabel={t("settings.scaleReset", { name: t("settings.textScale.content") })}
+                  onChange={(value) => {
+                    const changed = setTextScale("content", value);
+                    if (changed) announceSaved();
+                    return changed;
+                  }}
+                />
+              </SettingRow>
+              <SettingRow
+                icon={AppWindow}
+                title={t("settings.textScale.detail")}
+                description={t("settings.textScale.detailDescription")}
+              >
+                <ScaleControl
+                  label={t("settings.textScale.detail")}
+                  value={globalSettings.textScale.detail}
+                  limits={DISPLAY_SCALE_LIMITS.text}
+                  resetLabel={t("settings.scaleReset", { name: t("settings.textScale.detail") })}
+                  onChange={(value) => {
+                    const changed = setTextScale("detail", value);
+                    if (changed) announceSaved();
+                    return changed;
+                  }}
+                />
               </SettingRow>
             </section>
           ) : null}

@@ -1,6 +1,6 @@
 import { GalleryHorizontal, Grid3X3, List } from "lucide-react";
 import { useI18n } from "../../i18n";
-import styles from "./ViewSwitcher.module.css";
+import { viewSwitcherStyles as styles } from "../../themes/classNames";
 
 export const DEFAULT_VIEW_OPTIONS = Object.freeze([
   { value: "masonry", label: "瀑布流", Icon: Grid3X3 },

@@ -3,7 +3,7 @@ import { Search, SlidersHorizontal, X } from "lucide-react";
 import { useI18n } from "../../../i18n";
 import ViewSwitcher from "../../shared/ViewSwitcher";
 import { Select } from "../../ui";
-import styles from "./TimelineToolbar.module.css";
+import { timelineToolbarStyles as styles } from "../../../themes/classNames";
 
 function FilterFields({
   allTags,

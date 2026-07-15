@@ -1,6 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import "./App.css";
-
 import AlbumsPage from "./components/AlbumsPage";
 import CreateAlbumDialog from "./components/CreateAlbumDialog";
 import ImportWizard from "./components/ImportWizard";

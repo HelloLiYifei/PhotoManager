@@ -1,0 +1,59 @@
+.pm-view-switcher-switcher {
+  display: inline-flex;
+  min-width: 0;
+  padding: 3px;
+  align-items: center;
+  gap: 2px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-color);
+  border-radius: 9px;
+}
+
+.pm-view-switcher-switcher button {
+  display: inline-flex;
+  min-width: 36px;
+  height: 30px;
+  padding: 0 8px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.pm-view-switcher-switcher button:hover {
+  color: var(--text-main);
+  background: var(--bg-hover);
+}
+
+.pm-view-switcher-switcher button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.pm-view-switcher-switcher button.pm-view-switcher-active {
+  color: #fff;
+  background: var(--primary-start);
+}
+
+.pm-view-switcher-switcher svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
+.pm-view-switcher-switcher span {
+  font-size: var(--font-size-xs);
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .pm-view-switcher-switcher span {
+    display: none;
+  }
+}
+

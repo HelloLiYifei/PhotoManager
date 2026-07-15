@@ -1,4 +1,3 @@
-import "./Shell.css";
 import { useI18n } from "../../i18n";
 
 const SIDEBAR_MODES = new Set(["expanded", "collapsed", "overlay"]);

@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 
-import styles from "./Ui.module.css";
+import { uiStyles as styles } from "../../themes/classNames";
 
 function sameValue(left, right) {
   return String(left) === String(right);

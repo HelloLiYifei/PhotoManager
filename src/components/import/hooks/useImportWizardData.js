@@ -8,8 +8,16 @@ import {
   scanCard,
 } from "../../../services/importService";
 import { selectDirectory } from "../../../services/workspaceService";
+import {
+  createImportDraft,
+  DEFAULT_IMPORT_ALBUM_NAME,
+  findImportDraft,
+  removeImportDraft,
+  restoreImportDraft,
+  saveImportDraft,
+} from "./importDraftStorage";
 
-export const DEFAULT_IMPORT_ALBUM_NAME = "默认相册";
+export { DEFAULT_IMPORT_ALBUM_NAME } from "./importDraftStorage";
 
 const NOOP = () => {};
 
@@ -58,6 +66,8 @@ export default function useImportWizardData({
   autoSelectDetectedSource = true,
   initialBackupPath = "",
   initialAttachCurrentLocation = true,
+  draftScope = "default",
+  draftStorage,
 } = {}) {
   const [cards, setCards] = useState([]);
   const [detectingCards, setDetectingCards] = useState(true);
@@ -98,6 +108,8 @@ export default function useImportWizardData({
   const alreadyImportedPathsRef = useRef(new Set());
   const submissionLockRef = useRef(false);
   const submissionRequestRef = useRef(0);
+  const activeDraftRef = useRef(null);
+  const draftDirtyRef = useRef(false);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -122,6 +134,7 @@ export default function useImportWizardData({
   alreadyImportedPathsRef.current = alreadyImportedPaths;
 
   const setSelectedPaths = useCallback((nextValue) => {
+    draftDirtyRef.current = true;
     setSelectedPathsState((current) => {
       const nextPaths = typeof nextValue === "function"
         ? nextValue(current)
@@ -131,6 +144,7 @@ export default function useImportWizardData({
   }, []);
 
   const setPhotoAlbums = useCallback((nextValue) => {
+    draftDirtyRef.current = true;
     setPhotoAlbumsState((current) => {
       const nextAlbums = typeof nextValue === "function"
         ? nextValue(current)
@@ -149,6 +163,27 @@ export default function useImportWizardData({
   );
 
   const importedCount = alreadyImportedPaths.size;
+
+  const persistCurrentDraft = useCallback(() => {
+    const draft = createImportDraft({
+      scope: draftScope,
+      sourcePath,
+      photos,
+      selectedPaths: selectedPathsState,
+      photoAlbums: photoAlbumsState,
+    });
+    if (!draft) return null;
+    if (saveImportDraft(draftStorage, draft)) {
+      activeDraftRef.current = draft;
+      draftDirtyRef.current = false;
+    }
+    return draft;
+  }, [draftScope, draftStorage, photoAlbumsState, photos, selectedPathsState, sourcePath]);
+
+  useEffect(() => {
+    if (!draftDirtyRef.current || photos.length === 0) return;
+    persistCurrentDraft();
+  }, [photoAlbumsState, photos.length, persistCurrentDraft, selectedPathsState]);
 
   const reloadAlbums = useCallback(async () => {
     const requestId = ++albumsRequestRef.current;
@@ -183,6 +218,8 @@ export default function useImportWizardData({
     alreadyImportedPathsRef.current = new Set();
     setSelectedPathsState([]);
     setPhotoAlbumsState({});
+    activeDraftRef.current = null;
+    draftDirtyRef.current = false;
     setScanError(null);
 
     if (!nextPath) {
@@ -207,10 +244,44 @@ export default function useImportWizardData({
         .filter((photo) => !photo.alreadyImported)
         .map((photo) => photo.absolutePath);
 
+      let nextSelectedPaths = freshPaths;
+      let nextPhotoAlbums = {};
+      const savedDraft = findImportDraft(draftStorage, {
+        scope: draftScope,
+        photos: nextPhotos,
+      });
+      if (savedDraft) {
+        const restored = restoreImportDraft(savedDraft, nextPhotos);
+        if (restored.selectedPaths.length > 0) {
+          const shouldResume = await confirmAction(
+            `检测到这张存储卡上次未完成的涂色记录，仍有 ${restored.selectedPaths.length} 张照片待导入。是否恢复上次涂色并继续？`,
+            {
+              title: "继续上次导入",
+              confirmText: "恢复涂色",
+              cancelText: "重新开始",
+            },
+          );
+          if (!mountedRef.current || requestId !== scanRequestRef.current) {
+            return null;
+          }
+          if (shouldResume) {
+            nextSelectedPaths = restored.selectedPaths;
+            nextPhotoAlbums = restored.photoAlbums;
+            activeDraftRef.current = savedDraft;
+          } else {
+            removeImportDraft(draftStorage, savedDraft);
+          }
+        } else {
+          nextSelectedPaths = [];
+          removeImportDraft(draftStorage, savedDraft);
+        }
+      }
+
       alreadyImportedPathsRef.current = importedPaths;
       setPhotos(nextPhotos);
-      setSelectedPathsState(uniqueImportablePaths(freshPaths, importedPaths));
-      setPhotoAlbumsState({});
+      setSelectedPathsState(uniqueImportablePaths(nextSelectedPaths, importedPaths));
+      setPhotoAlbumsState(nextPhotoAlbums);
+      draftDirtyRef.current = false;
       return nextPhotos;
     } catch (error) {
       if (mountedRef.current && requestId === scanRequestRef.current) {
@@ -222,7 +293,7 @@ export default function useImportWizardData({
         setScanning(false);
       }
     }
-  }, []);
+  }, [confirmAction, draftScope, draftStorage]);
 
   const browseSource = useCallback(async () => {
     try {
@@ -408,6 +479,8 @@ export default function useImportWizardData({
         return { status: "empty" };
       }
 
+      const submittedDraft = persistCurrentDraft();
+
       let importLocation = null;
       if (attachCurrentLocationState) {
         try {
@@ -450,6 +523,14 @@ export default function useImportWizardData({
         currentLocation: attachCurrentLocationState ? importLocation : null,
       });
 
+      if (count !== safePaths.length) {
+        throw new Error(`导入未完整完成：计划 ${safePaths.length} 张，实际完成 ${count} 张。请重新插入存储卡后继续。`);
+      }
+
+      draftDirtyRef.current = false;
+      removeImportDraft(draftStorage, submittedDraft || activeDraftRef.current);
+      activeDraftRef.current = null;
+
       if (submissionCancelled()) return { status: "complete", count };
 
       await notify(`导入成功！共复制并注册了 ${count} 张照片。`);
@@ -480,6 +561,8 @@ export default function useImportWizardData({
     onClose,
     onImportComplete,
     photoAlbumsState,
+    draftStorage,
+    persistCurrentDraft,
     requestCurrentLocation,
     selectedImportPaths,
   ]);

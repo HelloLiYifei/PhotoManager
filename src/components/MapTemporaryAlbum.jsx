@@ -3,7 +3,7 @@ import { ArrowLeft, MapPinned } from "lucide-react";
 import { useI18n } from "../i18n";
 import { Button } from "./ui";
 import TimelineGrid from "./TimelineGrid";
-import styles from "./MapTemporaryAlbum.module.css";
+import { mapTemporaryAlbumStyles as styles } from "../themes/classNames";
 
 export default function MapTemporaryAlbum({
   workspace,

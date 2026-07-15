@@ -177,9 +177,15 @@ describe("TimelineGrid phase-three integration", () => {
     expect(screen.queryByRole("button", { name: "图标视图" })).not.toBeInTheDocument();
 
     fireEvent.keyDown(first, { key: " " });
-    expect(await screen.findByRole("complementary", { name: "照片属性面板" })).toBeInTheDocument();
+    expect(screen.queryByRole("complementary", { name: "照片属性面板" })).not.toBeInTheDocument();
+    expect(screen.getByText("已选择 1 张照片")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "属性" }));
+    const inspector = await screen.findByRole("complementary", { name: "照片属性面板" });
+    expect(container.querySelector(".pm-timeline-grid-content")?.lastElementChild)
+      .toBe(inspector);
     fireEvent.keyDown(second, { key: " ", ctrlKey: true });
     expect(screen.getByText("已选择 2 张照片")).toBeInTheDocument();
+    expect(screen.getByRole("complementary", { name: "照片属性面板" })).toBeInTheDocument();
     await screen.findByRole("button", { name: "删除标签 树林" });
     fireEvent.click(screen.getByRole("button", { name: "关闭照片属性面板" }));
     expect(screen.queryByRole("complementary", { name: "照片属性面板" })).not.toBeInTheDocument();
@@ -211,6 +217,7 @@ describe("TimelineGrid phase-three integration", () => {
   it("wires rating and every normal-view batch operation", async () => {
     renderTimeline();
     fireEvent.click(await screen.findByRole("gridcell", { name: "海边.jpg" }), { detail: 1 });
+    fireEvent.click(screen.getByRole("button", { name: "属性" }));
 
     fireEvent.click(screen.getByRole("button", { name: "设为 5 星" }));
     await waitFor(() => expect(mocks.updateRating).toHaveBeenCalledWith({ id: "photo-1", rating: 5 }));
@@ -257,6 +264,7 @@ describe("TimelineGrid phase-three integration", () => {
   it("keeps the photo inspector open when rating triggers a refresh", async () => {
     render(<RefreshingTimeline />);
     fireEvent.click(await screen.findByRole("gridcell", { name: "海边.jpg" }), { detail: 1 });
+    fireEvent.click(screen.getByRole("button", { name: "属性" }));
 
     fireEvent.click(screen.getByRole("button", { name: "设为 5 星" }));
 

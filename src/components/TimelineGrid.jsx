@@ -22,31 +22,9 @@ import { GalleryView, ListView, MasonryView } from "./timeline/views";
 import { useGlobalDialog } from "./ui";
 import { timelineGridStyles as styles } from "../themes/classNames";
 
-const NARROW_TIMELINE_QUERY = "(max-width: 900px)";
-
 function errorMessage(error) {
   if (!error) return "";
   return error instanceof Error ? error.message : String(error);
-}
-
-function readNarrowTimeline() {
-  return typeof window.matchMedia === "function" &&
-    window.matchMedia(NARROW_TIMELINE_QUERY).matches;
-}
-
-function useNarrowTimeline() {
-  const [isNarrow, setIsNarrow] = useState(readNarrowTimeline);
-
-  useEffect(() => {
-    if (typeof window.matchMedia !== "function") return undefined;
-    const mediaQuery = window.matchMedia(NARROW_TIMELINE_QUERY);
-    const handleChange = (event) => setIsNarrow(event.matches);
-    setIsNarrow(mediaQuery.matches);
-    mediaQuery.addEventListener?.("change", handleChange);
-    return () => mediaQuery.removeEventListener?.("change", handleChange);
-  }, []);
-
-  return isNarrow;
 }
 
 export default function TimelineGrid({
@@ -74,7 +52,6 @@ export default function TimelineGrid({
   const [moveBusy, setMoveBusy] = useState(false);
   const [moveError, setMoveError] = useState(null);
   const gridScrollRef = useRef(null);
-  const isNarrow = useNarrowTimeline();
   const indexedPhotoIdSet = useMemo(
     () => Array.isArray(indexedPhotoIds)
       ? new Set(indexedPhotoIds.map((id) => String(id)))
@@ -136,8 +113,8 @@ export default function TimelineGrid({
   const primaryPhotoId = primaryPhoto?.id;
 
   useEffect(() => {
-    setInspectorOpen(Boolean(primaryPhotoId) && !isNarrow);
-  }, [isNarrow, primaryPhotoId]);
+    if (!primaryPhotoId) setInspectorOpen(false);
+  }, [primaryPhotoId]);
 
   useEffect(() => {
     clearSelection();

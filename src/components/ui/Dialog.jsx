@@ -4,7 +4,7 @@ import { X } from "lucide-react";
 import { useI18n } from "../../i18n";
 import Button from "./Button";
 import useOverlayFocus from "./useOverlayFocus";
-import styles from "./Ui.module.css";
+import { uiStyles as styles } from "../../themes/classNames";
 
 export default function Dialog({
   open = false,

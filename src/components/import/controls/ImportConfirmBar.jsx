@@ -1,14 +1,15 @@
 import { Brush, Download, Eraser } from "lucide-react";
 
+import { DEFAULT_BRUSH_COLOR } from "../../../content/contentColors";
 import { useI18n } from "../../../i18n";
-import styles from "./ImportControls.module.css";
+import { importControlsStyles as styles } from "../../../themes/classNames";
 
 export default function ImportConfirmBar({
   selectedCount = 0,
   totalCount = 0,
   importedCount = 0,
   activeBrush = "",
-  brushColor = "#4f8cff",
+  brushColor = DEFAULT_BRUSH_COLOR,
   importing = false,
   scanning = false,
   disabled = false,

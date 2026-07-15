@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 
 import { useI18n } from "../../../i18n";
-import styles from "./ImportControls.module.css";
+import { importControlsStyles as styles } from "../../../themes/classNames";
 
 export default function SourceConfig({
   sourcePath = "",

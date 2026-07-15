@@ -1,0 +1,845 @@
+.pm-import-controls-section,
+.pm-import-controls-configuration-panel,
+.pm-import-controls-preview-toolbar,
+.pm-import-controls-confirm-bar,
+.pm-import-controls-progress-card {
+  box-sizing: border-box;
+  color: var(--text-main);
+}
+
+.pm-import-controls-section {
+  padding: var(--space-3);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+}
+
+.pm-import-controls-growing-section {
+  display: flex;
+  min-height: 184px;
+  flex: 1 0 184px;
+  flex-direction: column;
+}
+
+.pm-import-controls-section-heading,
+.pm-import-controls-section-heading-row,
+.pm-import-controls-subheading-row,
+.pm-import-controls-input-action-row,
+.pm-import-controls-scan-status,
+.pm-import-controls-location-status,
+.pm-import-controls-preview-toolbar,
+.pm-import-controls-preview-controls,
+.pm-import-controls-filter-buttons,
+.pm-import-controls-confirm-bar,
+.pm-import-controls-confirm-shortcuts,
+.pm-import-controls-progress-heading {
+  display: flex;
+  align-items: center;
+}
+
+.pm-import-controls-section-heading {
+  min-width: 0;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.pm-import-controls-section-heading-row,
+.pm-import-controls-subheading-row,
+.pm-import-controls-preview-toolbar,
+.pm-import-controls-progress-heading {
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.pm-import-controls-section-heading h3,
+.pm-import-controls-section-heading p,
+.pm-import-controls-configuration-header h2,
+.pm-import-controls-configuration-header p,
+.pm-import-controls-progress-card p {
+  margin: 0;
+}
+
+.pm-import-controls-section-heading h3 {
+  font-size: var(--font-size-sm);
+}
+
+.pm-import-controls-section-heading p,
+.pm-import-controls-configuration-header p,
+.pm-import-controls-help-text,
+.pm-import-controls-compact-hint,
+.pm-import-controls-muted-status,
+.pm-import-controls-scan-status small,
+.pm-import-controls-location-status small,
+.pm-import-controls-preview-stats span,
+.pm-import-controls-confirm-stats span,
+.pm-import-controls-progress-card p {
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  line-height: 1.45;
+}
+
+.pm-import-controls-section-icon,
+.pm-import-controls-progress-icon {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-color);
+  background: var(--accent-muted);
+  border-radius: var(--radius-md);
+}
+
+.pm-import-controls-section-icon svg,
+.pm-import-controls-progress-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.pm-import-controls-field {
+  margin-top: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+}
+
+.pm-import-controls-field input,
+.pm-import-controls-field select,
+.pm-import-controls-input-action-row button,
+.pm-import-controls-choice-list button,
+.pm-import-controls-text-button,
+.pm-import-controls-icon-text-button,
+.pm-import-controls-brush-choice,
+.pm-import-controls-location-status button,
+.pm-import-controls-filter-buttons button,
+.pm-import-controls-confirm-shortcuts button,
+.pm-import-controls-import-button,
+.pm-import-controls-configuration-trigger,
+.pm-import-controls-configuration-header button {
+  color: var(--text-main);
+  font: inherit;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  outline: none;
+}
+
+.pm-import-controls-field input,
+.pm-import-controls-field select {
+  width: 100%;
+  height: 36px;
+  box-sizing: border-box;
+  padding: 0 10px;
+  background: var(--bg-main);
+  font-size: var(--font-size-xs);
+}
+
+.pm-import-controls-input-action-row {
+  min-width: 0;
+  gap: 6px;
+}
+
+.pm-import-controls-input-action-row input {
+  min-width: 0;
+  flex: 1;
+}
+
+.pm-import-controls-input-action-row button,
+.pm-import-controls-location-status button {
+  min-height: 36px;
+  padding: 0 10px;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
+  background: var(--bg-elevated);
+  cursor: pointer;
+  font-size: var(--font-size-xs);
+}
+
+.pm-import-controls-input-action-row button svg,
+.pm-import-controls-text-button svg,
+.pm-import-controls-icon-text-button svg,
+.pm-import-controls-location-status button svg,
+.pm-import-controls-filter-buttons button svg,
+.pm-import-controls-confirm-shortcuts button svg,
+.pm-import-controls-import-button svg,
+.pm-import-controls-configuration-trigger svg,
+.pm-import-controls-configuration-header button svg {
+  width: 15px;
+  height: 15px;
+}
+
+.pm-import-controls-subheading-row {
+  margin-top: var(--space-3);
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+}
+
+.pm-import-controls-text-button,
+.pm-import-controls-icon-text-button {
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--accent-color);
+  background: transparent;
+  border-color: transparent;
+  cursor: pointer;
+  font-size: var(--font-size-xs);
+}
+
+.pm-import-controls-choice-list,
+.pm-import-controls-brush-list {
+  margin-top: var(--space-2);
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pm-import-controls-choice-list button,
+.pm-import-controls-brush-choice {
+  width: 100%;
+  min-height: 38px;
+  padding: 6px 9px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  text-align: left;
+  background: var(--bg-main);
+  cursor: pointer;
+}
+
+.pm-import-controls-choice-list button > svg {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+  color: var(--text-muted);
+}
+
+.pm-import-controls-choice-list button > span {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.pm-import-controls-choice-list strong,
+.pm-import-controls-choice-list small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pm-import-controls-choice-list strong {
+  font-size: var(--font-size-xs);
+}
+
+.pm-import-controls-choice-list small {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.pm-import-controls-choice-list button.pm-import-controls-active-choice {
+  background: var(--accent-muted);
+  border-color: var(--accent-color);
+}
+
+.pm-import-controls-muted-status {
+  margin: var(--space-2) 0 0;
+}
+
+.pm-import-controls-scan-status,
+.pm-import-controls-location-status {
+  min-height: 36px;
+  margin-top: var(--space-2);
+  padding: 6px var(--space-2);
+  align-items: center;
+  gap: var(--space-2);
+  background: var(--bg-main);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.pm-import-controls-scan-status > svg,
+.pm-import-controls-location-status > svg {
+  width: 16px;
+  height: 16px;
+  margin-top: 0;
+  flex: 0 0 auto;
+  color: var(--accent-color);
+}
+
+.pm-import-controls-scan-status > span,
+.pm-import-controls-location-status > span {
+  min-width: 0;
+  display: flex;
+  flex: 1;
+  align-items: baseline;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.pm-import-controls-scan-status strong,
+.pm-import-controls-location-status strong {
+  flex: 0 0 auto;
+  font-size: var(--font-size-xs);
+}
+
+.pm-import-controls-scan-status small,
+.pm-import-controls-location-status small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pm-import-controls-error-status,
+.pm-import-controls-location-error {
+  color: #fecaca;
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.pm-import-controls-error-status > svg,
+.pm-import-controls-location-error > svg {
+  color: #f87171;
+}
+
+.pm-import-controls-location-ready {
+  border-color: rgba(16, 185, 129, 0.34);
+}
+
+.pm-import-controls-location-ready > svg {
+  color: #34d399;
+}
+
+.pm-import-controls-spinner {
+  animation: import-controls-import-control-spin 900ms linear infinite;
+}
+
+.pm-import-controls-section-heading-row {
+  align-items: flex-start;
+}
+
+.pm-import-controls-help-text {
+  margin: var(--space-3) 0 0;
+}
+
+.pm-import-controls-compact-hint {
+  margin: var(--space-2) 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pm-import-controls-brush-list {
+  padding-right: 2px;
+  min-height: 112px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.pm-import-controls-brush-choice {
+  justify-content: space-between;
+  border-color: color-mix(in srgb, var(--brush-color) 22%, var(--border-color));
+}
+
+.pm-import-controls-brush-choice:hover:not(:disabled) {
+  border-color: var(--brush-color);
+}
+
+.pm-import-controls-brush-choice.pm-import-controls-active-brush {
+  color: #fff;
+  background: color-mix(in srgb, var(--brush-color) 78%, #111827);
+  border-color: var(--brush-color);
+}
+
+.pm-import-controls-brush-name,
+.pm-import-controls-brush-choice small {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.pm-import-controls-brush-name {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--font-size-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pm-import-controls-brush-choice small {
+  flex: 0 0 auto;
+  font-size: 10px;
+}
+
+.pm-import-controls-brush-choice small svg {
+  width: 12px;
+  height: 12px;
+}
+
+.pm-import-controls-color-dot {
+  width: 10px;
+  height: 10px;
+  display: inline-block;
+  flex: 0 0 auto;
+  background: var(--brush-color);
+  border: 1px solid var(--border-hover);
+  border-radius: 999px;
+}
+
+.pm-import-controls-switch-row {
+  margin-top: var(--space-3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.pm-import-controls-switch-row > span {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.pm-import-controls-switch-row strong {
+  font-size: var(--font-size-xs);
+}
+
+.pm-import-controls-switch-row small {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.pm-import-controls-switch-row input {
+  width: 34px;
+  height: 18px;
+  accent-color: var(--primary-start);
+}
+
+.pm-import-controls-configuration-root {
+  width: 320px;
+  min-width: 320px;
+  height: 100%;
+  min-height: 0;
+  flex: 0 0 320px;
+}
+
+.pm-import-controls-configuration-panel {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border-color);
+}
+
+.pm-import-controls-configuration-header {
+  min-height: 52px;
+  box-sizing: border-box;
+  padding: var(--space-3) var(--space-4);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.pm-import-controls-configuration-header h2 {
+  font-size: var(--font-size-md);
+}
+
+.pm-import-controls-configuration-header p {
+  margin-top: 3px;
+}
+
+.pm-import-controls-configuration-header button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.pm-import-controls-configuration-content {
+  min-height: 0;
+  padding: var(--space-2);
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-2);
+  overflow-y: auto;
+}
+
+.pm-import-controls-configuration-content > .pm-import-controls-section:not(.pm-import-controls-growing-section) {
+  flex: 0 0 auto;
+}
+
+.pm-import-controls-configuration-trigger,
+.pm-import-controls-configuration-scrim {
+  display: none;
+}
+
+.pm-import-controls-preview-toolbar {
+  padding: var(--space-3);
+  flex-wrap: wrap;
+  background: var(--header-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(16px);
+  box-shadow: var(--shadow-control);
+}
+
+.pm-import-controls-preview-stats,
+.pm-import-controls-confirm-stats {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.pm-import-controls-preview-stats strong,
+.pm-import-controls-confirm-stats strong {
+  font-size: var(--font-size-sm);
+}
+
+.pm-import-controls-preview-controls {
+  min-width: 0;
+  gap: var(--space-2);
+}
+
+.pm-import-controls-filter-buttons {
+  gap: 5px;
+}
+
+.pm-import-controls-filter-buttons button,
+.pm-import-controls-confirm-shortcuts button {
+  min-height: 32px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-muted);
+  background: var(--bg-main);
+  cursor: pointer;
+  font-size: var(--font-size-xs);
+  white-space: nowrap;
+}
+
+.pm-import-controls-filter-buttons button small {
+  min-width: 18px;
+  padding: 1px 5px;
+  color: var(--text-main);
+  background: var(--bg-subtle);
+  border-radius: 999px;
+}
+
+.pm-import-controls-filter-buttons button.pm-import-controls-pressed-button {
+  color: #fff;
+  background: var(--primary-start);
+  border-color: var(--primary-start);
+}
+
+.pm-import-controls-confirm-bar {
+  position: absolute;
+  z-index: 110;
+  right: var(--space-4);
+  bottom: var(--space-4);
+  left: calc(320px + var(--space-4));
+  min-height: 58px;
+  padding: 8px 10px 8px var(--space-4);
+  justify-content: center;
+  gap: var(--space-3);
+  background: color-mix(in srgb, var(--bg-elevated) 97%, transparent);
+  border: 1px solid var(--border-hover);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-elevated);
+  backdrop-filter: blur(18px);
+}
+
+.pm-import-controls-confirm-stats {
+  margin-right: auto;
+  flex: 0 0 auto;
+}
+
+.pm-import-controls-confirm-shortcuts {
+  min-width: 0;
+  gap: 5px;
+}
+
+.pm-import-controls-confirm-shortcuts button:first-child .pm-import-controls-color-dot {
+  background: var(--brush-color);
+}
+
+.pm-import-controls-import-button {
+  min-height: 40px;
+  padding: 0 var(--space-4);
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  color: #fff;
+  background: var(--primary-start);
+  border-color: var(--primary-start);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.pm-import-controls-progress-backdrop {
+  position: fixed;
+  z-index: 1500;
+  inset: 0;
+  padding: var(--space-4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--overlay-scrim);
+  backdrop-filter: blur(7px);
+}
+
+.pm-import-controls-progress-card {
+  width: min(500px, 100%);
+  padding: var(--space-5);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-elevated);
+}
+
+.pm-import-controls-progress-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.pm-import-controls-progress-heading span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-sm);
+}
+
+.pm-import-controls-progress-heading svg {
+  width: 15px;
+  height: 15px;
+}
+
+.pm-import-controls-progress-heading strong {
+  flex: 0 0 auto;
+  font-size: var(--font-size-sm);
+}
+
+.pm-import-controls-progress-track {
+  height: 8px;
+  margin: var(--space-3) 0 var(--space-2);
+  overflow: hidden;
+  background: var(--bg-main);
+  border-radius: 999px;
+}
+
+.pm-import-controls-progress-track > span {
+  height: 100%;
+  display: block;
+  background: linear-gradient(90deg, var(--primary-start), var(--accent-color));
+  border-radius: inherit;
+  transition: width var(--transition-fast);
+}
+
+.pm-import-controls-progress-card p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pm-import-controls-field input:hover:not(:disabled),
+.pm-import-controls-field select:hover:not(:disabled),
+.pm-import-controls-choice-list button:hover:not(:disabled),
+.pm-import-controls-input-action-row button:hover:not(:disabled),
+.pm-import-controls-filter-buttons button:hover:not(:disabled),
+.pm-import-controls-confirm-shortcuts button:hover:not(:disabled),
+.pm-import-controls-configuration-header button:hover:not(:disabled) {
+  border-color: var(--border-hover);
+}
+
+.pm-import-controls-field input:focus-visible,
+.pm-import-controls-field select:focus-visible,
+.pm-import-controls-input-action-row button:focus-visible,
+.pm-import-controls-choice-list button:focus-visible,
+.pm-import-controls-text-button:focus-visible,
+.pm-import-controls-icon-text-button:focus-visible,
+.pm-import-controls-brush-choice:focus-visible,
+.pm-import-controls-location-status button:focus-visible,
+.pm-import-controls-filter-buttons button:focus-visible,
+.pm-import-controls-confirm-shortcuts button:focus-visible,
+.pm-import-controls-import-button:focus-visible,
+.pm-import-controls-configuration-trigger:focus-visible,
+.pm-import-controls-configuration-header button:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+
+.pm-import-controls-field input:disabled,
+.pm-import-controls-field select:disabled,
+.pm-import-controls-input-action-row button:disabled,
+.pm-import-controls-choice-list button:disabled,
+.pm-import-controls-text-button:disabled,
+.pm-import-controls-icon-text-button:disabled,
+.pm-import-controls-brush-choice:disabled,
+.pm-import-controls-location-status button:disabled,
+.pm-import-controls-filter-buttons button:disabled,
+.pm-import-controls-confirm-shortcuts button:disabled,
+.pm-import-controls-import-button:disabled,
+.pm-import-controls-configuration-trigger:disabled,
+.pm-import-controls-configuration-header button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+@media (max-width: 900px) {
+  .pm-import-controls-configuration-root {
+    position: absolute;
+    z-index: 690;
+    inset: 0 auto 0 0;
+    width: 0;
+    min-width: 0;
+    height: 100%;
+    flex-basis: 0;
+    overflow: visible;
+    pointer-events: none;
+  }
+
+  .pm-import-controls-configuration-panel {
+    position: fixed;
+    z-index: 710;
+    inset: 0 auto 0 0;
+    width: min(360px, 88vw);
+    display: none;
+    border-right: 1px solid var(--border-color);
+    box-shadow: var(--shadow-elevated);
+    pointer-events: auto;
+  }
+
+  .pm-import-controls-configuration-open .pm-import-controls-configuration-panel {
+    display: flex;
+  }
+
+  .pm-import-controls-configuration-header button {
+    display: inline-flex;
+  }
+
+  .pm-import-controls-configuration-trigger {
+    position: fixed;
+    z-index: 680;
+    top: 78px;
+    left: 76px;
+    min-height: 36px;
+    padding: 0 var(--space-3);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-main);
+    background: var(--bg-elevated);
+    box-shadow: var(--shadow-elevated);
+    cursor: pointer;
+    pointer-events: auto;
+  }
+
+  .pm-import-controls-configuration-scrim {
+    position: fixed;
+    z-index: 700;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    padding: 0;
+    display: block;
+    background: var(--overlay-scrim);
+    border: 0;
+    cursor: default;
+    pointer-events: auto;
+  }
+
+  .pm-import-controls-preview-toolbar {
+    padding-left: 190px;
+  }
+
+  .pm-import-controls-preview-controls {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .pm-import-controls-confirm-bar {
+    left: var(--space-3);
+    right: var(--space-3);
+    bottom: var(--space-3);
+  }
+}
+
+@media (max-width: 680px) {
+  .pm-import-controls-preview-toolbar {
+    padding-left: var(--space-3);
+    padding-top: 52px;
+  }
+
+  .pm-import-controls-preview-controls,
+  .pm-import-controls-filter-buttons,
+  .pm-import-controls-confirm-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .pm-import-controls-filter-buttons button,
+  .pm-import-controls-confirm-shortcuts button {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .pm-import-controls-confirm-stats {
+    margin-right: 0;
+  }
+
+  .pm-import-controls-confirm-shortcuts {
+    width: 100%;
+  }
+
+  .pm-import-controls-import-button {
+    width: 100%;
+  }
+
+  .pm-import-controls-progress-card {
+    align-items: center;
+    flex-direction: column;
+  }
+
+  .pm-import-controls-progress-body {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pm-import-controls-spinner {
+    animation-duration: 1.8s;
+  }
+
+  .pm-import-controls-progress-track > span {
+    transition: none;
+  }
+}
+
+@keyframes import-controls-import-control-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+

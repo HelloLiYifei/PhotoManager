@@ -2,7 +2,7 @@ import { useId } from "react";
 import { Crosshair, FolderOpen, LoaderCircle, Settings2 } from "lucide-react";
 
 import { useI18n } from "../../../i18n";
-import styles from "./ImportControls.module.css";
+import { importControlsStyles as styles } from "../../../themes/classNames";
 
 export default function ImportOptions({
   attachCurrentLocation = false,

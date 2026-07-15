@@ -1,0 +1,298 @@
+.pm-albums-page-page {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow-y: auto;
+  padding: var(--space-4);
+}
+
+.pm-albums-page-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: var(--space-5);
+  align-content: start;
+}
+
+.pm-albums-page-card {
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  color: var(--text-main);
+  text-align: left;
+  font: inherit;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  box-shadow: none;
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.pm-albums-page-card:hover {
+  background: var(--bg-subtle);
+  border-color: var(--border-hover);
+  transform: translateY(-2px);
+}
+
+.pm-albums-page-card:focus-visible,
+.pm-albums-page-primary-button:focus-visible,
+.pm-albums-page-secondary-button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.pm-albums-page-cover {
+  display: flex;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: var(--text-dark);
+  background: var(--bg-subtle);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.pm-albums-page-cover-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pm-albums-page-cover-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pm-albums-page-cover-status svg {
+  width: 24px;
+  height: 24px;
+}
+
+.pm-albums-page-card-body {
+  display: flex;
+  min-width: 0;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.pm-albums-page-card-title,
+.pm-albums-page-description,
+.pm-albums-page-photo-count,
+.pm-albums-page-create-title,
+.pm-albums-page-create-hint {
+  display: block;
+}
+
+.pm-albums-page-card-title {
+  overflow: hidden;
+  color: var(--text-main);
+  font-size: var(--font-size-md);
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pm-albums-page-description {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pm-albums-page-photo-count {
+  margin-top: var(--space-1);
+  color: var(--text-dark);
+  font-size: var(--font-size-xs);
+}
+
+.pm-albums-page-create-card {
+  min-height: 230px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  text-align: center;
+  background: transparent;
+  border-style: dashed;
+}
+
+.pm-albums-page-create-icon,
+.pm-albums-page-empty-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary-start);
+  background: rgba(59, 130, 246, 0.12);
+  border-radius: 999px;
+}
+
+.pm-albums-page-create-icon {
+  width: 44px;
+  height: 44px;
+  margin-bottom: var(--space-1);
+}
+
+.pm-albums-page-create-icon svg {
+  width: 21px;
+  height: 21px;
+}
+
+.pm-albums-page-create-title {
+  color: var(--text-main);
+  font-size: var(--font-size-md);
+  font-weight: 650;
+}
+
+.pm-albums-page-create-hint {
+  font-size: var(--font-size-xs);
+}
+
+.pm-albums-page-centered-state {
+  min-width: 0;
+  min-height: 260px;
+  height: 100%;
+  padding: var(--space-8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: var(--space-4);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.pm-albums-page-centered-state h2,
+.pm-albums-page-centered-state p {
+  margin: 0;
+}
+
+.pm-albums-page-centered-state h2 {
+  margin-bottom: var(--space-2);
+  color: var(--text-main);
+  font-size: var(--font-size-lg);
+}
+
+.pm-albums-page-centered-state p {
+  max-width: 390px;
+  font-size: var(--font-size-sm);
+  line-height: 1.55;
+}
+
+.pm-albums-page-empty-icon {
+  width: 56px;
+  height: 56px;
+}
+
+.pm-albums-page-empty-icon svg {
+  width: 25px;
+  height: 25px;
+}
+
+.pm-albums-page-error-icon {
+  width: 32px;
+  height: 32px;
+  color: var(--danger-color);
+}
+
+.pm-albums-page-primary-button,
+.pm-albums-page-secondary-button {
+  min-height: 38px;
+  padding: 0 var(--space-4);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  color: var(--text-main);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: 650;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.pm-albums-page-primary-button {
+  background: var(--primary-start);
+}
+
+.pm-albums-page-primary-button:hover {
+  background: #2563eb;
+}
+
+.pm-albums-page-secondary-button {
+  background: var(--bg-subtle);
+  border-color: var(--border-color);
+}
+
+.pm-albums-page-secondary-button:hover {
+  border-color: var(--border-hover);
+}
+
+.pm-albums-page-spinner,
+.pm-albums-page-state-spinner {
+  animation: albums-page-spin 900ms linear infinite;
+}
+
+.pm-albums-page-state-spinner {
+  width: 28px;
+  height: 28px;
+  color: var(--primary-start);
+}
+
+.pm-albums-page-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@keyframes albums-page-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 900px) {
+  .pm-albums-page-page {
+    padding: var(--space-3);
+  }
+
+  .pm-albums-page-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: var(--space-3);
+  }
+
+  .pm-albums-page-create-card {
+    min-height: 190px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pm-albums-page-card {
+    transition: none;
+  }
+
+  .pm-albums-page-card:hover {
+    transform: none;
+  }
+
+  .pm-albums-page-spinner,
+  .pm-albums-page-state-spinner {
+    animation-duration: 1.8s;
+  }
+}
+

@@ -2,7 +2,7 @@ import { EyeOff, GalleryHorizontal, Grid3X3, List, Palette } from "lucide-react"
 
 import { useI18n } from "../../../i18n";
 import ViewSwitcher from "../../shared/ViewSwitcher";
-import styles from "./ImportControls.module.css";
+import { importControlsStyles as styles } from "../../../themes/classNames";
 
 const IMPORT_VIEW_OPTIONS = [
   { value: "masonry", label: "瀑布流", Icon: Grid3X3 },

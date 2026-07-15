@@ -1,10 +1,11 @@
 import { Brush, FolderPlus } from "lucide-react";
 
+import { DEFAULT_BRUSH_COLOR } from "../../../content/contentColors";
 import { useI18n } from "../../../i18n";
-import styles from "./ImportControls.module.css";
+import { importControlsStyles as styles } from "../../../themes/classNames";
 
 function brushColor(album, getAlbumColor) {
-  return album.color || getAlbumColor?.(album.name, album) || "#4f8cff";
+  return album.color || getAlbumColor?.(album.name, album) || DEFAULT_BRUSH_COLOR;
 }
 
 export default function AlbumBrushPanel({

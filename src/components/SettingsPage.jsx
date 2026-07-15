@@ -28,9 +28,10 @@ import {
 } from "../services/settingsService";
 import { selectDirectory } from "../services/workspaceService";
 import { CACHE_LIMITS, useSettings } from "../settings";
+import { listThemes } from "../themes";
 import { PageHeader } from "./shell";
 import { Button, Select, useGlobalDialog } from "./ui";
-import styles from "./SettingsPage.module.css";
+import { settingsPageStyles as styles } from "../themes/classNames";
 
 const SECTIONS = [
   { id: "general", labelKey: "settings.general", Icon: Brush },
@@ -160,6 +161,8 @@ export default function SettingsPage({
     globalSettings,
     getWorkspaceSettings,
     persistenceError,
+    setTheme,
+    themeError,
     resetAll,
     updateGlobal,
     updateWorkspace,
@@ -288,10 +291,10 @@ export default function SettingsPage({
     announceSaved(t("settings.resetDone"));
   };
 
-  const themeOptions = ["system", "dark", "light"].map((value) => ({
-    value,
-    label: t(`settings.theme.${value}`),
-  }));
+  const themeOptions = [
+    { value: "system", label: t("settings.theme.system") },
+    ...listThemes(globalSettings.locale),
+  ];
   const densityOptions = ["comfortable", "compact"].map((value) => ({
     value,
     label: t(`settings.density.${value}`),
@@ -343,6 +346,11 @@ export default function SettingsPage({
               {t("settings.persistenceError")}
             </div>
           ) : null}
+          {themeError ? (
+            <div className={styles.warning} role="alert">
+              {t("settings.themeLoadError", { message: themeError })}
+            </div>
+          ) : null}
 
           {activeSection === "general" ? (
             <section className={styles.card} aria-labelledby="settings-general-heading">
@@ -367,7 +375,17 @@ export default function SettingsPage({
                 />
               </SettingRow>
               <SettingRow icon={Brush} title={t("settings.theme")} description={t("settings.themeDescription")}>
-                <SegmentedControl label={t("settings.theme")} value={globalSettings.theme} options={themeOptions} onChange={(theme) => changeGlobal({ theme })} />
+                <Select
+                  wrapperClassName={styles.themeSelect}
+                  value={globalSettings.theme}
+                  options={themeOptions}
+                  aria-label={t("settings.theme")}
+                  onChange={(theme) => {
+                    void setTheme(theme).then((changed) => {
+                      if (changed) announceSaved();
+                    });
+                  }}
+                />
               </SettingRow>
               <SettingRow icon={AppWindow} title={t("settings.density")} description={t("settings.densityDescription")}>
                 <SegmentedControl label={t("settings.density")} value={globalSettings.density} options={densityOptions} onChange={(density) => changeGlobal({ density })} />

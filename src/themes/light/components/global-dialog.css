@@ -1,0 +1,192 @@
+.pm-global-dialog-backdrop {
+  position: fixed;
+  z-index: 2400;
+  inset: 0;
+  display: grid;
+  padding: var(--space-5);
+  place-items: center;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(79, 140, 255, 0.09), transparent 36%),
+    rgba(3, 6, 12, 0.76);
+  backdrop-filter: blur(10px) saturate(0.85);
+  animation: global-dialog-backdrop-in 160ms ease-out;
+}
+
+.pm-global-dialog-dialog {
+  position: relative;
+  width: min(430px, 100%);
+  overflow: hidden;
+  color: var(--text-main);
+  border: 1px solid var(--border-hover);
+  border-radius: var(--radius-xl);
+  outline: none;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.035), transparent 38%),
+    var(--bg-elevated);
+  box-shadow:
+    0 28px 80px rgba(0, 0, 0, 0.62),
+    0 0 0 1px rgba(255, 255, 255, 0.025) inset;
+  animation: global-dialog-dialog-in 190ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.pm-global-dialog-accent {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--dialog-accent), transparent);
+}
+
+.pm-global-dialog-dialog[data-tone="info"] {
+  --dialog-accent: var(--accent-color);
+  --dialog-muted: var(--accent-muted);
+}
+
+.pm-global-dialog-dialog[data-tone="success"] {
+  --dialog-accent: var(--success-color);
+  --dialog-muted: rgba(16, 185, 129, 0.13);
+}
+
+.pm-global-dialog-dialog[data-tone="warning"] {
+  --dialog-accent: var(--warning-color);
+  --dialog-muted: rgba(245, 158, 11, 0.13);
+}
+
+.pm-global-dialog-dialog[data-tone="danger"] {
+  --dialog-accent: var(--danger-color);
+  --dialog-muted: rgba(239, 68, 68, 0.13);
+}
+
+.pm-global-dialog-header {
+  display: grid;
+  padding: var(--space-5) var(--space-5) var(--space-3);
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.pm-global-dialog-icon {
+  width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--dialog-accent);
+  border: 1px solid color-mix(in srgb, var(--dialog-accent) 26%, transparent);
+  border-radius: var(--radius-lg);
+  background: var(--dialog-muted);
+}
+
+.pm-global-dialog-icon svg {
+  width: 21px;
+  height: 21px;
+}
+
+.pm-global-dialog-heading {
+  min-width: 0;
+}
+
+.pm-global-dialog-kicker {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--text-dark);
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.pm-global-dialog-heading h2 {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.pm-global-dialog-close-button {
+  width: 32px;
+  height: 32px;
+  color: var(--text-dark);
+}
+
+.pm-global-dialog-body {
+  padding: var(--space-2) var(--space-5) var(--space-5);
+}
+
+.pm-global-dialog-message {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+  line-height: 1.65;
+  white-space: pre-line;
+}
+
+.pm-global-dialog-input-field {
+  display: grid;
+  margin-top: var(--space-4);
+  gap: 7px;
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: 650;
+}
+
+.pm-global-dialog-input-field input {
+  width: 100%;
+  min-height: 40px;
+  box-sizing: border-box;
+  padding: 0 var(--space-3);
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  outline: none;
+  background: var(--bg-main);
+  font: inherit;
+  font-size: var(--font-size-sm);
+}
+
+.pm-global-dialog-input-field input:focus-visible {
+  border-color: var(--dialog-accent);
+  box-shadow: var(--focus-ring);
+}
+
+.pm-global-dialog-footer {
+  display: flex;
+  padding: var(--space-3) var(--space-5) var(--space-4);
+  justify-content: flex-end;
+  gap: var(--space-2);
+  border-top: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.018);
+}
+
+@keyframes global-dialog-backdrop-in {
+  from { opacity: 0; }
+}
+
+@keyframes global-dialog-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.975);
+  }
+}
+
+@media (max-width: 520px) {
+  .pm-global-dialog-backdrop {
+    padding: var(--space-4);
+  }
+
+  .pm-global-dialog-header,
+  .pm-global-dialog-body,
+  .pm-global-dialog-footer {
+    padding-inline: var(--space-4);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pm-global-dialog-backdrop,
+  .pm-global-dialog-dialog {
+    animation: none;
+  }
+}
+

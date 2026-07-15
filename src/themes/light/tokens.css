@@ -1,0 +1,101 @@
+:root {
+  color-scheme: light;
+
+  /* Surfaces */
+  --bg-main: #f4f6f9;
+  --bg-card: #ffffff;
+  --bg-sidebar: #f8fafc;
+  --bg-elevated: #ffffff;
+  --bg-subtle: rgba(15, 23, 42, 0.035);
+  --bg-hover: #eef2f7;
+  --bg-active: rgba(37, 99, 235, 0.1);
+  --bg-input: #f7f9fc;
+  --header-bg: rgba(255, 255, 255, 0.9);
+  --overlay-scrim: rgba(15, 23, 42, 0.42);
+
+  /* Borders and text */
+  --border-color: rgba(15, 23, 42, 0.1);
+  --border-hover: rgba(15, 23, 42, 0.2);
+  --text-main: #182230;
+  --text-muted: #526071;
+  --text-dark: #7b8797;
+
+  /* Brand and status */
+  --primary-start: #3976e8;
+  --primary-end: #2f65ce;
+  --accent-color: #2563c7;
+  --accent-muted: rgba(37, 99, 199, 0.1);
+  --accent-border: rgba(37, 99, 199, 0.22);
+  --accent-glow: rgba(37, 99, 199, 0.1);
+  --success-color: #10b981;
+  --success-bg: rgba(5, 150, 105, 0.08);
+  --success-border: rgba(5, 150, 105, 0.25);
+  --success-text: #047857;
+  --danger-color: #ef4444;
+  --danger-bg: rgba(220, 38, 38, 0.045);
+  --danger-bg-strong: rgba(220, 38, 38, 0.09);
+  --danger-border: rgba(220, 38, 38, 0.2);
+  --warning-color: #f59e0b;
+  --warning-bg: rgba(217, 119, 6, 0.07);
+  --warning-border: rgba(217, 119, 6, 0.24);
+  --warning-text: #9a5705;
+  --focus-ring: 0 0 0 3px rgba(37, 99, 235, 0.24);
+
+  /* Typography */
+  --font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-size-xs: 0.6875rem;
+  --font-size-sm: 0.8125rem;
+  --font-size-md: 0.875rem;
+  --font-size-lg: 1rem;
+  --font-size-xl: 1.25rem;
+
+  /* Spacing */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+
+  /* Shape and motion */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --control-height: 2.25rem;
+  --sidebar-width: 16.25rem;
+  --sidebar-compact-width: 4rem;
+  --page-header-height: 4.5rem;
+  --shadow-elevated: 0 18px 48px rgba(15, 23, 42, 0.18);
+  --shadow-card: 0 10px 28px rgba(15, 23, 42, 0.06);
+  --shadow-control: 0 1px 4px rgba(15, 23, 42, 0.12);
+  --glass-blur: blur(20px);
+  --transition-fast: 160ms ease;
+  --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+html[data-density="compact"] {
+  --control-height: 2rem;
+  --page-header-height: 4rem;
+}
+
+html[data-motion="reduced"] *,
+html[data-motion="reduced"] *::before,
+html[data-motion="reduced"] *::after {
+  scroll-behavior: auto !important;
+  transition-duration: 0.01ms !important;
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-motion="system"] *,
+  html[data-motion="system"] *::before,
+  html[data-motion="system"] *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

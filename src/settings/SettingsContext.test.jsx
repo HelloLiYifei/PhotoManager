@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
@@ -11,13 +11,13 @@ import {
 } from "./SettingsContext";
 
 function Harness() {
-  const { globalSettings, getWorkspaceSettings, updateGlobal, updateWorkspace } = useSettings();
+  const { globalSettings, getWorkspaceSettings, setTheme, updateWorkspace } = useSettings();
   const workspace = { id: "one", path: "D:/Photos" };
   const scoped = getWorkspaceSettings(workspace);
   return (
     <>
       <output>{globalSettings.theme}:{scoped.photoView}</output>
-      <button type="button" onClick={() => updateGlobal({ theme: "light" })}>light</button>
+      <button type="button" onClick={() => void setTheme("light")}>light</button>
       <button type="button" onClick={() => updateWorkspace(workspace, { photoView: "list" })}>list</button>
     </>
   );
@@ -50,7 +50,7 @@ describe("settings store", () => {
     });
   });
 
-  it("persists global and workspace-scoped changes and applies theme attributes", () => {
+  it("persists global and workspace-scoped changes and applies theme attributes", async () => {
     render(
       <SettingsProvider>
         <Harness />
@@ -60,8 +60,10 @@ describe("settings store", () => {
     fireEvent.click(screen.getByRole("button", { name: "light" }));
     fireEvent.click(screen.getByRole("button", { name: "list" }));
 
-    expect(screen.getByText("light:list")).toBeInTheDocument();
-    expect(document.documentElement).toHaveAttribute("data-theme", "light");
+    await waitFor(() => {
+      expect(screen.getByText("light:list")).toBeInTheDocument();
+      expect(document.documentElement).toHaveAttribute("data-theme", "light");
+    });
     const stored = JSON.parse(localStorage.getItem(SETTINGS_STORAGE_KEY));
     expect(stored.global.theme).toBe("light");
     expect(stored.workspaces["id:one"].photoView).toBe("list");

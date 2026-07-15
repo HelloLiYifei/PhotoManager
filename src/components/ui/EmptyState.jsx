@@ -1,6 +1,6 @@
 import { createElement, isValidElement } from "react";
 
-import styles from "./Ui.module.css";
+import { uiStyles as styles } from "../../themes/classNames";
 
 export default function EmptyState({
   icon: Icon,

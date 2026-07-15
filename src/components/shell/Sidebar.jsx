@@ -15,7 +15,6 @@ import {
   X,
 } from "lucide-react";
 import { useI18n } from "../../i18n";
-import "./Shell.css";
 
 const NAVIGATION_ITEMS = [
   { id: "albums", labelKey: "nav.albums", Icon: Images },

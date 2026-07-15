@@ -1,7 +1,7 @@
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use std::fs;
+use std::fs::{self, OpenOptions};
 use std::path::Path;
 use tauri::Emitter;
 use uuid::Uuid;
@@ -80,6 +80,60 @@ fn destination_filename(src_path: &Path, collision_index: usize) -> String {
         }
         _ => format!("{}_{}", stem, collision_index),
     }
+}
+
+fn copy_file_atomically(source: &Path, destination: &Path) -> Result<(), String> {
+    let destination_name = destination
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("photo");
+    let temporary_path = destination.with_file_name(format!(
+        ".{}.{}.part",
+        destination_name,
+        Uuid::new_v4()
+    ));
+
+    let result = (|| {
+        let expected_size = fs::metadata(source)
+            .map_err(|error| format!("无法读取源文件：{}", error))?
+            .len();
+        let copied_size = fs::copy(source, &temporary_path)
+            .map_err(|error| format!("复制数据失败：{}", error))?;
+        if copied_size != expected_size {
+            return Err(format!(
+                "复制后的文件大小不一致（应为 {} 字节，实际为 {} 字节）",
+                expected_size, copied_size
+            ));
+        }
+        OpenOptions::new()
+            .write(true)
+            .open(&temporary_path)
+            .and_then(|file| file.sync_all())
+            .map_err(|error| format!("写入磁盘失败：{}", error))?;
+        fs::rename(&temporary_path, destination)
+            .map_err(|error| format!("完成文件写入失败：{}", error))?;
+        Ok(())
+    })();
+
+    if result.is_err() {
+        let _ = fs::remove_file(&temporary_path);
+    }
+    result
+}
+
+fn interrupted_import_error(
+    copied: i32,
+    total: i32,
+    source: &Path,
+    detail: impl std::fmt::Display,
+) -> String {
+    format!(
+        "导入中断（已完成 {}/{}）：{}：{}。涂色记录已保留，可重新插入存储卡后继续。",
+        copied,
+        total,
+        source.file_name().unwrap_or_default().to_string_lossy(),
+        detail
+    )
 }
 
 fn metadata_fingerprint(metadata: &fs::Metadata) -> String {
@@ -386,12 +440,25 @@ pub fn execute_import(
     let mut copied = 0;
     let mut imported_files = load_imported_file_index(conn);
 
-    let _ = fs::create_dir_all(workspace_root.join(".photomanager").join("thumbnails"));
+    fs::create_dir_all(workspace_root.join(".photomanager").join("thumbnails"))
+        .map_err(|error| format!("无法准备工作区缓存目录：{}", error))?;
+
+    let backup_root = backup_path.as_deref().map(Path::new);
+    if let Some(path) = backup_root {
+        if !path.is_dir() {
+            return Err(format!("备份目录不可用：{}", path.to_string_lossy()));
+        }
+    }
 
     for import in imports {
         let src_path = Path::new(&import.absolute_path);
         if !src_path.exists() {
-            continue;
+            return Err(interrupted_import_error(
+                copied,
+                total,
+                src_path,
+                "源文件或存储卡已断开",
+            ));
         }
 
         // Get target album name and folder path
@@ -402,7 +469,9 @@ pub fn execute_import(
         };
 
         let dest_folder_path = workspace_root.join(&album_name);
-        let _ = fs::create_dir_all(&dest_folder_path);
+        fs::create_dir_all(&dest_folder_path).map_err(|error| {
+            interrupted_import_error(copied, total, src_path, format!("无法创建目标目录：{}", error))
+        })?;
 
         // Get album_id (or create if not exists)
         let album_id = match conn.query_row(
@@ -414,19 +483,26 @@ pub fn execute_import(
             Err(_) => {
                 let id = Uuid::new_v4().to_string();
                 let created_at = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
-                let _ = conn.execute(
+                conn.execute(
                     "INSERT INTO albums (id, name, created_at) VALUES (?1, ?2, ?3)",
                     rusqlite::params![&id, &album_name, &created_at],
-                );
+                )
+                .map_err(|error| {
+                    interrupted_import_error(
+                        copied,
+                        total,
+                        src_path,
+                        format!("无法创建目标相册：{}", error),
+                    )
+                })?;
                 id
             }
         };
 
         // Get file properties
-        let metadata = match fs::metadata(src_path) {
-            Ok(m) => m,
-            Err(_) => continue,
-        };
+        let metadata = fs::metadata(src_path).map_err(|error| {
+            interrupted_import_error(copied, total, src_path, format!("无法读取源文件：{}", error))
+        })?;
 
         let file_size = metadata.len() as i64;
         let file_ext = src_path
@@ -471,19 +547,29 @@ pub fn execute_import(
         }
 
         // 3. Copy to workspace destination
-        if let Err(_) = fs::copy(src_path, &final_dest_path) {
-            continue;
-        }
+        copy_file_atomically(src_path, &final_dest_path).map_err(|error| {
+            interrupted_import_error(copied, total, src_path, error)
+        })?;
 
         // 4. (Optional) Copy to backup destination
-        if let Some(ref backup_root_str) = backup_path {
-            let backup_root = Path::new(backup_root_str);
-            if backup_root.exists() {
-                let backup_folder = backup_root.join(&album_name);
-                let _ = fs::create_dir_all(&backup_folder);
-                let backup_file_path = backup_folder.join(final_dest_path.file_name().unwrap());
-                let _ = fs::copy(src_path, backup_file_path);
+        let mut completed_backup_path = None;
+        if let Some(backup_root) = backup_root {
+            let backup_folder = backup_root.join(&album_name);
+            if let Err(error) = fs::create_dir_all(&backup_folder) {
+                let _ = fs::remove_file(&final_dest_path);
+                return Err(interrupted_import_error(
+                    copied,
+                    total,
+                    src_path,
+                    format!("无法创建备份目录：{}", error),
+                ));
             }
+            let backup_file_path = backup_folder.join(final_dest_path.file_name().unwrap());
+            if let Err(error) = copy_file_atomically(src_path, &backup_file_path) {
+                let _ = fs::remove_file(&final_dest_path);
+                return Err(interrupted_import_error(copied, total, src_path, error));
+            }
+            completed_backup_path = Some(backup_file_path);
         }
 
         // 5. Register the photo. No thumbnail file is created during import.
@@ -503,7 +589,7 @@ pub fn execute_import(
             resolve_import_coordinates(exif.latitude, exif.longitude, import_location);
 
         // 6. Write record to database
-        let _ = conn.execute(
+        if let Err(error) = conn.execute(
             "INSERT INTO photos (
                 id, path, filename, source_filename, file_size, file_type, width, height,
                 date_taken, date_added, camera_make, camera_model, lens_model, 
@@ -531,13 +617,36 @@ pub fn execute_import(
                 longitude,
                 &source_fingerprint,
             ],
-        );
+        ) {
+            let _ = fs::remove_file(&final_dest_path);
+            if let Some(path) = &completed_backup_path {
+                let _ = fs::remove_file(path);
+            }
+            return Err(interrupted_import_error(
+                copied,
+                total,
+                src_path,
+                format!("无法注册照片：{}", error),
+            ));
+        }
 
         // 7. Insert mapping in album_photos
-        let _ = conn.execute(
+        if let Err(error) = conn.execute(
             "INSERT OR IGNORE INTO album_photos (album_id, photo_id) VALUES (?1, ?2)",
             rusqlite::params![&album_id, &photo_id],
-        );
+        ) {
+            let _ = conn.execute("DELETE FROM photos WHERE id = ?1", [&photo_id]);
+            let _ = fs::remove_file(&final_dest_path);
+            if let Some(path) = &completed_backup_path {
+                let _ = fs::remove_file(path);
+            }
+            return Err(interrupted_import_error(
+                copied,
+                total,
+                src_path,
+                format!("无法加入目标相册：{}", error),
+            ));
+        }
 
         copied += 1;
         imported_files.identities.insert(source_identity);
@@ -560,7 +669,7 @@ pub fn execute_import(
 #[cfg(test)]
 mod tests {
     use super::{
-        card_photo_dimensions, destination_filename, load_imported_file_index,
+        card_photo_dimensions, copy_file_atomically, destination_filename, load_imported_file_index,
         normalized_import_identity, resolve_import_coordinates, scan_card_files, ImportLocation,
     };
     use rusqlite::Connection;
@@ -570,6 +679,30 @@ mod tests {
         let source = std::path::Path::new("D:/DCIM/IMG_0001.JPG");
         assert_eq!(destination_filename(source, 0), "IMG_0001.JPG");
         assert_eq!(destination_filename(source, 2), "IMG_0001_2.JPG");
+    }
+
+    #[test]
+    fn copies_through_a_temporary_file_and_cleans_failed_attempts() {
+        let root = std::env::temp_dir().join(format!(
+            "photomanager-atomic-copy-{}",
+            uuid::Uuid::new_v4()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let source = root.join("source.jpg");
+        let destination = root.join("destination.jpg");
+        std::fs::write(&source, b"complete image bytes").unwrap();
+
+        copy_file_atomically(&source, &destination).unwrap();
+        assert_eq!(std::fs::read(&destination).unwrap(), b"complete image bytes");
+        assert!(std::fs::read_dir(&root)
+            .unwrap()
+            .all(|entry| !entry.unwrap().file_name().to_string_lossy().ends_with(".part")));
+
+        let missing_destination = root.join("missing.jpg");
+        assert!(copy_file_atomically(&root.join("missing-source.jpg"), &missing_destination).is_err());
+        assert!(!missing_destination.exists());
+
+        let _ = std::fs::remove_dir_all(root);
     }
 
     #[test]

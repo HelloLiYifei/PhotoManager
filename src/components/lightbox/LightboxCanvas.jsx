@@ -1,7 +1,7 @@
 import { ChevronLeft, ChevronRight, ImageOff } from "lucide-react";
 import { useI18n } from "../../i18n";
 import { Button, EmptyState, Spinner } from "../ui";
-import styles from "./Lightbox.module.css";
+import { lightboxStyles as styles } from "../../themes/classNames";
 
 export default function LightboxCanvas({
   photo,

@@ -53,8 +53,11 @@ describe("SettingsPage", () => {
   it("updates appearance and language immediately", async () => {
     renderPage();
     await waitFor(() => expect(getWorkspaceStorageStats).toHaveBeenCalled());
-    fireEvent.click(screen.getByRole("button", { name: "浅色" }));
-    expect(document.documentElement).toHaveAttribute("data-theme", "light");
+    fireEvent.click(screen.getByRole("combobox", { name: "主题" }));
+    fireEvent.click(screen.getByRole("option", { name: "浅色" }));
+    await waitFor(() => {
+      expect(document.documentElement).toHaveAttribute("data-theme", "light");
+    });
 
     fireEvent.click(screen.getByRole("combobox", { name: "界面语言" }));
     fireEvent.click(screen.getByRole("option", { name: "English" }));

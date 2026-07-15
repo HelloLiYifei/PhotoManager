@@ -1,7 +1,7 @@
 import { MapPin, Tag, X } from "lucide-react";
 import { useI18n } from "../../i18n";
 import { Button, EmptyState, Field } from "../ui";
-import styles from "./Lightbox.module.css";
+import { lightboxStyles as styles } from "../../themes/classNames";
 
 const displayValue = (value, suffix = "") => (
   value === null || value === undefined || value === "" ? "—" : `${value}${suffix}`

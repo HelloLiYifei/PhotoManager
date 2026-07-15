@@ -7,13 +7,19 @@ import {
   useMemo,
   useState,
 } from "react";
+import {
+  THEMES as REGISTERED_THEMES,
+  activateTheme,
+  normalizeThemePreference,
+  resolveEffectiveTheme,
+} from "../themes";
 
 export const SETTINGS_STORAGE_KEY = "photomanager-settings-v1";
 export const LEGACY_PHOTO_VIEW_KEY = "photomanager-photo-view";
 export const LEGACY_IMPORT_VIEW_KEY = "photomanager-import-view";
 
 export const VIEW_MODES = Object.freeze(["masonry", "list", "gallery"]);
-export const THEMES = Object.freeze(["system", "dark", "light"]);
+export const THEMES = REGISTERED_THEMES;
 export const LOCALES = Object.freeze(["zh-CN", "en-US"]);
 export const DENSITIES = Object.freeze(["comfortable", "compact"]);
 export const MOTION_MODES = Object.freeze(["system", "full", "reduced"]);
@@ -161,7 +167,9 @@ const FALLBACK_SETTINGS_CONTEXT = {
   settings: DEFAULT_SETTINGS,
   globalSettings: DEFAULT_GLOBAL_SETTINGS,
   persistenceError: "",
+  themeError: "",
   updateGlobal: () => {},
+  setTheme: async () => false,
   getWorkspaceSettings: () => DEFAULT_WORKSPACE_SETTINGS,
   updateWorkspace: () => {},
   resetAll: () => {},
@@ -170,6 +178,7 @@ const FALLBACK_SETTINGS_CONTEXT = {
 export function SettingsProvider({ children, storage = getStorage() }) {
   const [settings, setSettings] = useState(() => readSettings(storage));
   const [persistenceError, setPersistenceError] = useState("");
+  const [themeError, setThemeError] = useState("");
 
   const persist = useCallback((nextSettings) => {
     try {
@@ -199,6 +208,26 @@ export function SettingsProvider({ children, storage = getStorage() }) {
     }));
   }, [replaceSettings]);
 
+  const setTheme = useCallback(async (preference) => {
+    const normalized = normalizeThemePreference(preference);
+    const media = globalThis.matchMedia?.("(prefers-color-scheme: dark)");
+    const effectiveTheme = resolveEffectiveTheme(normalized, Boolean(media?.matches));
+
+    try {
+      await activateTheme(effectiveTheme);
+      document.documentElement.dataset.themePreference = normalized;
+      setThemeError("");
+      replaceSettings((current) => ({
+        ...current,
+        global: { ...current.global, theme: normalized },
+      }));
+      return true;
+    } catch (error) {
+      setThemeError(error instanceof Error ? error.message : String(error));
+      return false;
+    }
+  }, [replaceSettings]);
+
   const getWorkspaceSettings = useCallback((workspace) => {
     const key = workspaceSettingsKey(workspace);
     return settings.workspaces[key] ?? settings.workspaceDefaults;
@@ -225,19 +254,33 @@ export function SettingsProvider({ children, storage = getStorage() }) {
   useEffect(() => {
     const root = document.documentElement;
     const media = globalThis.matchMedia?.("(prefers-color-scheme: dark)");
+    let active = true;
 
-    const applyTheme = () => {
-      const effectiveTheme = settings.global.theme === "system"
-        ? (media?.matches ? "dark" : "light")
-        : settings.global.theme;
-      root.dataset.theme = effectiveTheme;
-      root.dataset.themePreference = settings.global.theme;
-      root.style.colorScheme = effectiveTheme;
+    const applyTheme = async () => {
+      const effectiveTheme = resolveEffectiveTheme(
+        settings.global.theme,
+        Boolean(media?.matches),
+      );
+      try {
+        await activateTheme(effectiveTheme);
+        if (!active) return;
+        root.dataset.themePreference = settings.global.theme;
+        setThemeError("");
+      } catch (error) {
+        if (!active) return;
+        setThemeError(error instanceof Error ? error.message : String(error));
+      }
     };
 
-    applyTheme();
-    media?.addEventListener?.("change", applyTheme);
-    return () => media?.removeEventListener?.("change", applyTheme);
+    void applyTheme();
+    const handleSystemThemeChange = () => {
+      if (settings.global.theme === "system") void applyTheme();
+    };
+    media?.addEventListener?.("change", handleSystemThemeChange);
+    return () => {
+      active = false;
+      media?.removeEventListener?.("change", handleSystemThemeChange);
+    };
   }, [settings.global.theme]);
 
   useEffect(() => {
@@ -251,7 +294,9 @@ export function SettingsProvider({ children, storage = getStorage() }) {
     settings,
     globalSettings: settings.global,
     persistenceError,
+    themeError,
     updateGlobal,
+    setTheme,
     getWorkspaceSettings,
     updateWorkspace,
     resetAll,
@@ -259,7 +304,9 @@ export function SettingsProvider({ children, storage = getStorage() }) {
     getWorkspaceSettings,
     persistenceError,
     resetAll,
+    setTheme,
     settings,
+    themeError,
     updateGlobal,
     updateWorkspace,
   ]);

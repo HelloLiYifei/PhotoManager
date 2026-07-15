@@ -1,3 +1,5 @@
+import { IMPORTED_PHOTO_BORDER_COLOR } from "../../../content/contentColors";
+
 export function getImportPhotoState(photo, getPhotoVisualState) {
   const state = getPhotoVisualState?.(photo) || {};
   return {
@@ -12,7 +14,7 @@ export function getImportPhotoStyle(photo, state) {
   return {
     "--import-album-color": state.albumColor,
     "--import-border-color": photo.alreadyImported
-      ? "#10b981"
+      ? IMPORTED_PHOTO_BORDER_COLOR
       : state.targetAlbum
         ? state.albumColor
         : "transparent",

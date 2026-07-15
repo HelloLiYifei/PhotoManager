@@ -20,7 +20,7 @@ import {
 import { ComparePreviewImage } from "./timeline/media";
 import { GalleryView, ListView, MasonryView } from "./timeline/views";
 import { useGlobalDialog } from "./ui";
-import styles from "./TimelineGrid.module.css";
+import { timelineGridStyles as styles } from "../themes/classNames";
 
 const NARROW_TIMELINE_QUERY = "(max-width: 900px)";
 

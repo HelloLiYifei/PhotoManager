@@ -10,7 +10,7 @@ import { Button, EmptyState, Spinner } from "./ui";
 import MapStatusBanner from "./map/MapStatusBanner";
 import { groupPhotosByLocation } from "./map/mapPhotoUtils";
 import useMapPhotos from "./map/useMapPhotos";
-import styles from "./MapView.module.css";
+import { mapViewStyles as styles } from "../themes/classNames";
 
 const DEFAULT_ZOOM = 13;
 const FOCUSED_ZOOM = 15;

@@ -26,7 +26,7 @@ import {
   ImportMasonryView,
 } from "./import/views";
 import { useGlobalDialog } from "./ui";
-import styles from "./ImportWizard.module.css";
+import { importWizardStyles as styles } from "../themes/classNames";
 
 const INITIAL_VISIBLE_PHOTOS = 64;
 
@@ -54,6 +54,7 @@ export default function ImportWizard({ onClose, onImportComplete, workspace, pre
     autoSelectDetectedSource: preferences.autoSelectDetectedSource ?? true,
     initialBackupPath: preferences.backupPath ?? "",
     initialAttachCurrentLocation: preferences.attachCurrentLocation ?? true,
+    draftScope: workspace?.path || workspace?.id || "default",
   });
   const [viewMode, setViewMode] = useImportViewPreference(workspace);
   const [sourceDraft, setSourceDraft] = useState("");

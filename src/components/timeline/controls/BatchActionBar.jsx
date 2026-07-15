@@ -10,7 +10,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useI18n } from "../../../i18n";
-import styles from "./BatchActionBar.module.css";
+import { batchActionBarStyles as styles } from "../../../themes/classNames";
 
 function ActionButton({ Icon, label, variant = "default", active = false, ...props }) {
   const classNames = [

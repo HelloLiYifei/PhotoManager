@@ -1,6 +1,6 @@
 import { WifiOff } from "lucide-react";
 import { useI18n } from "../../i18n";
-import styles from "../MapView.module.css";
+import { mapViewStyles as styles } from "../../themes/classNames";
 
 export default function MapStatusBanner() {
   const { t } = useI18n();

@@ -17,7 +17,7 @@ import {
 } from "../services/workspaceService";
 import { useI18n } from "../i18n";
 import { Button, EmptyState, Field, Spinner, useGlobalDialog } from "./ui";
-import styles from "./WorkspaceSelector.module.css";
+import { workspaceSelectorStyles as styles } from "../themes/classNames";
 
 const getErrorMessage = (error) =>
   error instanceof Error ? error.message : String(error);

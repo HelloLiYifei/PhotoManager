@@ -1,0 +1,257 @@
+.pm-create-album-dialog-backdrop {
+  position: fixed;
+  z-index: 1100;
+  inset: 0;
+  padding: var(--space-4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(3, 5, 10, 0.76);
+  backdrop-filter: blur(6px);
+}
+
+.pm-create-album-dialog-dialog {
+  width: min(420px, 100%);
+  max-height: calc(100vh - (2 * var(--space-4)));
+  overflow-y: auto;
+  color: var(--text-main);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-elevated);
+}
+
+.pm-create-album-dialog-header {
+  padding: var(--space-5) var(--space-5) var(--space-4);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.pm-create-album-dialog-title-icon {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary-start);
+  background: rgba(59, 130, 246, 0.12);
+  border-radius: var(--radius-md);
+}
+
+.pm-create-album-dialog-title-icon svg {
+  width: 19px;
+  height: 19px;
+}
+
+.pm-create-album-dialog-heading {
+  min-width: 0;
+  flex: 1;
+}
+
+.pm-create-album-dialog-heading h2,
+.pm-create-album-dialog-heading p {
+  margin: 0;
+}
+
+.pm-create-album-dialog-heading h2 {
+  color: var(--text-main);
+  font-size: var(--font-size-lg);
+  line-height: 1.4;
+}
+
+.pm-create-album-dialog-heading p {
+  margin-top: var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  line-height: 1.5;
+}
+
+.pm-create-album-dialog-close-button {
+  width: 34px;
+  height: 34px;
+  margin: -4px -4px 0 0;
+  padding: 0;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.pm-create-album-dialog-close-button:hover:not(:disabled) {
+  color: var(--text-main);
+  background: var(--bg-subtle);
+}
+
+.pm-create-album-dialog-close-button svg {
+  width: 18px;
+  height: 18px;
+}
+
+.pm-create-album-dialog-form {
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.pm-create-album-dialog-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  color: var(--text-main);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.pm-create-album-dialog-field small {
+  color: var(--text-dark);
+  font-size: var(--font-size-xs);
+  font-weight: 400;
+}
+
+.pm-create-album-dialog-field input,
+.pm-create-album-dialog-field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  color: var(--text-main);
+  font: inherit;
+  font-weight: 400;
+  line-height: 1.45;
+  background: var(--bg-main);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  outline: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.pm-create-album-dialog-field textarea {
+  min-height: 78px;
+  resize: vertical;
+}
+
+.pm-create-album-dialog-field input::placeholder,
+.pm-create-album-dialog-field textarea::placeholder {
+  color: var(--text-dark);
+}
+
+.pm-create-album-dialog-field input:hover:not(:disabled),
+.pm-create-album-dialog-field textarea:hover:not(:disabled) {
+  border-color: var(--border-hover);
+}
+
+.pm-create-album-dialog-field input:focus-visible,
+.pm-create-album-dialog-field textarea:focus-visible,
+.pm-create-album-dialog-close-button:focus-visible,
+.pm-create-album-dialog-cancel-button:focus-visible,
+.pm-create-album-dialog-submit-button:focus-visible {
+  border-color: var(--primary-start);
+  box-shadow: var(--focus-ring);
+}
+
+.pm-create-album-dialog-field input:disabled,
+.pm-create-album-dialog-field textarea:disabled,
+.pm-create-album-dialog-close-button:disabled,
+.pm-create-album-dialog-cancel-button:disabled,
+.pm-create-album-dialog-submit-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.pm-create-album-dialog-error {
+  margin: 0;
+  padding: var(--space-3);
+  color: #fecaca;
+  font-size: var(--font-size-xs);
+  line-height: 1.5;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: var(--radius-md);
+}
+
+.pm-create-album-dialog-actions {
+  margin-top: var(--space-1);
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+.pm-create-album-dialog-cancel-button,
+.pm-create-album-dialog-submit-button {
+  min-height: 38px;
+  padding: 0 var(--space-4);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  color: var(--text-main);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: 650;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.pm-create-album-dialog-cancel-button {
+  background: transparent;
+  border: 1px solid var(--border-color);
+}
+
+.pm-create-album-dialog-cancel-button:hover:not(:disabled) {
+  background: var(--bg-subtle);
+  border-color: var(--border-hover);
+}
+
+.pm-create-album-dialog-submit-button {
+  background: var(--primary-start);
+  border: 1px solid var(--primary-start);
+}
+
+.pm-create-album-dialog-submit-button:hover:not(:disabled) {
+  background: #2563eb;
+  border-color: #2563eb;
+}
+
+.pm-create-album-dialog-submit-button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.pm-create-album-dialog-spinner {
+  animation: create-album-dialog-spin 900ms linear infinite;
+}
+
+@keyframes create-album-dialog-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-height: 620px) {
+  .pm-create-album-dialog-header {
+    padding: var(--space-4);
+  }
+
+  .pm-create-album-dialog-form {
+    padding: var(--space-4);
+    gap: var(--space-3);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pm-create-album-dialog-spinner {
+    animation-duration: 1.8s;
+  }
+}
+.pm-create-album-dialog-shared-dialog {
+  width: min(420px, 100%);
+}
+

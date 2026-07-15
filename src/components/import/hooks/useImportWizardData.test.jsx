@@ -12,6 +12,11 @@ import { selectDirectory } from "../../../services/workspaceService";
 import useImportWizardData, {
   DEFAULT_IMPORT_ALBUM_NAME,
 } from "./useImportWizardData";
+import {
+  createImportDraft,
+  findImportDraft,
+  saveImportDraft,
+} from "./importDraftStorage";
 
 vi.mock("../../../services/albumService", () => ({
   createAlbum: vi.fn(),
@@ -54,6 +59,7 @@ function deferred() {
 describe("useImportWizardData", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
     detectCards.mockResolvedValue([]);
     getAlbums.mockResolvedValue([]);
     scanCard.mockResolvedValue([]);
@@ -201,6 +207,142 @@ describe("useImportWizardData", () => {
     expect(onImportComplete).toHaveBeenCalledWith(1);
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(notify).toHaveBeenCalledWith(expect.stringContaining("1"));
+    expect(findImportDraft(localStorage, {
+      scope: "default",
+      photos: [freshPhoto, importedPhoto],
+    })).toBeNull();
+  });
+
+  it("restores a saved coloring draft and filters photos completed before interruption", async () => {
+    const originalPhotos = [
+      { ...freshPhoto, size: 100 },
+      {
+        absolutePath: "D:/DCIM/IMG_0003.JPG",
+        relativePath: "IMG_0003.JPG",
+        size: 300,
+        alreadyImported: false,
+      },
+    ];
+    const draft = createImportDraft({
+      scope: "workspace-a",
+      photos: originalPhotos,
+      selectedPaths: originalPhotos.map((photo) => photo.absolutePath),
+      photoAlbums: { [originalPhotos[1].absolutePath]: "旅行" },
+    });
+    saveImportDraft(localStorage, draft);
+
+    const reinsertedPhotos = [
+      { ...originalPhotos[0], absolutePath: "F:/DCIM/IMG_0001.JPG", alreadyImported: true },
+      { ...originalPhotos[1], absolutePath: "F:/DCIM/IMG_0003.JPG" },
+    ];
+    detectCards.mockResolvedValue([{ path: "F:/DCIM" }]);
+    scanCard.mockResolvedValue(reinsertedPhotos);
+    const confirmAction = vi.fn(() => true);
+
+    const { result } = renderHook(() => useImportWizardData({
+      confirmAction,
+      draftScope: "workspace-a",
+    }));
+    await waitFor(() => expect(result.current.photos).toHaveLength(2));
+
+    expect(confirmAction).toHaveBeenCalledWith(
+      expect.stringContaining("上次未完成"),
+      expect.objectContaining({ confirmText: "恢复涂色" }),
+    );
+    expect(result.current.selectedPaths).toEqual([reinsertedPhotos[1].absolutePath]);
+    expect(result.current.photoAlbums).toEqual({
+      [reinsertedPhotos[1].absolutePath]: "旅行",
+    });
+  });
+
+  it("lets the user discard a saved coloring draft and start over", async () => {
+    const resumablePhoto = { ...freshPhoto, size: 100 };
+    saveImportDraft(localStorage, createImportDraft({
+      scope: "workspace-a",
+      photos: [resumablePhoto],
+      selectedPaths: [resumablePhoto.absolutePath],
+      photoAlbums: { [resumablePhoto.absolutePath]: "旅行" },
+    }));
+    detectCards.mockResolvedValue([{ path: "D:/DCIM" }]);
+    scanCard.mockResolvedValue([resumablePhoto]);
+
+    const { result } = renderHook(() => useImportWizardData({
+      confirmAction: vi.fn(() => false),
+      draftScope: "workspace-a",
+    }));
+    await waitFor(() => expect(result.current.photos).toHaveLength(1));
+
+    expect(result.current.selectedPaths).toEqual([resumablePhoto.absolutePath]);
+    expect(result.current.photoAlbums).toEqual({});
+    expect(findImportDraft(localStorage, {
+      scope: "workspace-a",
+      photos: [resumablePhoto],
+    })).toBeNull();
+  });
+
+  it("keeps the coloring draft when copying is interrupted", async () => {
+    const resumablePhoto = { ...freshPhoto, size: 100 };
+    detectCards.mockResolvedValue([{ path: "D:/DCIM" }]);
+    scanCard.mockResolvedValue([resumablePhoto]);
+    importPhotos.mockRejectedValue(new Error("device disconnected"));
+    const notify = vi.fn();
+
+    const { result } = renderHook(() => useImportWizardData({
+      confirmAction: vi.fn(() => true),
+      draftScope: "workspace-a",
+      initialAttachCurrentLocation: false,
+      notify,
+    }));
+    await waitFor(() => expect(result.current.photos).toHaveLength(1));
+    act(() => result.current.setPhotoAlbums({
+      [resumablePhoto.absolutePath]: "旅行",
+    }));
+
+    let importRequest;
+    act(() => {
+      importRequest = result.current.startImport();
+    });
+    await waitFor(() => expect(importPhotos).toHaveBeenCalledTimes(1));
+    const outcome = await importRequest;
+
+    expect(outcome.status).toBe("error");
+    expect(findImportDraft(localStorage, {
+      scope: "workspace-a",
+      photos: [resumablePhoto],
+    })?.selections).toEqual([{
+      photoKey: expect.any(String),
+      albumName: "旅行",
+    }]);
+    expect(notify).toHaveBeenCalledWith(expect.stringContaining("导入失败"));
+  });
+
+  it("treats a short backend result as incomplete and retains the draft", async () => {
+    const resumablePhoto = { ...freshPhoto, size: 100 };
+    detectCards.mockResolvedValue([{ path: "D:/DCIM" }]);
+    scanCard.mockResolvedValue([resumablePhoto]);
+    importPhotos.mockResolvedValue(0);
+
+    const { result } = renderHook(() => useImportWizardData({
+      confirmAction: vi.fn(() => true),
+      draftScope: "workspace-a",
+      initialAttachCurrentLocation: false,
+      notify: vi.fn(),
+    }));
+    await waitFor(() => expect(result.current.photos).toHaveLength(1));
+
+    let importRequest;
+    act(() => {
+      importRequest = result.current.startImport();
+    });
+    await waitFor(() => expect(importPhotos).toHaveBeenCalledTimes(1));
+    const outcome = await importRequest;
+
+    expect(outcome.status).toBe("error");
+    expect(outcome.error.message).toContain("实际完成 0 张");
+    expect(findImportDraft(localStorage, {
+      scope: "workspace-a",
+      photos: [resumablePhoto],
+    })).not.toBeNull();
   });
 
   it("can continue without GPS after location lookup fails", async () => {

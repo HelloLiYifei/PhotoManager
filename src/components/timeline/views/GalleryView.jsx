@@ -4,7 +4,7 @@ import { useI18n } from "../../../i18n";
 import { Button } from "../../ui";
 import { GalleryPreviewImage, ThumbnailImage } from "../media";
 import { handlePhotoItemKeyDown } from "./photoItemKeyboard";
-import styles from "./PhotoViews.module.css";
+import { photoViewsStyles as styles } from "../../../themes/classNames";
 
 function photoIndex(photos, photo) {
   if (!photo) return -1;

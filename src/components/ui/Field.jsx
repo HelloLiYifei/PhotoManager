@@ -1,4 +1,4 @@
-import styles from "./Ui.module.css";
+import { uiStyles as styles } from "../../themes/classNames";
 
 export default function Field({
   label,

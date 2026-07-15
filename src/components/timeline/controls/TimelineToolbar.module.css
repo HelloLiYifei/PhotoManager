@@ -7,10 +7,11 @@
   flex: 0 0 auto;
   align-items: center;
   gap: var(--space-3);
-  background: rgba(12, 15, 20, 0.92);
+  background: var(--header-bg);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   backdrop-filter: blur(16px);
+  box-shadow: var(--shadow-control);
 }
 
 .visuallyHidden {
@@ -43,8 +44,7 @@
   transform: translateY(-50%);
 }
 
-.searchField input,
-.filterField select {
+.searchField input {
   width: 100%;
   box-sizing: border-box;
   color: var(--text-main);
@@ -86,23 +86,26 @@
   white-space: nowrap;
 }
 
-.filterField select {
+.filterSelectRoot {
   width: 112px;
-  height: 34px;
-  padding: 0 26px 0 9px;
 }
 
-.filterField:last-child select {
+.filterSelect {
+  height: 34px;
+  min-height: 34px;
+  padding-left: 9px;
+  font-size: var(--font-size-xs);
+}
+
+.filterField:last-child .filterSelectRoot {
   width: 108px;
 }
 
-.searchField input:hover,
-.filterField select:hover {
+.searchField input:hover {
   border-color: var(--border-hover);
 }
 
 .searchField input:focus-visible,
-.filterField select:focus-visible,
 .viewSwitcher button:focus-visible,
 .mobileFilterButton:focus-visible,
 .mobileFilterPanel header button:focus-visible {

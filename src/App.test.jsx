@@ -20,6 +20,21 @@ vi.mock("./services/workspaceService", () => ({
   getWorkspaces: vi.fn(),
 }));
 
+vi.mock("./services/settingsService", () => ({
+  clearWorkspaceCache: vi.fn(),
+  getWorkspaceStorageStats: vi.fn().mockResolvedValue({
+    photoCount: 0,
+    trashCount: 0,
+    albumCount: 0,
+    originalBytes: 0,
+    databaseBytes: 0,
+    thumbnailCache: { fileCount: 0, bytes: 0 },
+    importPreviewCache: { fileCount: 0, bytes: 0 },
+  }),
+  listenToScanProgress: vi.fn().mockResolvedValue(() => {}),
+  scanWorkspace: vi.fn(),
+}));
+
 vi.mock("./lib/thumbnailLoader", () => ({
   loadPhotoThumbnail: vi.fn().mockResolvedValue("asset://cover"),
 }));
@@ -150,16 +165,15 @@ describe("App phase-two shell", () => {
     expect(getAlbumSummaries).toHaveBeenCalledTimes(3);
   });
 
-  it("shows semantic workspace information instead of a settings alert", async () => {
+  it("opens the settings page with current workspace information", async () => {
     render(<App />);
     await screen.findByRole("main", { name: "相册" });
 
-    fireEvent.click(screen.getByRole("button", { name: "工作区信息" }));
-    const dialog = screen.getByRole("dialog", { name: "工作区信息" });
-    expect(within(dialog).getByText("D:/Photos")).toBeInTheDocument();
-    expect(within(dialog).getByText("物理目录直接映射")).toBeInTheDocument();
-
-    fireEvent.click(within(dialog).getByRole("button", { name: "知道了" }));
-    expect(screen.queryByRole("dialog", { name: "工作区信息" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "设置" }));
+    expect(screen.getByRole("heading", { name: "设置" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "工作区" }));
+    await screen.findAllByText("0 B");
+    expect(screen.getByText("D:/Photos")).toBeInTheDocument();
+    expect(screen.getByText("物理目录直接映射")).toBeInTheDocument();
   });
 });

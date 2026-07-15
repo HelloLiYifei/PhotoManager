@@ -1,4 +1,5 @@
 import { ChevronLeft, ChevronRight, ImageOff } from "lucide-react";
+import { useI18n } from "../../i18n";
 import { Button, EmptyState, Spinner } from "../ui";
 import styles from "./Lightbox.module.css";
 
@@ -24,18 +25,19 @@ export default function LightboxCanvas({
   onLoaded,
   onRetry,
 }) {
+  const { t } = useI18n();
   const transform = `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`;
 
   return (
-    <section className={styles.canvasRegion} aria-label={`${photo.filename} 预览`}>
+    <section className={styles.canvasRegion} aria-label={t("lightbox.previewLabel", { name: photo.filename })}>
       {canGoPrevious && (
         <Button
-          variant="ghost"
+          variant="navigation"
           size="icon"
           className={`${styles.navButton} ${styles.previous}`}
           onClick={onPrevious}
           disabled={navigationDisabled}
-          aria-label="上一张照片"
+          aria-label={t("lightbox.previous")}
         >
           <ChevronLeft aria-hidden="true" />
         </Button>
@@ -63,16 +65,16 @@ export default function LightboxCanvas({
 
         {loading && !thumbnailSrc && !error && (
           <div className={styles.loading} aria-live="polite">
-            <Spinner label="正在打开大图" size="md" />
+            <Spinner label={t("lightbox.openingPreview")} size="md" />
           </div>
         )}
 
         {error && (
           <EmptyState
             icon={<ImageOff aria-hidden="true" />}
-            title="预览载入失败"
+            title={t("lightbox.previewFailed")}
             description={error}
-            actions={<Button variant="secondary" size="sm" onClick={onRetry}>重试</Button>}
+            actions={<Button variant="secondary" size="sm" onClick={onRetry}>{t("common.retry")}</Button>}
             role="alert"
           />
         )}
@@ -94,12 +96,12 @@ export default function LightboxCanvas({
 
       {canGoNext && (
         <Button
-          variant="ghost"
+          variant="navigation"
           size="icon"
           className={`${styles.navButton} ${styles.next}`}
           onClick={onNext}
           disabled={navigationDisabled}
-          aria-label="下一张照片"
+          aria-label={t("lightbox.next")}
         >
           <ChevronRight aria-hidden="true" />
         </Button>

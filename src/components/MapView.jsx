@@ -3,6 +3,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { MapPinned, TriangleAlert } from "lucide-react";
 import { loadPhotoThumbnail } from "../lib/thumbnailLoader";
+import { useI18n } from "../i18n";
 import { Button, EmptyState, Spinner } from "./ui";
 import createPhotoPopup from "./map/createPhotoPopup";
 import MapStatusBanner from "./map/MapStatusBanner";
@@ -30,6 +31,7 @@ function createMarkerIcon(count, focused) {
 }
 
 export default function MapView({ onShowPhoto, focusedPhotoId = null }) {
+  const { t, formatNumber } = useI18n();
   const mapElementRef = useRef(null);
   const mapRef = useRef(null);
   const markerGroupsRef = useRef([]);
@@ -83,10 +85,10 @@ export default function MapView({ onShowPhoto, focusedPhotoId = null }) {
       const marker = L.marker([group.latitude, group.longitude], {
         icon: createMarkerIcon(group.photos.length, containsFocus),
         title: group.photos.length > 1
-          ? `${group.photos.length} 张照片`
+          ? t("common.photoCount", { count: formatNumber(group.photos.length) })
           : group.photos[0].filename,
         alt: group.photos.length > 1
-          ? `${group.photos.length} 张照片的位置`
+          ? t("map.photoCountLocation", { count: formatNumber(group.photos.length) })
           : group.photos[0].filename,
       }).addTo(map);
 
@@ -129,7 +131,7 @@ export default function MapView({ onShowPhoto, focusedPhotoId = null }) {
       map.remove();
       mapRef.current = null;
     };
-  }, [error, gpsPhotos, loading, locationGroups]);
+  }, [error, formatNumber, gpsPhotos, loading, locationGroups, t]);
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -151,7 +153,7 @@ export default function MapView({ onShowPhoto, focusedPhotoId = null }) {
   if (loading) {
     return (
       <div className={styles.centeredState}>
-        <Spinner label="正在读取 GPS 元数据…" showLabel />
+        <Spinner label={t("map.loading")} showLabel />
       </div>
     );
   }
@@ -161,9 +163,9 @@ export default function MapView({ onShowPhoto, focusedPhotoId = null }) {
       <div className={styles.centeredState}>
         <EmptyState
           icon={<TriangleAlert aria-hidden="true" />}
-          title="无法加载照片位置"
+          title={t("map.loadFailed")}
           description={error}
-          action={<Button onClick={reload}>重试</Button>}
+          action={<Button onClick={reload}>{t("common.retry")}</Button>}
         />
       </div>
     );
@@ -174,23 +176,23 @@ export default function MapView({ onShowPhoto, focusedPhotoId = null }) {
       <div className={styles.centeredState}>
         <EmptyState
           icon={<MapPinned aria-hidden="true" />}
-          title="暂无带位置信息的照片"
-          description="导入包含 GPS 经纬度的手机或相机照片后，它们会自动显示在地图上。"
+          title={t("map.empty")}
+          description={t("map.emptyDescription")}
         />
       </div>
     );
   }
 
   return (
-    <section className={styles.page} aria-label="照片地图">
+    <section className={styles.page} aria-label={t("map.label")}>
       <p className={styles.summary} role="status">
-        {gpsPhotos.length} 张照片，分布在 {locationGroups.length} 个位置。点击标记可查看照片。
+        {t("map.summary", { photos: formatNumber(gpsPhotos.length), locations: formatNumber(locationGroups.length) })}
       </p>
       {tilesUnavailable && <MapStatusBanner />}
       <div
         ref={mapElementRef}
         className={styles.map}
-        aria-label="照片位置地图"
+        aria-label={t("map.mapLabel")}
       />
     </section>
   );

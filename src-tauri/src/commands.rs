@@ -7,7 +7,7 @@ use chrono::Utc;
 
 use crate::db::{map_row_to_photo, Album, AlbumSummary, DbState, Photo};
 use crate::workspace::{load_workspaces, save_workspaces, open_workspace_db, Workspace};
-use crate::scan::scan_workspace_dir;
+use crate::scan::{scan_workspace_dir, ScanResult};
 use crate::import::{detect_removable_cards, scan_card_files, execute_import, CardInfo, CardPhoto, ImportLocation, PhotoImportInfo};
 
 fn remove_thumbnail_cache(workspace_root: &Path, photo_id: &str) {
@@ -51,6 +51,103 @@ fn import_preview_cache_key(path: &str, metadata: &fs::Metadata) -> String {
     mix(&modified_nanos.to_le_bytes());
 
     format!("{hash:016x}")
+}
+
+#[derive(Debug, serde::Serialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct CacheStorageStats {
+    pub file_count: u64,
+    pub bytes: u64,
+}
+
+#[derive(Debug, serde::Serialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceStorageStats {
+    pub photo_count: i64,
+    pub trash_count: i64,
+    pub album_count: i64,
+    pub original_bytes: i64,
+    pub database_bytes: u64,
+    pub thumbnail_cache: CacheStorageStats,
+    pub import_preview_cache: CacheStorageStats,
+}
+
+#[derive(Debug, serde::Serialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct CacheClearResult {
+    pub files_removed: u64,
+    pub bytes_freed: u64,
+}
+
+fn cache_storage_stats(path: &Path) -> CacheStorageStats {
+    let mut result = CacheStorageStats::default();
+    let Ok(root_metadata) = fs::symlink_metadata(path) else {
+        return result;
+    };
+    if root_metadata.file_type().is_symlink() || !root_metadata.is_dir() {
+        return result;
+    }
+    let Ok(entries) = fs::read_dir(path) else {
+        return result;
+    };
+
+    for entry in entries.flatten() {
+        let entry_path = entry.path();
+        let Ok(metadata) = fs::symlink_metadata(&entry_path) else {
+            continue;
+        };
+        let file_type = metadata.file_type();
+        if file_type.is_symlink() {
+            result.file_count += 1;
+        } else if file_type.is_file() {
+            result.file_count += 1;
+            result.bytes = result.bytes.saturating_add(metadata.len());
+        } else if file_type.is_dir() {
+            let nested = cache_storage_stats(&entry_path);
+            result.file_count = result.file_count.saturating_add(nested.file_count);
+            result.bytes = result.bytes.saturating_add(nested.bytes);
+        }
+    }
+    result
+}
+
+fn clear_cache_files(path: &Path) -> CacheClearResult {
+    let mut result = CacheClearResult::default();
+    let Ok(root_metadata) = fs::symlink_metadata(path) else {
+        return result;
+    };
+    if root_metadata.file_type().is_symlink() || !root_metadata.is_dir() {
+        return result;
+    }
+    let Ok(entries) = fs::read_dir(path) else {
+        return result;
+    };
+
+    for entry in entries.flatten() {
+        let entry_path = entry.path();
+        let Ok(metadata) = fs::symlink_metadata(&entry_path) else {
+            continue;
+        };
+        let file_type = metadata.file_type();
+        if file_type.is_dir() && !file_type.is_symlink() {
+            let nested = clear_cache_files(&entry_path);
+            result.files_removed = result.files_removed.saturating_add(nested.files_removed);
+            result.bytes_freed = result.bytes_freed.saturating_add(nested.bytes_freed);
+            let _ = fs::remove_dir(&entry_path);
+            continue;
+        }
+
+        let length = if file_type.is_file() {
+            metadata.len()
+        } else {
+            0
+        };
+        if fs::remove_file(&entry_path).is_ok() {
+            result.files_removed += 1;
+            result.bytes_freed = result.bytes_freed.saturating_add(length);
+        }
+    }
+    result
 }
 
 // --- WORKSPACE COMMANDS ---
@@ -503,7 +600,10 @@ pub fn remove_photos_from_album(state: State<'_, DbState>, album_id: String, pho
 // --- SCAN AND IMPORT COMMANDS ---
 
 #[tauri::command]
-pub async fn scan_workspace(app_handle: AppHandle, state: State<'_, DbState>) -> Result<i32, String> {
+pub async fn scan_workspace(
+    app_handle: AppHandle,
+    state: State<'_, DbState>,
+) -> Result<ScanResult, String> {
     let current_path_guard = state.current_path.lock().unwrap();
     let workspace_root = match &*current_path_guard {
         Some(path) => path.clone(),
@@ -518,6 +618,76 @@ pub async fn scan_workspace(app_handle: AppHandle, state: State<'_, DbState>) ->
 
     // Scan the folder
     scan_workspace_dir(&workspace_root, &app_handle, conn)
+}
+
+#[tauri::command]
+pub fn get_workspace_storage_stats(
+    state: State<'_, DbState>,
+) -> Result<WorkspaceStorageStats, String> {
+    let workspace_root = {
+        let current_path_guard = state.current_path.lock().unwrap();
+        current_path_guard
+            .as_ref()
+            .ok_or("没有打开的工作空间")?
+            .clone()
+    };
+
+    let (photo_count, trash_count, album_count, original_bytes) = {
+        let conn_guard = state.conn.lock().unwrap();
+        let conn = conn_guard.as_ref().ok_or("数据库未连接")?;
+        let photo_count = conn
+            .query_row("SELECT COUNT(*) FROM photos WHERE is_deleted = 0", [], |row| row.get(0))
+            .map_err(|error| error.to_string())?;
+        let trash_count = conn
+            .query_row("SELECT COUNT(*) FROM photos WHERE is_deleted = 1", [], |row| row.get(0))
+            .map_err(|error| error.to_string())?;
+        let album_count = conn
+            .query_row("SELECT COUNT(*) FROM albums", [], |row| row.get(0))
+            .map_err(|error| error.to_string())?;
+        let original_bytes = conn
+            .query_row("SELECT COALESCE(SUM(file_size), 0) FROM photos", [], |row| row.get(0))
+            .map_err(|error| error.to_string())?;
+        (photo_count, trash_count, album_count, original_bytes)
+    };
+
+    let metadata_root = Path::new(&workspace_root).join(".photomanager");
+    let database_bytes = fs::metadata(metadata_root.join("metadata.db"))
+        .map(|metadata| metadata.len())
+        .unwrap_or(0);
+
+    Ok(WorkspaceStorageStats {
+        photo_count,
+        trash_count,
+        album_count,
+        original_bytes,
+        database_bytes,
+        thumbnail_cache: cache_storage_stats(&metadata_root.join("thumbnails")),
+        import_preview_cache: cache_storage_stats(&metadata_root.join("import-previews")),
+    })
+}
+
+#[tauri::command]
+pub fn clear_workspace_cache(
+    state: State<'_, DbState>,
+    kind: String,
+) -> Result<CacheClearResult, String> {
+    let workspace_root = {
+        let current_path_guard = state.current_path.lock().unwrap();
+        current_path_guard
+            .as_ref()
+            .ok_or("没有打开的工作空间")?
+            .clone()
+    };
+
+    let cache_name = match kind.as_str() {
+        "thumbnails" => "thumbnails",
+        "importPreviews" => "import-previews",
+        _ => return Err("不支持的缓存类型".to_string()),
+    };
+    let cache_root = Path::new(&workspace_root)
+        .join(".photomanager")
+        .join(cache_name);
+    Ok(clear_cache_files(&cache_root))
 }
 
 #[tauri::command]
@@ -987,4 +1157,61 @@ pub fn export_photos(state: State<'_, DbState>, photo_ids: Vec<String>, dest_dir
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod settings_tests {
+    use super::{cache_storage_stats, clear_cache_files};
+    use std::fs;
+
+    fn temp_cache_dir() -> std::path::PathBuf {
+        std::env::temp_dir().join(format!(
+            "photomanager-cache-test-{}",
+            uuid::Uuid::new_v4()
+        ))
+    }
+
+    #[test]
+    fn cache_stats_and_clear_are_scoped_to_the_given_directory() {
+        let root = temp_cache_dir();
+        let nested = root.join("nested");
+        fs::create_dir_all(&nested).expect("create cache fixture");
+        fs::write(root.join("one.jpg"), [1_u8, 2, 3]).expect("write first fixture");
+        fs::write(nested.join("two.jpg"), [4_u8, 5]).expect("write nested fixture");
+
+        let before = cache_storage_stats(&root);
+        assert_eq!(before.file_count, 2);
+        assert_eq!(before.bytes, 5);
+
+        let result = clear_cache_files(&root);
+        assert_eq!(result.files_removed, 2);
+        assert_eq!(result.bytes_freed, 5);
+        assert!(root.exists());
+        assert_eq!(cache_storage_stats(&root).file_count, 0);
+
+        fs::remove_dir_all(root).expect("remove cache fixture");
+    }
+
+    #[test]
+    fn missing_cache_directories_are_safe_noops() {
+        let root = temp_cache_dir();
+        let stats = cache_storage_stats(&root);
+        let result = clear_cache_files(&root);
+        assert_eq!(stats.file_count, 0);
+        assert_eq!(stats.bytes, 0);
+        assert_eq!(result.files_removed, 0);
+        assert_eq!(result.bytes_freed, 0);
+    }
+
+    #[test]
+    fn a_non_directory_cache_root_is_never_removed() {
+        let root = temp_cache_dir();
+        fs::write(&root, [1_u8, 2, 3]).expect("write cache-root fixture");
+
+        assert_eq!(cache_storage_stats(&root).file_count, 0);
+        assert_eq!(clear_cache_files(&root).files_removed, 0);
+        assert!(root.exists());
+
+        fs::remove_file(root).expect("remove cache-root fixture");
+    }
 }

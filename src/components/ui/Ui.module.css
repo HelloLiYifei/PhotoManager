@@ -57,9 +57,26 @@
 }
 
 .button_danger {
-  color: #fecaca;
-  background: rgba(239, 68, 68, 0.12);
-  border-color: rgba(248, 113, 113, 0.34);
+  color: #fff;
+  background: var(--danger-color);
+  border-color: var(--danger-color);
+}
+
+.button_navigation {
+  width: 48px;
+  height: 48px;
+  border-color: var(--border-hover);
+  border-radius: 999px;
+  background: var(--header-bg);
+  color: var(--text-main);
+  box-shadow: var(--shadow-elevated);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.button_navigation svg {
+  width: 24px;
+  height: 24px;
 }
 
 .button:hover:not(:disabled) {
@@ -78,6 +95,131 @@
 
 .buttonFullWidth {
   width: 100%;
+}
+
+.selectRoot {
+  position: relative;
+  display: inline-flex;
+  min-width: 0;
+}
+
+.selectTrigger {
+  display: flex;
+  width: 100%;
+  min-height: 38px;
+  padding: 0 34px 0 11px;
+  align-items: center;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-input);
+  color: var(--text-main);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--font-size-sm);
+  text-align: left;
+  transition: background var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.selectTrigger > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selectTrigger:hover:not(:disabled) {
+  border-color: var(--border-hover);
+  background: var(--bg-elevated);
+}
+
+.selectTrigger:focus-visible,
+.selectRoot:has(.selectMenu) .selectTrigger {
+  border-color: var(--accent-color);
+  box-shadow: var(--focus-ring);
+}
+
+.selectTrigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.selectChevron {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  width: 16px;
+  height: 16px;
+  color: var(--text-dark);
+  pointer-events: none;
+  transform: translateY(-50%);
+  transition: transform var(--transition-fast), color var(--transition-fast);
+}
+
+.selectRoot:has(.selectMenu) .selectChevron {
+  color: var(--accent-color);
+  transform: translateY(-50%) rotate(180deg);
+}
+
+.selectMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 120;
+  display: flex;
+  width: max-content;
+  min-width: 100%;
+  max-width: min(320px, 80vw);
+  max-height: 260px;
+  padding: 5px;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--bg-elevated) 97%, transparent);
+  box-shadow: var(--shadow-elevated);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+}
+
+.selectOption {
+  display: flex;
+  width: 100%;
+  min-height: 34px;
+  padding: 0 9px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--font-size-sm);
+  text-align: left;
+}
+
+.selectOptionHighlighted {
+  background: var(--bg-hover);
+  color: var(--text-main);
+}
+
+.selectOptionSelected {
+  background: var(--accent-muted);
+  color: var(--accent-color);
+  font-weight: 650;
+}
+
+.selectOption svg {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+}
+
+.selectOption:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
 }
 
 .field {

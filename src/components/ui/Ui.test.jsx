@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { Button, Dialog, Drawer, EmptyState, Field, Spinner } from ".";
+import { Button, Dialog, Drawer, EmptyState, Field, Select, Spinner } from ".";
 
 describe("shared UI primitives", () => {
   it("renders buttons, fields, status and empty states", () => {
@@ -20,6 +20,27 @@ describe("shared UI primitives", () => {
     expect(screen.getByRole("textbox", { name: "名称" })).toBeInTheDocument();
     expect(screen.getByRole("status", { name: "加载照片" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "暂无照片" })).toBeInTheDocument();
+  });
+
+  it("supports keyboard navigation in the themed select menu", () => {
+    const onChange = vi.fn();
+    render(
+      <Select
+        value="one"
+        onChange={onChange}
+        aria-label="排序方式"
+        options={[
+          { value: "one", label: "名称" },
+          { value: "two", label: "日期" },
+        ]}
+      />,
+    );
+
+    const select = screen.getByRole("combobox", { name: "排序方式" });
+    fireEvent.keyDown(select, { key: "ArrowDown" });
+    fireEvent.keyDown(select, { key: "ArrowDown" });
+    fireEvent.keyDown(select, { key: "Enter" });
+    expect(onChange).toHaveBeenCalledWith("two");
   });
 
   it("closes dialogs with Escape and restores focus", () => {

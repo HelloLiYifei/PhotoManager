@@ -1,6 +1,7 @@
 import { useId, useRef } from "react";
 import { X } from "lucide-react";
 
+import { useI18n } from "../../i18n";
 import Button from "./Button";
 import useOverlayFocus from "./useOverlayFocus";
 import styles from "./Ui.module.css";
@@ -13,11 +14,13 @@ export default function Dialog({
   ariaLabel,
   children,
   footer = null,
-  closeLabel = "关闭对话框",
+  closeLabel = null,
   closeDisabled = false,
   className = "",
   panelClassName = "",
 }) {
+  const { t } = useI18n();
+  const resolvedCloseLabel = closeLabel || t("dialog.closeDialog");
   const titleId = useId();
   const descriptionId = useId();
   const panelRef = useRef(null);
@@ -52,7 +55,7 @@ export default function Dialog({
             size="icon"
             onClick={onClose}
             disabled={closeDisabled}
-            aria-label={closeLabel}
+            aria-label={resolvedCloseLabel}
           >
             <X aria-hidden="true" />
           </Button>

@@ -30,12 +30,10 @@ describe("TimelineToolbar", () => {
     fireEvent.change(screen.getByRole("searchbox", { name: "搜索照片" }), {
       target: { value: "富士" },
     });
-    fireEvent.change(screen.getByRole("combobox", { name: "按标签筛选" }), {
-      target: { value: "旅行" },
-    });
-    fireEvent.change(screen.getByRole("combobox", { name: "按评分筛选" }), {
-      target: { value: "3" },
-    });
+    fireEvent.click(screen.getByRole("combobox", { name: "按标签筛选" }));
+    fireEvent.click(screen.getByRole("option", { name: "旅行" }));
+    fireEvent.click(screen.getByRole("combobox", { name: "按评分筛选" }));
+    fireEvent.click(screen.getByRole("option", { name: "3 星及以上" }));
     fireEvent.click(screen.getByRole("button", { name: "列表视图" }));
 
     expect(onSearchChange).toHaveBeenCalledWith("富士");

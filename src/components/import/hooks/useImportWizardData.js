@@ -56,6 +56,8 @@ export default function useImportWizardData({
   notify = defaultNotify,
   geolocation,
   autoSelectDetectedSource = true,
+  initialBackupPath = "",
+  initialAttachCurrentLocation = true,
 } = {}) {
   const [cards, setCards] = useState([]);
   const [detectingCards, setDetectingCards] = useState(true);
@@ -72,8 +74,12 @@ export default function useImportWizardData({
   const [albumsLoading, setAlbumsLoading] = useState(true);
   const [albumsError, setAlbumsError] = useState(null);
 
-  const [backupPath, setBackupPath] = useState("");
-  const [attachCurrentLocationState, setAttachCurrentLocationState] = useState(true);
+  const [backupPath, setBackupPath] = useState(() =>
+    typeof initialBackupPath === "string" ? initialBackupPath : "",
+  );
+  const [attachCurrentLocationState, setAttachCurrentLocationState] = useState(
+    initialAttachCurrentLocation !== false,
+  );
   const [currentLocation, setCurrentLocation] = useState(null);
   const [locationStatus, setLocationStatus] = useState("idle");
   const [locationError, setLocationError] = useState("");

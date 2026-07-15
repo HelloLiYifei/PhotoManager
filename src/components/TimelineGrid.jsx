@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ImageOff, LoaderCircle, RefreshCw, X } from "lucide-react";
 
 import { getAlbums } from "../services/albumService";
+import { useI18n } from "../i18n";
 import {
   BatchActionBar,
   MoveAlbumDialog,
@@ -48,6 +49,7 @@ function useNarrowTimeline() {
 }
 
 export default function TimelineGrid({
+  workspace,
   currentView,
   albumId,
   onPhotoClick,
@@ -55,12 +57,13 @@ export default function TimelineGrid({
   refreshTrigger,
 }) {
   const { alert: showAlert } = useGlobalDialog();
+  const { t } = useI18n();
   const [searchQuery, setSearchQuery] = useState("");
   const [ratingFilter, setRatingFilter] = useState(0);
   const [tagFilter, setTagFilter] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
-  const [viewMode, setViewMode] = usePhotoViewPreference();
+  const [viewMode, setViewMode] = usePhotoViewPreference(workspace);
   const [newTagInput, setNewTagInput] = useState("");
   const [compareMode, setCompareMode] = useState(false);
   const [compareLockedId, setCompareLockedId] = useState(null);
@@ -175,8 +178,8 @@ export default function TimelineGrid({
     }
 
     if (selectedIds.length === 0) {
-      void showAlert("请先选择一张照片作为对比基准。", {
-        title: "尚未选择照片",
+      void showAlert(t("timeline.compareSelect"), {
+        title: t("timeline.compareSelectTitle"),
         tone: "warning",
       });
       return;
@@ -185,30 +188,30 @@ export default function TimelineGrid({
     setViewMode("masonry");
     setCompareLockedId(selectedIds.at(-1));
     setCompareMode(true);
-  }, [compareMode, selectedIds, setViewMode, showAlert]);
+  }, [compareMode, selectedIds, setViewMode, showAlert, t]);
 
   const addTag = useCallback(async () => {
     try {
       const added = await addPrimaryTag(newTagInput);
       if (added) setNewTagInput("");
     } catch (caught) {
-      void showAlert(`添加标签失败：${errorMessage(caught)}`, {
-        title: "添加标签失败",
+      void showAlert(t("timeline.addTagFailed", { message: errorMessage(caught) }), {
+        title: t("timeline.addTagFailedTitle"),
         tone: "danger",
       });
     }
-  }, [addPrimaryTag, newTagInput, showAlert]);
+  }, [addPrimaryTag, newTagInput, showAlert, t]);
 
   const removeTag = useCallback(async (tagName) => {
     try {
       await removePrimaryTag(tagName);
     } catch (caught) {
-      void showAlert(`删除标签失败：${errorMessage(caught)}`, {
-        title: "删除标签失败",
+      void showAlert(t("timeline.removeTagFailed", { message: errorMessage(caught) }), {
+        title: t("timeline.removeTagFailedTitle"),
         tone: "danger",
       });
     }
-  }, [removePrimaryTag, showAlert]);
+  }, [removePrimaryTag, showAlert, t]);
 
   const openMoveDialog = useCallback(async () => {
     setMoveError(null);
@@ -217,12 +220,12 @@ export default function TimelineGrid({
       setMoveAlbums(albums);
       setMoveDialogOpen(true);
     } catch (caught) {
-      void showAlert(`读取相册失败：${errorMessage(caught)}`, {
-        title: "无法读取相册",
+      void showAlert(t("timeline.readAlbumsFailed", { message: errorMessage(caught) }), {
+        title: t("timeline.readAlbumsFailedTitle"),
         tone: "danger",
       });
     }
-  }, [showAlert]);
+  }, [showAlert, t]);
 
   const moveToAlbum = useCallback(async (targetAlbumId) => {
     setMoveBusy(true);
@@ -298,7 +301,7 @@ export default function TimelineGrid({
   return (
     <section
       className={`${styles.viewport} animate-fade-in`}
-      aria-label="照片浏览器"
+      aria-label={t("timeline.browser")}
       aria-busy={loading}
       data-view-mode={viewMode}
     >
@@ -321,7 +324,7 @@ export default function TimelineGrid({
           <span>{errorMessage(error)}</span>
           <button type="button" onClick={retry}>
             <RefreshCw aria-hidden="true" />
-            重试
+            {t("common.retry")}
           </button>
         </div>
       ) : null}
@@ -335,40 +338,40 @@ export default function TimelineGrid({
           {loading && photos.length === 0 ? (
             <div className={styles.state} role="status">
               <LoaderCircle className={styles.spinner} aria-hidden="true" />
-              <strong>正在加载照片</strong>
-              <span>正在读取当前视图的照片信息…</span>
+              <strong>{t("timeline.loading")}</strong>
+              <span>{t("timeline.loadingDescription")}</span>
             </div>
           ) : error && photos.length === 0 ? (
             <div className={styles.state} role="alert">
               <ImageOff aria-hidden="true" />
-              <strong>照片加载失败</strong>
+              <strong>{t("timeline.loadFailed")}</strong>
               <span>{errorMessage(error)}</span>
               <button type="button" onClick={retry}>
                 <RefreshCw aria-hidden="true" />
-                重试
+                {t("common.retry")}
               </button>
             </div>
           ) : photos.length === 0 ? (
             <div className={styles.state} role="status">
               <ImageOff aria-hidden="true" />
-              <strong>{searchQuery || tagFilter || ratingFilter ? "没有匹配的照片" : "还没有照片"}</strong>
-              <span>{searchQuery || tagFilter || ratingFilter ? "请调整搜索或筛选条件。" : "导入照片后会在这里显示。"}</span>
+              <strong>{searchQuery || tagFilter || ratingFilter ? t("timeline.noMatches") : t("timeline.noPhotos")}</strong>
+              <span>{searchQuery || tagFilter || ratingFilter ? t("timeline.adjustFilters") : t("timeline.importHint")}</span>
             </div>
           ) : compareMode ? (
             <div className={styles.compareLayout}>
               <div className={styles.compareBrowser}>{photoView}</div>
-              <section className={styles.comparePreview} aria-label="照片对比基准">
+              <section className={styles.comparePreview} aria-label={t("timeline.compareBaseline")}>
                 <button
                   type="button"
                   className={styles.compareClose}
                   onClick={toggleCompare}
-                  aria-label="退出照片对比"
+                  aria-label={t("timeline.exitCompare")}
                 >
                   <X aria-hidden="true" />
-                  退出对比
+                  {t("timeline.exitCompareText")}
                 </button>
                 <ComparePreviewImage id={compareLockedId} />
-                <strong>对比锁定基准图</strong>
+                <strong>{t("timeline.lockedBaseline")}</strong>
               </section>
             </div>
           ) : photoView}

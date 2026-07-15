@@ -1,16 +1,19 @@
 import { SlidersHorizontal, X } from "lucide-react";
 
+import { useI18n } from "../../../i18n";
 import styles from "./ImportControls.module.css";
 
 export default function ConfigurationPanel({
   open = false,
-  title = "导入配置",
+  title = null,
   description = null,
   disabled = false,
   children,
   onOpen,
   onClose,
 }) {
+  const { t } = useI18n();
+  const resolvedTitle = title || t("import.configuration");
   return (
     <div className={`${styles.configurationRoot} ${open ? styles.configurationOpen : ""}`}>
       {!open ? (
@@ -22,7 +25,7 @@ export default function ConfigurationPanel({
           aria-expanded="false"
         >
           <SlidersHorizontal aria-hidden="true" />
-          导入配置
+          {t("import.configuration")}
         </button>
       ) : null}
 
@@ -32,17 +35,17 @@ export default function ConfigurationPanel({
           className={styles.configurationScrim}
           onClick={onClose}
           disabled={disabled}
-          aria-label="关闭导入配置"
+          aria-label={t("import.closeConfiguration")}
         />
       ) : null}
 
-      <aside className={styles.configurationPanel} aria-label={title}>
+      <aside className={styles.configurationPanel} aria-label={resolvedTitle}>
         <header className={styles.configurationHeader}>
           <div>
-            <h2>{title}</h2>
+            <h2>{resolvedTitle}</h2>
             {description ? <p>{description}</p> : null}
           </div>
-          <button type="button" onClick={onClose} disabled={disabled} aria-label="关闭导入配置面板">
+          <button type="button" onClick={onClose} disabled={disabled} aria-label={t("import.closeConfigurationPanel")}>
             <X aria-hidden="true" />
           </button>
         </header>

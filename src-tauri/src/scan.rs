@@ -16,6 +16,14 @@ pub struct ScanProgress {
     pub current_file: String,
 }
 
+#[derive(Debug, Serialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ScanResult {
+    pub scanned: i32,
+    pub added: i32,
+    pub removed: i32,
+}
+
 // Check if file extension is supported
 pub fn is_supported_image(ext: &str) -> bool {
     let ext_lower = ext.to_lowercase();
@@ -30,13 +38,14 @@ pub fn scan_workspace_dir(
     workspace_path: &str,
     app_handle: &tauri::AppHandle,
     conn: &Connection,
-) -> Result<i32, String> {
+) -> Result<ScanResult, String> {
     let root_path = Path::new(workspace_path);
     if !root_path.exists() {
         return Err("工作空间不存在".to_string());
     }
 
     // 0. Clean up deleted/moved files from database first
+    let mut removed_count = 0;
     if let Ok(mut stmt) = conn.prepare("SELECT id, path FROM photos") {
         if let Ok(photos_iter) = stmt.query_map([], |row| {
             Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
@@ -46,7 +55,9 @@ pub fn scan_workspace_dir(
                 let rel_path = photo.1;
                 let abs_path = root_path.join(&rel_path);
                 if !abs_path.exists() {
-                    let _ = conn.execute("DELETE FROM photos WHERE id = ?1", [&id]);
+                    if conn.execute("DELETE FROM photos WHERE id = ?1", [&id]).is_ok() {
+                        removed_count += 1;
+                    }
                 }
             }
         }
@@ -232,5 +243,9 @@ pub fn scan_workspace_dir(
         }
     }
 
-    Ok(added_count)
+    Ok(ScanResult {
+        scanned: total_files,
+        added: added_count,
+        removed: removed_count,
+    })
 }

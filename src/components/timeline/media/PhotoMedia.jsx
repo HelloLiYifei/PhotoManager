@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useI18n } from "../../../i18n";
 import { loadPhotoThumbnail } from "../../../lib/thumbnailLoader";
 import { loadPhotoPreview } from "../../../lib/previewLoader";
 
@@ -34,6 +35,7 @@ export function LazyThumbnail({
   loadingClassName = className,
   onLoad,
 }) {
+  const { t } = useI18n();
   const [src, setSrc] = useState("");
   const [loading, setLoading] = useState(true);
   const imageRef = useRef(null);
@@ -103,7 +105,7 @@ export function LazyThumbnail({
         className={`${loadingClassName} ${fitClassName}`.trim()}
         style={stableSizeStyle}
         role="status"
-        aria-label={`正在加载${alt || "照片"}`}
+        aria-label={t("photo.loading", { name: alt || t("photo.photo") })}
       />
     );
   }
@@ -124,6 +126,7 @@ export function LazyThumbnail({
 }
 
 export function GalleryPreviewImage({ id, alt }) {
+  const { t } = useI18n();
   const [src, setSrc] = useState("");
 
   useEffect(() => {
@@ -145,7 +148,7 @@ export function GalleryPreviewImage({ id, alt }) {
 
   if (!src) {
     return (
-      <div className="gallery-preview-loading" role="status" aria-label="正在读取预览图">
+      <div className="gallery-preview-loading" role="status" aria-label={t("photo.readingPreview")}>
         <div className="spinner" />
       </div>
     );
@@ -161,7 +164,9 @@ export function GalleryPreviewImage({ id, alt }) {
   );
 }
 
-export function ComparePreviewImage({ id, alt = "对比锁定图" }) {
+export function ComparePreviewImage({ id, alt = null }) {
+  const { t } = useI18n();
+  const resolvedAlt = alt || t("timeline.compareLockedImage");
   const [src, setSrc] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -188,8 +193,8 @@ export function ComparePreviewImage({ id, alt = "对比锁定图" }) {
 
   if (loading) {
     return (
-      <div role="status" aria-label="正在读取高清对比图">
-        正在读取高清对比图…
+      <div role="status" aria-label={t("timeline.readingHdCompare")}>
+        {t("timeline.readingHdCompareProgress")}
       </div>
     );
   }
@@ -198,7 +203,7 @@ export function ComparePreviewImage({ id, alt = "对比锁定图" }) {
     <img
       src={src}
       className="compare-locked-img"
-      alt={alt}
+      alt={resolvedAlt}
       decoding="async"
     />
   );

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useI18n } from "../../../i18n";
 import {
   ImportGalleryPreview,
   ImportPhotoMarkers,
@@ -29,6 +30,7 @@ export default function ImportGalleryView({
   onBrushEnter,
   onOpenPhoto,
 }) {
+  const { t } = useI18n();
   const galleryRef = useRef(null);
   const lastWheelTimeRef = useRef(0);
   const activeIndex = findPhotoIndex(photos, activePath);
@@ -39,7 +41,7 @@ export default function ImportGalleryView({
   }, []);
 
   if (!photo) {
-    return <div className={styles.empty} role="status">暂无可预览照片</div>;
+    return <div className={styles.empty} role="status">{t("import.noPreviewPhotos")}</div>;
   }
 
   const state = getImportPhotoState(photo, getPhotoVisualState);
@@ -90,7 +92,7 @@ export default function ImportGalleryView({
       className={styles.gallery}
       role="region"
       tabIndex={0}
-      aria-label="导入照片画廊"
+      aria-label={t("import.photoGallery")}
       onKeyDown={handleKeyDown}
     >
       <div
@@ -115,7 +117,7 @@ export default function ImportGalleryView({
         <div
           className={styles.galleryMedia}
           role="group"
-          aria-label="当前导入照片预览"
+          aria-label={t("import.currentPhotoPreview")}
           onDoubleClick={() => {
             if (!brushAlbum) onOpenPhoto?.(photo);
           }}
@@ -127,7 +129,7 @@ export default function ImportGalleryView({
               onMouseDown={(event) => event.stopPropagation()}
               onDoubleClick={(event) => event.stopPropagation()}
               onClick={() => activateIndex(activeIndex - 1)}
-              aria-label="上一张"
+              aria-label={t("lightbox.previous")}
             >
               ‹
             </button>
@@ -143,7 +145,7 @@ export default function ImportGalleryView({
               onMouseDown={(event) => event.stopPropagation()}
               onDoubleClick={(event) => event.stopPropagation()}
               onClick={() => activateIndex(activeIndex + 1)}
-              aria-label="下一张"
+              aria-label={t("lightbox.next")}
             >
               ›
             </button>
@@ -152,11 +154,11 @@ export default function ImportGalleryView({
 
         <div className={styles.galleryCaption}>
           <strong>{photo.relativePath}</strong>
-          <span>{photo.dateTaken || "日期未知"} · {formatImportFileSize(photo.size)}</span>
+          <span>{photo.dateTaken || t("import.dateUnknown")} · {formatImportFileSize(photo.size)}</span>
         </div>
       </div>
 
-      <div className={styles.filmstrip} role="listbox" aria-label="存储卡照片胶片带">
+      <div className={styles.filmstrip} role="listbox" aria-label={t("import.cardFilmstrip")}>
         {photos.map((filmPhoto) => {
           const filmState = getImportPhotoState(filmPhoto, getPhotoVisualState);
           const isActive = filmPhoto.absolutePath === photo.absolutePath;
@@ -196,7 +198,7 @@ export default function ImportGalleryView({
             >
               <ImportThumbnail photo={filmPhoto} scrollRoot={scrollRoot} fit="cover" />
               {filmPhoto.alreadyImported && (
-                <span className={`${styles.filmStatus} ${styles.importedFilmStatus}`}>已导入</span>
+                <span className={`${styles.filmStatus} ${styles.importedFilmStatus}`}>{t("import.imported")}</span>
               )}
               {!filmPhoto.alreadyImported && filmState.targetAlbum && (
                 <span

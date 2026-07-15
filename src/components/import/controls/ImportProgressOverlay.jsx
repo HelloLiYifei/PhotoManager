@@ -1,5 +1,6 @@
 import { Download, LoaderCircle } from "lucide-react";
 
+import { useI18n } from "../../../i18n";
 import styles from "./ImportControls.module.css";
 
 function percent(copied, total) {
@@ -13,23 +14,26 @@ export default function ImportProgressOverlay({
   open = false,
   copied = 0,
   total = 0,
-  currentFile = "准备导入中…",
-  title = "正在拷入并分析照片",
+  currentFile = null,
+  title = null,
 }) {
+  const { formatNumber, t } = useI18n();
   if (!open) return null;
 
   const progress = percent(copied, total);
+  const resolvedCurrentFile = currentFile || t("import.preparing");
+  const resolvedTitle = title || t("import.copyingAndAnalyzing");
 
   return (
-    <div className={styles.progressBackdrop} role="dialog" aria-modal="true" aria-label="照片导入进度">
+    <div className={styles.progressBackdrop} role="dialog" aria-modal="true" aria-label={t("import.progress")}>
       <div className={styles.progressCard} aria-live="polite" aria-busy="true">
         <span className={styles.progressIcon}>
           <LoaderCircle className={styles.spinner} aria-hidden="true" />
         </span>
         <div className={styles.progressBody}>
           <div className={styles.progressHeading}>
-            <span><Download aria-hidden="true" />{title}</span>
-            <strong>{copied} / {total}</strong>
+            <span><Download aria-hidden="true" />{resolvedTitle}</span>
+            <strong>{formatNumber(copied)} / {formatNumber(total)}</strong>
           </div>
           <div
             className={styles.progressTrack}
@@ -40,7 +44,7 @@ export default function ImportProgressOverlay({
           >
             <span style={{ width: `${progress}%` }} />
           </div>
-          <p title={currentFile}>正在拷贝：{currentFile}</p>
+          <p title={resolvedCurrentFile}>{t("import.copyingFile", { name: resolvedCurrentFile })}</p>
         </div>
       </div>
     </div>

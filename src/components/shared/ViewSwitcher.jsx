@@ -1,4 +1,5 @@
 import { GalleryHorizontal, Grid3X3, List } from "lucide-react";
+import { useI18n } from "../../i18n";
 import styles from "./ViewSwitcher.module.css";
 
 export const DEFAULT_VIEW_OPTIONS = Object.freeze([
@@ -14,26 +15,33 @@ export default function ViewSwitcher({
   ariaLabel = "照片视图",
   className = "",
 }) {
+  const { t } = useI18n();
+  const resolvedAriaLabel = ariaLabel === "照片视图" ? t("timeline.photoView") : ariaLabel;
   return (
     <div
       className={`${styles.switcher} ${className}`.trim()}
       role="group"
-      aria-label={ariaLabel}
+      aria-label={resolvedAriaLabel}
     >
-      {options.map(({ value: optionValue, label, Icon }) => (
-        <button
-          type="button"
-          key={optionValue}
-          className={value === optionValue ? styles.active : undefined}
-          onClick={() => onChange?.(optionValue)}
-          title={`${label}视图`}
-          aria-label={`${label}视图`}
-          aria-pressed={value === optionValue}
-        >
-          {Icon ? <Icon aria-hidden="true" /> : null}
-          <span>{label}</span>
-        </button>
-      ))}
+      {options.map(({ value: optionValue, label, Icon }) => {
+        const resolvedLabel = options === DEFAULT_VIEW_OPTIONS
+          ? t(`settings.view.${optionValue}`)
+          : label;
+        return (
+          <button
+            type="button"
+            key={optionValue}
+            className={value === optionValue ? styles.active : undefined}
+            onClick={() => onChange?.(optionValue)}
+            title={t("timeline.viewLabel", { name: resolvedLabel })}
+            aria-label={t("timeline.viewLabel", { name: resolvedLabel })}
+            aria-pressed={value === optionValue}
+          >
+            {Icon ? <Icon aria-hidden="true" /> : null}
+            <span>{resolvedLabel}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }

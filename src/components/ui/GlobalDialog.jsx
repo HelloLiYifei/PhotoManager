@@ -19,6 +19,7 @@ import Button from "./Button";
 import { GlobalDialogContext } from "./globalDialogContext";
 import useOverlayFocus from "./useOverlayFocus";
 import styles from "./GlobalDialog.module.css";
+import { useI18n } from "../../i18n";
 
 const TONE_ICONS = {
   danger: XCircle,
@@ -28,6 +29,7 @@ const TONE_ICONS = {
 };
 
 function DialogSurface({ request, onResolve }) {
+  const { t } = useI18n();
   const titleId = useId();
   const messageId = useId();
   const panelRef = useRef(null);
@@ -76,7 +78,7 @@ function DialogSurface({ request, onResolve }) {
             className={styles.closeButton}
             variant="ghost"
             size="icon"
-            aria-label="关闭弹窗"
+            aria-label={t("dialog.close")}
             onClick={dismiss}
           >
             <X aria-hidden="true" />
@@ -118,6 +120,7 @@ function DialogSurface({ request, onResolve }) {
 }
 
 export function GlobalDialogProvider({ children }) {
+  const { t } = useI18n();
   const requestIdRef = useRef(0);
   const activeRequestRef = useRef(null);
   const pendingRequestsRef = useRef([]);
@@ -163,31 +166,31 @@ export function GlobalDialogProvider({ children }) {
     alert: (message, options = {}) => enqueue({
       type: "alert",
       message: String(message),
-      title: options.title ?? "操作提示",
+      title: options.title ?? t("dialog.notice"),
       tone: options.tone ?? "info",
-      confirmText: options.confirmText ?? "知道了",
+      confirmText: options.confirmText ?? t("dialog.gotIt"),
       cancelText: "",
     }),
     confirm: (message, options = {}) => enqueue({
       type: "confirm",
       message: String(message),
-      title: options.title ?? "请确认此操作",
+      title: options.title ?? t("dialog.confirm"),
       tone: options.tone ?? "warning",
-      confirmText: options.confirmText ?? "确认",
-      cancelText: options.cancelText ?? "取消",
+      confirmText: options.confirmText ?? t("common.confirm"),
+      cancelText: options.cancelText ?? t("common.cancel"),
     }),
     prompt: (message, options = {}) => enqueue({
       type: "prompt",
       message: String(message),
-      title: options.title ?? "请输入内容",
+      title: options.title ?? t("dialog.input"),
       tone: options.tone ?? "info",
-      confirmText: options.confirmText ?? "确定",
-      cancelText: options.cancelText ?? "取消",
+      confirmText: options.confirmText ?? t("common.ok"),
+      cancelText: options.cancelText ?? t("common.cancel"),
       defaultValue: options.defaultValue ?? "",
-      inputLabel: options.inputLabel ?? "输入内容",
+      inputLabel: options.inputLabel ?? t("dialog.inputLabel"),
       placeholder: options.placeholder ?? "",
     }),
-  }), [enqueue]);
+  }), [enqueue, t]);
 
   return (
     <GlobalDialogContext.Provider value={dialog}>

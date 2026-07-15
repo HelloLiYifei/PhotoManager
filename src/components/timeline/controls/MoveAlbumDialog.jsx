@@ -1,5 +1,6 @@
 import { Folder, FolderInput } from "lucide-react";
 
+import { useI18n } from "../../../i18n";
 import { Button, Dialog, EmptyState, Spinner } from "../../ui";
 import styles from "./MoveAlbumDialog.module.css";
 
@@ -12,30 +13,31 @@ export default function MoveAlbumDialog({
   onSelect,
   onClose,
 }) {
+  const { formatNumber, t } = useI18n();
   return (
     <Dialog
       open={open}
       onClose={onClose}
-      title="移动到相册"
+      title={t("batch.moveToAlbum")}
       description={selectedCount > 0
-        ? `为已选择的 ${selectedCount} 张照片选择目标相册。`
-        : "请选择目标相册。"}
-      closeLabel="关闭移动照片对话框"
+        ? t("batch.moveSelectedDescription", { count: formatNumber(selectedCount) })
+        : t("batch.chooseAlbumDescription")}
+      closeLabel={t("batch.closeMoveDialog")}
       closeDisabled={busy}
       panelClassName={styles.sharedDialog}
     >
         <div className={styles.body} aria-busy={busy}>
           {error ? (
             <p className={styles.error} role="alert">
-              {typeof error === "string" ? error : error.message || "无法移动照片，请重试。"}
+              {typeof error === "string" ? error : error.message || t("batch.moveFailed")}
             </p>
           ) : null}
 
           {albums.length === 0 ? (
             <EmptyState
               icon={Folder}
-              title="暂无可用相册"
-              description="请先创建一个相册，再移动照片。"
+              title={t("batch.noAlbums")}
+              description={t("batch.noAlbumsDescription")}
             />
           ) : (
             <div className={styles.albumList}>
@@ -47,11 +49,11 @@ export default function MoveAlbumDialog({
                   disabled={busy}
                 >
                   <span className={styles.albumIcon}>
-                    {busy ? <Spinner label="正在移动" size="sm" /> : <Folder aria-hidden="true" />}
+                    {busy ? <Spinner label={t("batch.moving")} size="sm" /> : <Folder aria-hidden="true" />}
                   </span>
                   <span className={styles.albumName}>{album.name}</span>
                   {Number.isFinite(Number(album.photoCount)) ? (
-                    <small>{Number(album.photoCount)} 张</small>
+                    <small>{t("common.photoCount", { count: formatNumber(album.photoCount) })}</small>
                   ) : null}
                 </Button>
               ))}

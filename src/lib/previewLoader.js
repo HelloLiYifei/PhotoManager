@@ -55,3 +55,15 @@ export function prefetchPhotoPreview(id) {
     })
     .catch(() => {});
 }
+
+export function clearPreviewMemoryCache(kind) {
+  const pathOnly = kind === "importPreviews";
+  for (const key of urlCache.keys()) {
+    if (!pathOnly || String(key).startsWith("path:")) urlCache.delete(key);
+  }
+  if (!pathOnly) preloadedImages.clear();
+}
+
+globalThis.addEventListener?.("photomanager-cache-cleared", (event) => {
+  clearPreviewMemoryCache(event.detail?.kind);
+});

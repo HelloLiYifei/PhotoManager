@@ -25,8 +25,10 @@
   flex: 0 0 auto;
   align-items: center;
   gap: var(--space-3);
-  background: var(--bg-sidebar);
+  background: var(--header-bg);
   border-bottom: 1px solid var(--border-color);
+  box-shadow: var(--shadow-control);
+  backdrop-filter: blur(16px);
 }
 
 .headerIcon {
@@ -175,16 +177,16 @@
 
 .duplicateNotice {
   margin-top: var(--space-3);
-  color: #d1fae5;
-  background: rgba(16, 185, 129, 0.1);
-  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: var(--success-text);
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
 }
 
 .inlineError,
 .configError {
-  color: #fecaca;
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: var(--danger-color);
+  background: var(--danger-bg-strong);
+  border: 1px solid var(--danger-border);
 }
 
 .inlineError {

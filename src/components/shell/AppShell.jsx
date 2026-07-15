@@ -1,4 +1,5 @@
 import "./Shell.css";
+import { useI18n } from "../../i18n";
 
 const SIDEBAR_MODES = new Set(["expanded", "collapsed", "overlay"]);
 
@@ -9,9 +10,11 @@ function AppShell({
   sidebarMode = "expanded",
   onRequestSidebarClose,
   contentId = "main-content",
-  contentLabel = "照片内容",
+  contentLabel = null,
   className = "",
 }) {
+  const { t } = useI18n();
+  const resolvedContentLabel = contentLabel || t("nav.photoContent");
   const resolvedMode = SIDEBAR_MODES.has(sidebarMode)
     ? sidebarMode
     : "expanded";
@@ -31,7 +34,7 @@ function AppShell({
         <button
           type="button"
           className="app-shell__scrim"
-          aria-label="关闭侧边栏"
+          aria-label={t("nav.closeSidebar")}
           onClick={onRequestSidebarClose}
         />
       )}
@@ -41,7 +44,7 @@ function AppShell({
         <main
           id={contentId}
           className="app-shell__content"
-          aria-label={contentLabel}
+          aria-label={resolvedContentLabel}
           tabIndex={-1}
         >
           {children}

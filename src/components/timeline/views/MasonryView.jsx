@@ -1,4 +1,5 @@
 import { ThumbnailImage } from "../media";
+import { useI18n } from "../../../i18n";
 import { handlePhotoItemKeyDown } from "./photoItemKeyboard";
 import styles from "./PhotoViews.module.css";
 
@@ -16,8 +17,9 @@ export default function MasonryView({
   onSelect,
   onOpen,
 }) {
+  const { t } = useI18n();
   return (
-    <div className="masonry-grid" role="grid" aria-label="瀑布流照片">
+    <div className="masonry-grid" role="grid" aria-label={t("timeline.masonryPhotos")}>
       {photos.map((photo, index) => {
         const isSelected = selectedIds.includes(photo.id);
         const isCompareBase = compareLockedId === photo.id;
@@ -63,7 +65,7 @@ export default function MasonryView({
             )}
 
             {photo.isFavorite && (
-              <span className={`${styles.badge} ${styles.favoriteBadge}`} aria-label="已收藏">
+              <span className={`${styles.badge} ${styles.favoriteBadge}`} aria-label={t("photo.favorited")}>
                 ♥
               </span>
             )}
@@ -71,14 +73,14 @@ export default function MasonryView({
             <span className={`photo-card-overlay ${styles.overlay}`}>
               <strong className={styles.filename}>{photo.filename}</strong>
               {photo.rating > 0 && (
-                <span className={styles.rating} aria-label={`${photo.rating} 星`}>
+                <span className={styles.rating} aria-label={t("photo.stars", { count: photo.rating })}>
                   ★ {photo.rating}
                 </span>
               )}
             </span>
 
             {isCompareBase && (
-              <span className={styles.compareLabel}>对比基准</span>
+              <span className={styles.compareLabel}>{t("timeline.compareBaselineShort")}</span>
             )}
           </div>
         );

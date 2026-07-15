@@ -13,10 +13,12 @@ import {
   ZoomOut,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useI18n } from "../../i18n";
 import { Button } from "../ui";
 import styles from "./Lightbox.module.css";
 
 function ImportColorMenu({ albums, targetAlbum, targetColor, disabled, onChange }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const menuRef = useRef(null);
 
@@ -50,10 +52,10 @@ function ImportColorMenu({ albums, targetAlbum, targetColor, disabled, onChange 
         size="sm"
         onClick={() => setOpen((current) => !current)}
         disabled={disabled}
-        aria-label={disabled ? "已导入，不可染色" : "为当前照片染色"}
+        aria-label={disabled ? t("import.alreadyImportedNoColor") : t("import.colorCurrentPhoto")}
         aria-haspopup="menu"
         aria-expanded={open}
-        title={disabled ? "已导入的重复照片不可再次染色" : undefined}
+        title={disabled ? t("import.duplicateColorDisabled") : undefined}
       >
         <span
           className={styles.colorSwatch}
@@ -61,11 +63,15 @@ function ImportColorMenu({ albums, targetAlbum, targetColor, disabled, onChange 
           aria-hidden="true"
         />
         <Paintbrush aria-hidden="true" />
-        {disabled ? "已导入，不可染色" : targetAlbum ? `染色 · ${targetAlbum}` : "染色"}
+        {disabled
+          ? t("import.alreadyImportedNoColor")
+          : targetAlbum
+            ? t("import.colorAlbum", { name: targetAlbum })
+            : t("import.color")}
       </Button>
 
       {open && !disabled && (
-        <div className={styles.colorMenuPopup} role="menu" aria-label="选择目标相册">
+        <div className={styles.colorMenuPopup} role="menu" aria-label={t("import.chooseTargetAlbum")}>
           {albums.map((album) => (
             <button
               type="button"
@@ -89,7 +95,7 @@ function ImportColorMenu({ albums, targetAlbum, targetColor, disabled, onChange 
                 className={`${styles.colorMenuItem} ${styles.clearColorItem}`}
                 onClick={() => chooseAlbum(null)}
               >
-                取消染色
+                {t("import.clearColor")}
               </button>
             </>
           )}
@@ -123,45 +129,46 @@ export default function LightboxToolbar({
   importColorDisabled = false,
   onImportAlbumChange,
 }) {
+  const { t } = useI18n();
   const transformReset = zoom === 1 && pan.x === 0 && pan.y === 0;
   const isImportMode = mode === "import";
 
   return (
     <>
-      <div className={styles.topActions} role="toolbar" aria-label="照片窗口操作">
+      <div className={styles.topActions} role="toolbar" aria-label={t("lightbox.windowActions")}>
         <Button
           variant={detailsOpen ? "secondary" : "ghost"}
           size="icon"
           onClick={onToggleDetails}
-          aria-label={detailsOpen ? "关闭照片信息" : "打开照片信息"}
+          aria-label={detailsOpen ? t("lightbox.closeInfo") : t("lightbox.openInfo")}
           aria-expanded={detailsOpen}
         >
           <Info aria-hidden="true" />
         </Button>
-        <Button variant="ghost" size="icon" onClick={onClose} aria-label="关闭照片预览">
+        <Button variant="ghost" size="icon" onClick={onClose} aria-label={t("lightbox.closePreview")}>
           <X aria-hidden="true" />
         </Button>
       </div>
 
-      <div className={styles.toolbar} role="toolbar" aria-label="照片编辑快捷操作">
-        <div className={styles.toolbarGroup} role="group" aria-label="缩放">
-          <Button variant="ghost" size="icon" onClick={onZoomOut} disabled={zoom <= 0.25} aria-label="缩小照片">
+      <div className={styles.toolbar} role="toolbar" aria-label={t("lightbox.quickActions")}>
+        <div className={styles.toolbarGroup} role="group" aria-label={t("lightbox.zoom")}>
+          <Button variant="ghost" size="icon" onClick={onZoomOut} disabled={zoom <= 0.25} aria-label={t("lightbox.zoomOut")}>
             <ZoomOut aria-hidden="true" />
           </Button>
-          <Button variant="ghost" size="sm" className={styles.zoomValue} onClick={onResetZoom} aria-label="恢复适合窗口">
+          <Button variant="ghost" size="sm" className={styles.zoomValue} onClick={onResetZoom} aria-label={t("lightbox.fitWindow")}>
             {Math.round(zoom * 100)}%
           </Button>
-          <Button variant="ghost" size="icon" onClick={onZoomIn} disabled={zoom >= 8} aria-label="放大照片">
+          <Button variant="ghost" size="icon" onClick={onZoomIn} disabled={zoom >= 8} aria-label={t("lightbox.zoomIn")}>
             <ZoomIn aria-hidden="true" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={onResetZoom} disabled={transformReset} aria-label="复位照片">
+          <Button variant="ghost" size="icon" onClick={onResetZoom} disabled={transformReset} aria-label={t("lightbox.resetPhoto")}>
             {transformReset ? <Maximize2 aria-hidden="true" /> : <RotateCcw aria-hidden="true" />}
           </Button>
         </div>
 
         <span className={styles.divider} aria-hidden="true" />
 
-        {!isImportMode && <div className={styles.rating} role="group" aria-label="照片评分">
+        {!isImportMode && <div className={styles.rating} role="group" aria-label={t("photo.rating")}>
           {[1, 2, 3, 4, 5].map((star) => (
             <Button
               key={star}
@@ -170,7 +177,7 @@ export default function LightboxToolbar({
               className={star <= rating ? styles.starActive : styles.star}
               onClick={() => onRatingChange(star)}
               disabled={busy}
-              aria-label={`评为 ${star} 星`}
+              aria-label={t("photo.rateStars", { count: star })}
               aria-pressed={star <= rating}
             >
               <Star aria-hidden="true" fill={star <= rating ? "currentColor" : "none"} />
@@ -188,7 +195,7 @@ export default function LightboxToolbar({
           aria-pressed={favorite}
         >
           <Heart aria-hidden="true" fill={favorite ? "currentColor" : "none"} />
-          {favorite ? "已喜欢" : "喜欢"}
+          {favorite ? t("photo.liked") : t("photo.like")}
         </Button>}
         {!isImportMode && <Button
           variant={isDeleted ? "secondary" : "danger"}
@@ -197,11 +204,11 @@ export default function LightboxToolbar({
           disabled={busy}
         >
           {isDeleted ? <Undo2 aria-hidden="true" /> : <Trash2 aria-hidden="true" />}
-          {isDeleted ? "恢复" : "移入回收站"}
+          {isDeleted ? t("common.restore") : t("photo.moveToTrash")}
         </Button>}
         {!isImportMode && isDeleted && (
           <Button variant="danger" size="sm" onClick={onPermanentDelete} disabled={busy}>
-            永久删除
+            {t("common.deletePermanently")}
           </Button>
         )}
         {isImportMode && (

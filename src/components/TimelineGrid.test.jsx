@@ -168,7 +168,10 @@ describe("TimelineGrid phase-three integration", () => {
 
     const first = await screen.findByRole("gridcell", { name: "海边.jpg" });
     const second = screen.getByRole("gridcell", { name: "树林.raw" });
+    const tagFilter = await screen.findByRole("combobox", { name: "按标签筛选" });
+    fireEvent.click(tagFilter);
     await screen.findByRole("option", { name: "旅行" });
+    fireEvent.keyDown(tagFilter, { key: "Escape" });
     expect(localStorage.getItem("photomanager-photo-view")).toBe("masonry");
     expect(screen.getAllByRole("button", { name: /视图$/ })).toHaveLength(3);
     expect(screen.queryByRole("button", { name: "图标视图" })).not.toBeInTheDocument();

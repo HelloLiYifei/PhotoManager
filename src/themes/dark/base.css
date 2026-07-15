@@ -223,7 +223,7 @@ body {
 .finder-list {
   min-width: 720px;
   padding-bottom: 20px;
-  font-size: 12px;
+  font-size: var(--font-size-caption);
 }
 
 .finder-list-header,
@@ -241,7 +241,7 @@ body {
   border-bottom: 1px solid var(--border-color);
   background: color-mix(in srgb, var(--bg-elevated) 96%, transparent);
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   font-weight: 600;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
@@ -389,7 +389,7 @@ body {
 .finder-gallery-caption strong {
   overflow: hidden;
   color: var(--text-main);
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -400,7 +400,7 @@ body {
   flex-shrink: 0;
   overflow: hidden;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -412,10 +412,11 @@ body {
   justify-content: center;
 }
 
-.finder-gallery-actions > [aria-label="批量操作"] {
+.finder-gallery-actions > .pm-batch-action-bar-bar {
   position: relative;
   bottom: auto;
   left: auto;
+  width: max-content;
   max-width: 100%;
   transform: none;
 }

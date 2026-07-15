@@ -123,7 +123,39 @@
   }
 }
 
+@container timeline-browser (max-width: 900px) {
+  .pm-batch-action-bar-bar {
+    bottom: var(--space-3);
+    width: calc(100% - (2 * var(--space-3)));
+    max-width: none;
+    padding-left: var(--space-3);
+    gap: var(--space-2);
+  }
+
+  .pm-batch-action-bar-actions {
+    padding-bottom: 2px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+
+  .finder-gallery-actions > .pm-batch-action-bar-bar {
+    width: max-content;
+    max-width: 100%;
+  }
+}
+
 @media (max-width: 560px) {
+  .pm-batch-action-bar-bar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .pm-batch-action-bar-actions {
+    width: 100%;
+  }
+}
+
+@container timeline-browser (max-width: 560px) {
   .pm-batch-action-bar-bar {
     align-items: flex-start;
     flex-direction: column;
@@ -139,4 +171,3 @@
     transition: none;
   }
 }
-

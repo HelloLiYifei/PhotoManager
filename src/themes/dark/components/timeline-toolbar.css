@@ -184,7 +184,7 @@
   color: #fff;
   background: var(--primary-start);
   border-radius: 999px;
-  font-size: 10px;
+  font-size: var(--font-size-xxs);
 }
 
 .pm-timeline-toolbar-mobile-filter-backdrop {

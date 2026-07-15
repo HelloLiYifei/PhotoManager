@@ -70,8 +70,18 @@ for (const directory of themeDirectories) {
 
   const files = (await walk(themeDirectory)).filter((file) => file.endsWith(".css"));
   const relativeFiles = files.map((file) => relative(file, themeDirectory)).sort();
+  const cssSources = await Promise.all(files.map((file) => fs.readFile(file, "utf8")));
   themeFiles.set(directory, relativeFiles);
-  themeCss.set(directory, (await Promise.all(files.map((file) => fs.readFile(file, "utf8")))).join("\n"));
+  themeCss.set(directory, cssSources.join("\n"));
+
+  for (const [index, source] of cssSources.entries()) {
+    const stylesheet = postcss.parse(source, { from: files[index] });
+    stylesheet.walkDecls("font-size", (declaration) => {
+      if (!/^var\(--font-size-[a-z0-9-]+\)(?:\s*!important)?$/.test(declaration.value)) {
+        errors.push(`Theme font sizes must use scalable typography tokens: ${relative(files[index])}:${declaration.source.start.line}`);
+      }
+    });
+  }
 
   const reachable = new Set();
   async function followImports(file) {

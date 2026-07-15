@@ -1,0 +1,67 @@
+/*
+ * Semantic typography scopes. Components keep using the shared --font-size-* contract,
+ * while each scope remaps that contract to the user's selected region scale.
+ */
+
+:where(
+  .pm-albums-page-grid,
+  .pm-timeline-grid-scroll-area,
+  .pm-import-wizard-preview-panel,
+  .pm-map-view-map,
+  .pm-lightbox-canvas-region
+) {
+  --font-size-micro: var(--font-content-micro);
+  --font-size-tiny: var(--font-content-tiny);
+  --font-size-xxs: var(--font-content-xxs);
+  --font-size-xs: var(--font-content-xs);
+  --font-size-caption: var(--font-content-caption);
+  --font-size-sm: var(--font-content-sm);
+  --font-size-md: var(--font-content-md);
+  --font-size-lg: var(--font-content-lg);
+  --font-size-xl: var(--font-content-xl);
+  --font-size-display: var(--font-content-display);
+  --font-size-hero: var(--font-content-hero);
+}
+
+:where(
+  .page-header,
+  .pm-workspace-selector-header,
+  .pm-import-wizard-header,
+  .pm-import-controls-preview-toolbar,
+  .pm-import-controls-confirm-bar,
+  .pm-timeline-toolbar-toolbar,
+  .pm-batch-action-bar-bar,
+  .pm-map-temporary-album-header,
+  .pm-lightbox-toolbar,
+  .pm-lightbox-top-actions
+) {
+  --font-size-micro: var(--font-header-micro);
+  --font-size-tiny: var(--font-header-tiny);
+  --font-size-xxs: var(--font-header-xxs);
+  --font-size-xs: var(--font-header-xs);
+  --font-size-caption: var(--font-header-caption);
+  --font-size-sm: var(--font-header-sm);
+  --font-size-md: var(--font-header-md);
+  --font-size-lg: var(--font-header-lg);
+  --font-size-xl: var(--font-header-xl);
+  --font-size-display: var(--font-header-display);
+  --font-size-hero: var(--font-header-hero);
+}
+
+:where(
+  .sidebar,
+  .pm-settings-page-section-nav
+) {
+  --font-size-micro: var(--font-navigation-micro);
+  --font-size-tiny: var(--font-navigation-tiny);
+  --font-size-xxs: var(--font-navigation-xxs);
+  --font-size-xs: var(--font-navigation-xs);
+  --font-size-caption: var(--font-navigation-caption);
+  --font-size-sm: var(--font-navigation-sm);
+  --font-size-md: var(--font-navigation-md);
+  --font-size-lg: var(--font-navigation-lg);
+  --font-size-xl: var(--font-navigation-xl);
+  --font-size-display: var(--font-navigation-display);
+  --font-size-hero: var(--font-navigation-hero);
+}
+

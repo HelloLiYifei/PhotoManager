@@ -202,6 +202,9 @@ describe("TimelineGrid phase-three integration", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "瀑布流视图" }));
     expect(screen.getByRole("grid", { name: "瀑布流照片" })).toBeInTheDocument();
+    expect(container.querySelector(".pm-timeline-grid-browser-pane")).toContainElement(
+      container.querySelector(".pm-batch-action-bar-bar"),
+    );
     expect(localStorage.getItem("photomanager-photo-view")).toBe("masonry");
   });
 

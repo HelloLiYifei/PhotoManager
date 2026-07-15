@@ -20,6 +20,16 @@
   overflow: hidden;
 }
 
+.pm-timeline-grid-browser-pane {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+  container: timeline-browser / inline-size;
+}
+
 .pm-timeline-grid-scroll-area {
   min-width: 0;
   min-height: 0;

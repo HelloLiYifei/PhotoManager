@@ -108,6 +108,9 @@ export const settingsPageStyles = freeze({
   "pathControl": "pm-settings-page-path-control",
   "progress": "pm-settings-page-progress",
   "refreshButton": "pm-settings-page-refresh-button",
+  "scaleControl": "pm-settings-page-scale-control",
+  "scaleReset": "pm-settings-page-scale-reset",
+  "scaleValue": "pm-settings-page-scale-value",
   "savedBadge": "pm-settings-page-saved-badge",
   "sectionActive": "pm-settings-page-section-active",
   "sectionNav": "pm-settings-page-section-nav",
@@ -129,6 +132,7 @@ export const settingsPageStyles = freeze({
 });
 
 export const timelineGridStyles = freeze({
+  "browserPane": "pm-timeline-grid-browser-pane",
   "compareBrowser": "pm-timeline-grid-compare-browser",
   "compareClose": "pm-timeline-grid-compare-close",
   "compareLayout": "pm-timeline-grid-compare-layout",

@@ -155,7 +155,7 @@
   height: 18px;
   padding: 0 4px;
   color: #fff;
-  font-size: 10px;
+  font-size: var(--font-size-xxs);
   font-weight: 700;
   line-height: 14px;
   text-align: center;
@@ -200,7 +200,7 @@
   z-index: 1;
   max-width: 36px;
   overflow: hidden;
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   font-weight: 750;
   line-height: 1;
   text-overflow: ellipsis;

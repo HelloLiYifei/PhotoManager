@@ -43,11 +43,82 @@
 
   /* Typography */
   --font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-size-xs: 0.6875rem;
-  --font-size-sm: 0.8125rem;
-  --font-size-md: 0.875rem;
-  --font-size-lg: 1rem;
-  --font-size-xl: 1.25rem;
+  --text-scale-navigation: 1;
+  --text-scale-header: 1;
+  --text-scale-content: 1;
+  --text-scale-detail: 1;
+
+  --font-size-micro-base: 0.5rem;
+  --font-size-tiny-base: 0.5625rem;
+  --font-size-xxs-base: 0.625rem;
+  --font-size-xs-base: 0.6875rem;
+  --font-size-caption-base: 0.75rem;
+  --font-size-sm-base: 0.8125rem;
+  --font-size-md-base: 0.875rem;
+  --font-size-lg-base: 1rem;
+  --font-size-xl-base: 1.25rem;
+  --font-size-display-base: 1.5625rem;
+  --font-size-hero-base: clamp(1.55rem, 4vw, 2.1rem);
+
+  --font-navigation-micro: calc(var(--font-size-micro-base) * var(--text-scale-navigation));
+  --font-navigation-tiny: calc(var(--font-size-tiny-base) * var(--text-scale-navigation));
+  --font-navigation-xxs: calc(var(--font-size-xxs-base) * var(--text-scale-navigation));
+  --font-navigation-xs: calc(var(--font-size-xs-base) * var(--text-scale-navigation));
+  --font-navigation-caption: calc(var(--font-size-caption-base) * var(--text-scale-navigation));
+  --font-navigation-sm: calc(var(--font-size-sm-base) * var(--text-scale-navigation));
+  --font-navigation-md: calc(var(--font-size-md-base) * var(--text-scale-navigation));
+  --font-navigation-lg: calc(var(--font-size-lg-base) * var(--text-scale-navigation));
+  --font-navigation-xl: calc(var(--font-size-xl-base) * var(--text-scale-navigation));
+  --font-navigation-display: calc(var(--font-size-display-base) * var(--text-scale-navigation));
+  --font-navigation-hero: calc(var(--font-size-hero-base) * var(--text-scale-navigation));
+
+  --font-header-micro: calc(var(--font-size-micro-base) * var(--text-scale-header));
+  --font-header-tiny: calc(var(--font-size-tiny-base) * var(--text-scale-header));
+  --font-header-xxs: calc(var(--font-size-xxs-base) * var(--text-scale-header));
+  --font-header-xs: calc(var(--font-size-xs-base) * var(--text-scale-header));
+  --font-header-caption: calc(var(--font-size-caption-base) * var(--text-scale-header));
+  --font-header-sm: calc(var(--font-size-sm-base) * var(--text-scale-header));
+  --font-header-md: calc(var(--font-size-md-base) * var(--text-scale-header));
+  --font-header-lg: calc(var(--font-size-lg-base) * var(--text-scale-header));
+  --font-header-xl: calc(var(--font-size-xl-base) * var(--text-scale-header));
+  --font-header-display: calc(var(--font-size-display-base) * var(--text-scale-header));
+  --font-header-hero: calc(var(--font-size-hero-base) * var(--text-scale-header));
+
+  --font-content-micro: calc(var(--font-size-micro-base) * var(--text-scale-content));
+  --font-content-tiny: calc(var(--font-size-tiny-base) * var(--text-scale-content));
+  --font-content-xxs: calc(var(--font-size-xxs-base) * var(--text-scale-content));
+  --font-content-xs: calc(var(--font-size-xs-base) * var(--text-scale-content));
+  --font-content-caption: calc(var(--font-size-caption-base) * var(--text-scale-content));
+  --font-content-sm: calc(var(--font-size-sm-base) * var(--text-scale-content));
+  --font-content-md: calc(var(--font-size-md-base) * var(--text-scale-content));
+  --font-content-lg: calc(var(--font-size-lg-base) * var(--text-scale-content));
+  --font-content-xl: calc(var(--font-size-xl-base) * var(--text-scale-content));
+  --font-content-display: calc(var(--font-size-display-base) * var(--text-scale-content));
+  --font-content-hero: calc(var(--font-size-hero-base) * var(--text-scale-content));
+
+  --font-detail-micro: calc(var(--font-size-micro-base) * var(--text-scale-detail));
+  --font-detail-tiny: calc(var(--font-size-tiny-base) * var(--text-scale-detail));
+  --font-detail-xxs: calc(var(--font-size-xxs-base) * var(--text-scale-detail));
+  --font-detail-xs: calc(var(--font-size-xs-base) * var(--text-scale-detail));
+  --font-detail-caption: calc(var(--font-size-caption-base) * var(--text-scale-detail));
+  --font-detail-sm: calc(var(--font-size-sm-base) * var(--text-scale-detail));
+  --font-detail-md: calc(var(--font-size-md-base) * var(--text-scale-detail));
+  --font-detail-lg: calc(var(--font-size-lg-base) * var(--text-scale-detail));
+  --font-detail-xl: calc(var(--font-size-xl-base) * var(--text-scale-detail));
+  --font-detail-display: calc(var(--font-size-display-base) * var(--text-scale-detail));
+  --font-detail-hero: calc(var(--font-size-hero-base) * var(--text-scale-detail));
+
+  --font-size-micro: var(--font-detail-micro);
+  --font-size-tiny: var(--font-detail-tiny);
+  --font-size-xxs: var(--font-detail-xxs);
+  --font-size-xs: var(--font-detail-xs);
+  --font-size-caption: var(--font-detail-caption);
+  --font-size-sm: var(--font-detail-sm);
+  --font-size-md: var(--font-detail-md);
+  --font-size-lg: var(--font-detail-lg);
+  --font-size-xl: var(--font-detail-xl);
+  --font-size-display: var(--font-detail-display);
+  --font-size-hero: var(--font-detail-hero);
 
   /* Spacing */
   --space-1: 0.25rem;

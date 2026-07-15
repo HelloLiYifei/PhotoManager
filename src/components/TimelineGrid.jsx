@@ -344,51 +344,55 @@ export default function TimelineGrid({
       ) : null}
 
       <div className={styles.content}>
-        <div
-          ref={gridScrollRef}
-          className={styles.scrollArea}
-          tabIndex={-1}
-        >
-          {loading && photos.length === 0 ? (
-            <div className={styles.state} role="status">
-              <LoaderCircle className={styles.spinner} aria-hidden="true" />
-              <strong>{t("timeline.loading")}</strong>
-              <span>{t("timeline.loadingDescription")}</span>
-            </div>
-          ) : error && photos.length === 0 ? (
-            <div className={styles.state} role="alert">
-              <ImageOff aria-hidden="true" />
-              <strong>{t("timeline.loadFailed")}</strong>
-              <span>{errorMessage(error)}</span>
-              <button type="button" onClick={retry}>
-                <RefreshCw aria-hidden="true" />
-                {t("common.retry")}
-              </button>
-            </div>
-          ) : photos.length === 0 ? (
-            <div className={styles.state} role="status">
-              <ImageOff aria-hidden="true" />
-              <strong>{searchQuery || tagFilter || ratingFilter ? t("timeline.noMatches") : t("timeline.noPhotos")}</strong>
-              <span>{searchQuery || tagFilter || ratingFilter ? t("timeline.adjustFilters") : t("timeline.importHint")}</span>
-            </div>
-          ) : compareMode ? (
-            <div className={styles.compareLayout}>
-              <div className={styles.compareBrowser}>{photoView}</div>
-              <section className={styles.comparePreview} aria-label={t("timeline.compareBaseline")}>
-                <button
-                  type="button"
-                  className={styles.compareClose}
-                  onClick={toggleCompare}
-                  aria-label={t("timeline.exitCompare")}
-                >
-                  <X aria-hidden="true" />
-                  {t("timeline.exitCompareText")}
+        <div className={styles.browserPane}>
+          <div
+            ref={gridScrollRef}
+            className={styles.scrollArea}
+            tabIndex={-1}
+          >
+            {loading && photos.length === 0 ? (
+              <div className={styles.state} role="status">
+                <LoaderCircle className={styles.spinner} aria-hidden="true" />
+                <strong>{t("timeline.loading")}</strong>
+                <span>{t("timeline.loadingDescription")}</span>
+              </div>
+            ) : error && photos.length === 0 ? (
+              <div className={styles.state} role="alert">
+                <ImageOff aria-hidden="true" />
+                <strong>{t("timeline.loadFailed")}</strong>
+                <span>{errorMessage(error)}</span>
+                <button type="button" onClick={retry}>
+                  <RefreshCw aria-hidden="true" />
+                  {t("common.retry")}
                 </button>
-                <ComparePreviewImage id={compareLockedId} />
-                <strong>{t("timeline.lockedBaseline")}</strong>
-              </section>
-            </div>
-          ) : photoView}
+              </div>
+            ) : photos.length === 0 ? (
+              <div className={styles.state} role="status">
+                <ImageOff aria-hidden="true" />
+                <strong>{searchQuery || tagFilter || ratingFilter ? t("timeline.noMatches") : t("timeline.noPhotos")}</strong>
+                <span>{searchQuery || tagFilter || ratingFilter ? t("timeline.adjustFilters") : t("timeline.importHint")}</span>
+              </div>
+            ) : compareMode ? (
+              <div className={styles.compareLayout}>
+                <div className={styles.compareBrowser}>{photoView}</div>
+                <section className={styles.comparePreview} aria-label={t("timeline.compareBaseline")}>
+                  <button
+                    type="button"
+                    className={styles.compareClose}
+                    onClick={toggleCompare}
+                    aria-label={t("timeline.exitCompare")}
+                  >
+                    <X aria-hidden="true" />
+                    {t("timeline.exitCompareText")}
+                  </button>
+                  <ComparePreviewImage id={compareLockedId} />
+                  <strong>{t("timeline.lockedBaseline")}</strong>
+                </section>
+              </div>
+            ) : photoView}
+          </div>
+
+          {viewMode !== "gallery" ? batchActionBar : null}
         </div>
 
         <PhotoInspector
@@ -402,8 +406,6 @@ export default function TimelineGrid({
           onClose={() => setInspectorOpen(false)}
         />
       </div>
-
-      {viewMode !== "gallery" ? batchActionBar : null}
 
       <MoveAlbumDialog
         open={moveDialogOpen}

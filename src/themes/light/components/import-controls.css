@@ -239,7 +239,7 @@
 
 .pm-import-controls-choice-list small {
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: var(--font-size-xxs);
 }
 
 .pm-import-controls-choice-list button.pm-import-controls-active-choice {
@@ -329,14 +329,14 @@
 
 .pm-import-controls-compact-hint {
   margin: var(--space-2) 0 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  flex: 0 0 auto;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .pm-import-controls-brush-list {
   padding-right: 2px;
-  min-height: 112px;
+  min-height: 40px;
   flex: 1;
   overflow-y: auto;
 }
@@ -373,7 +373,7 @@
 
 .pm-import-controls-brush-choice small {
   flex: 0 0 auto;
-  font-size: 10px;
+  font-size: var(--font-size-xxs);
 }
 
 .pm-import-controls-brush-choice small svg {
@@ -411,7 +411,7 @@
 
 .pm-import-controls-switch-row small {
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: var(--font-size-xxs);
 }
 
 .pm-import-controls-switch-row input {
@@ -842,4 +842,3 @@
     transform: rotate(360deg);
   }
 }
-

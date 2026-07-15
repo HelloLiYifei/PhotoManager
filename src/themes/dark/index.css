@@ -1,5 +1,6 @@
 @import "./tokens.css";
 @import "./base.css";
+@import "./components/typography.css";
 @import "./components/shell.css";
 @import "./components/albums.css";
 @import "./components/create-album-dialog.css";

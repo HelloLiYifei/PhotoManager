@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ImageOff, LoaderCircle, RefreshCw, X } from "lucide-react";
 
 import { getAlbums } from "../services/albumService";
+import { getPhotos } from "../services/photoService";
 import { useI18n } from "../i18n";
 import {
   BatchActionBar,
@@ -55,6 +56,7 @@ export default function TimelineGrid({
   onPhotoClick,
   onPhotosUpdated,
   refreshTrigger,
+  indexedPhotoIds = null,
 }) {
   const { alert: showAlert } = useGlobalDialog();
   const { t } = useI18n();
@@ -73,6 +75,17 @@ export default function TimelineGrid({
   const [moveError, setMoveError] = useState(null);
   const gridScrollRef = useRef(null);
   const isNarrow = useNarrowTimeline();
+  const indexedPhotoIdSet = useMemo(
+    () => Array.isArray(indexedPhotoIds)
+      ? new Set(indexedPhotoIds.map((id) => String(id)))
+      : null,
+    [indexedPhotoIds],
+  );
+  const requestIndexedPhotos = useCallback(async (query) => {
+    const list = await getPhotos(query);
+    if (!indexedPhotoIdSet) return list;
+    return list.filter((photo) => indexedPhotoIdSet.has(String(photo.id)));
+  }, [indexedPhotoIdSet]);
 
   const {
     photos,
@@ -88,6 +101,7 @@ export default function TimelineGrid({
     tagFilter,
     searchQuery,
     refreshTrigger,
+    requestPhotos: requestIndexedPhotos,
   });
 
   const {

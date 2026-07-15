@@ -44,13 +44,29 @@ vi.mock("./components/WorkspaceSelector", () => ({
 }));
 
 vi.mock("./components/TimelineGrid", () => ({
-  default: ({ currentView, albumId }) => (
-    <div data-testid="timeline-view">{currentView}:{albumId || "all"}</div>
+  default: ({ currentView, albumId, indexedPhotoIds = [] }) => (
+    <div data-testid="timeline-view" data-photo-ids={indexedPhotoIds.join(",")}>
+      {currentView}:{albumId || "all"}
+    </div>
   ),
 }));
 
 vi.mock("./components/MapView", () => ({
-  default: () => <div>地图内容</div>,
+  default: ({ onOpenTemporaryAlbum }) => (
+    <div>
+      地图内容
+      <button
+        type="button"
+        onClick={() => onOpenTemporaryAlbum?.({
+          photoIds: ["map-photo-1", "map-photo-2"],
+          latitude: 30.25,
+          longitude: 120.16,
+        })}
+      >
+        打开地图临时相册
+      </button>
+    </div>
+  ),
 }));
 
 vi.mock("./components/ImportWizard", () => ({
@@ -138,6 +154,26 @@ describe("App phase-two shell", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "折叠侧边栏" }));
     expect(shell).toHaveAttribute("data-sidebar-mode", "collapsed");
+  });
+
+  it("opens a temporary map album backed only by photo IDs", async () => {
+    render(<App />);
+    await screen.findByRole("main", { name: "相册" });
+    await waitFor(() => expect(getAlbumSummaries).toHaveBeenCalledOnce());
+
+    fireEvent.click(screen.getByRole("button", { name: "地图" }));
+    fireEvent.click(screen.getByRole("button", { name: "打开地图临时相册" }));
+
+    expect(screen.getByRole("main", { name: "地图临时相册" })).toBeInTheDocument();
+    expect(screen.getByText("此位置的 2 张照片")).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-view")).toHaveTextContent("map-album:all");
+    expect(screen.getByTestId("timeline-view")).toHaveAttribute(
+      "data-photo-ids",
+      "map-photo-1,map-photo-2",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "返回地图" }));
+    expect(screen.getByText("地图内容")).toBeInTheDocument();
   });
 
   it("shows service errors, retries, and creates an album without duplicate submission", async () => {

@@ -60,6 +60,63 @@
 .markerShell {
   background: transparent;
   border: 0;
+  overflow: visible !important;
+}
+
+.markerVisual,
+.clusterVisual {
+  width: 82px;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 3px;
+  cursor: pointer;
+  filter: drop-shadow(0 5px 9px rgba(0, 0, 0, 0.35));
+}
+
+.markerThumbnail {
+  position: relative;
+  width: 72px;
+  height: 48px;
+  padding: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #111827;
+  border: 2px solid rgba(255, 255, 255, 0.96);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+}
+
+.markerThumbnail img {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  border-radius: 4px;
+  user-select: none;
+}
+
+.markerThumbnailPlaceholder {
+  width: 100%;
+  height: 100%;
+  display: block;
+  background:
+    linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.12) 45%, transparent 70%),
+    #1f2937;
+  background-size: 180% 100%;
+  border-radius: 4px;
+  animation: markerThumbnailLoading 1.2s linear infinite;
+}
+
+.markerVisual:has(.markerFocused) .markerThumbnail {
+  border-color: #f59e0b;
+  box-shadow:
+    0 0 0 4px rgba(245, 158, 11, 0.22),
+    0 4px 12px rgba(0, 0, 0, 0.45);
 }
 
 .marker {
@@ -108,84 +165,51 @@
   transform: rotate(45deg);
 }
 
-.popup {
-  color: #333;
-  font-family: inherit;
-  font-size: 12px;
-  line-height: 1.4;
-}
-
-.popupTitle {
-  margin-bottom: 2px;
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.popupCoordinates {
-  margin-bottom: 7px;
-  color: #6b7280;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 10px;
-}
-
-.popupGallery {
-  max-height: 290px;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 7px;
-  overflow-y: auto;
-}
-
-.popupGallery:has(.popupPhoto:only-child) {
-  grid-template-columns: 1fr;
-}
-
-.popupPhoto {
-  width: 100%;
-  min-width: 0;
-  padding: 0;
-  overflow: hidden;
-  color: #111827;
-  text-align: left;
-  background: #eceff3;
+.clusterShell {
+  background: transparent;
   border: 0;
-  border-radius: 7px;
-  cursor: pointer;
+  overflow: visible !important;
 }
 
-.popupPhoto:focus-visible {
-  outline: 2px solid #2563eb;
-  outline-offset: 2px;
-}
-
-.popupPlaceholder,
-.popupImage {
-  width: 140px;
-  max-width: 100%;
-  height: 96px;
-  margin: 0;
+.clusterMarker {
+  position: relative;
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #6b7280;
-  font-size: 11px;
-  object-fit: cover;
-  border-radius: 0;
-  box-shadow: none;
+  color: #fff;
+  background: linear-gradient(135deg, #3b82f6, #7c3aed);
+  border: 3px solid rgba(255, 255, 255, 0.95);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 6px rgba(96, 165, 250, 0.18),
+    0 6px 18px rgba(0, 0, 0, 0.45);
 }
 
-.popupFilename {
-  padding: 5px 7px;
-  display: block;
+.clusterMarker::after {
+  position: absolute;
+  inset: -9px;
+  border: 1px solid rgba(96, 165, 250, 0.28);
+  border-radius: 50%;
+  content: "";
+}
+
+.clusterCount {
+  position: relative;
+  z-index: 1;
+  max-width: 36px;
   overflow: hidden;
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.popupPhotoLoaded {
-  background: #fff;
+@keyframes markerThumbnailLoading {
+  to {
+    background-position: -180% 0;
+  }
 }
 
 @media (max-width: 900px) {
@@ -212,7 +236,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .marker,
-  .popupImage {
+  .markerThumbnailPlaceholder,
+  .clusterMarker {
     transition: none;
   }
 }

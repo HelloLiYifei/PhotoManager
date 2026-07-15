@@ -285,6 +285,23 @@ describe("TimelineGrid phase-three integration", () => {
     expect(screen.getByText("已选择 1 张照片")).toBeInTheDocument();
   });
 
+  it("limits a temporary map album to its in-memory photo ID index", async () => {
+    renderTimeline({
+      currentView: "map-album",
+      albumId: null,
+      indexedPhotoIds: ["photo-2"],
+    });
+
+    expect(await screen.findByRole("gridcell", { name: "树林.raw" }))
+      .toBeInTheDocument();
+    expect(screen.queryByRole("gridcell", { name: "海边.jpg" }))
+      .not.toBeInTheDocument();
+    expect(mocks.getPhotos).toHaveBeenCalledWith(expect.objectContaining({
+      albumId: null,
+      deletedOnly: false,
+    }));
+  });
+
   it("wires trash restore, permanent deletion, and empty-trash flows", async () => {
     renderTimeline({ currentView: "trash", albumId: null });
     const first = await screen.findByRole("gridcell", { name: "海边.jpg" });

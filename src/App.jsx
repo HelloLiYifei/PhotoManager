@@ -6,6 +6,7 @@ import CreateAlbumDialog from "./components/CreateAlbumDialog";
 import ImportWizard from "./components/ImportWizard";
 import LightboxViewer from "./components/LightboxViewer";
 import MapView from "./components/MapView";
+import MapTemporaryAlbum from "./components/MapTemporaryAlbum";
 import SettingsPage from "./components/SettingsPage";
 import { AppShell, Sidebar } from "./components/shell";
 import TimelineGrid from "./components/TimelineGrid";
@@ -37,6 +38,8 @@ function getViewTitle(currentView, activeAlbumName, t) {
       return t("nav.trash");
     case "map":
       return t("nav.map");
+    case "map-album":
+      return activeAlbumName || t("map.temporaryAlbumTitle");
     case "settings":
       return t("nav.settings");
     case "album":
@@ -67,6 +70,7 @@ function App() {
   const [showImportWizard, setShowImportWizard] = useState(false);
   const [lightboxData, setLightboxData] = useState(null);
   const [mapFocusedPhotoId, setMapFocusedPhotoId] = useState(null);
+  const [mapTemporaryAlbum, setMapTemporaryAlbum] = useState(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const [showCreateAlbum, setShowCreateAlbum] = useState(false);
@@ -198,6 +202,7 @@ function App() {
     setCurrentView("albums");
     setActiveAlbumId(null);
     setActiveAlbumName("");
+    setMapTemporaryAlbum(null);
     closeCompactSidebar();
   };
 
@@ -213,6 +218,7 @@ function App() {
     setActiveAlbumId(null);
     setActiveAlbumName("");
     setDetectedCard(null);
+    setMapTemporaryAlbum(null);
     closeCompactSidebar();
   };
 
@@ -221,6 +227,7 @@ function App() {
     setActiveAlbumId(null);
     setActiveAlbumName("");
     if (view === "map") setMapFocusedPhotoId(null);
+    if (view !== "map-album") setMapTemporaryAlbum(null);
     closeCompactSidebar();
   };
 
@@ -228,6 +235,7 @@ function App() {
     setCurrentView("album");
     setActiveAlbumId(album.id);
     setActiveAlbumName(album.name);
+    setMapTemporaryAlbum(null);
     closeCompactSidebar();
   };
 
@@ -280,7 +288,7 @@ function App() {
   const sidebar = (
     <Sidebar
       workspace={activeWorkspace}
-      currentView={currentView}
+      currentView={currentView === "map-album" ? "map" : currentView}
       activeAlbumId={activeAlbumId}
       albums={albums}
       detectedCard={detectedCard}
@@ -299,6 +307,7 @@ function App() {
         setCurrentView("settings");
         setActiveAlbumId(null);
         setActiveAlbumName("");
+        setMapTemporaryAlbum(null);
         closeCompactSidebar();
       }}
     />
@@ -326,7 +335,26 @@ function App() {
           <MapView
             key={`map-${refreshTrigger}`}
             focusedPhotoId={mapFocusedPhotoId}
-            onShowPhoto={(photo) => setLightboxData({ photosList: [photo], index: 0 })}
+            onOpenTemporaryAlbum={(album) => {
+              setMapTemporaryAlbum(album);
+              setActiveAlbumId(null);
+              setActiveAlbumName(t("map.temporaryAlbumTitle"));
+              setCurrentView("map-album");
+            }}
+          />
+        ) : currentView === "map-album" && mapTemporaryAlbum ? (
+          <MapTemporaryAlbum
+            workspace={activeWorkspace}
+            album={mapTemporaryAlbum}
+            refreshTrigger={refreshTrigger}
+            onBack={() => {
+              setCurrentView("map");
+              setActiveAlbumName("");
+              setMapFocusedPhotoId(null);
+              setMapTemporaryAlbum(null);
+            }}
+            onPhotosUpdated={triggerRefresh}
+            onPhotoClick={(list, index) => setLightboxData({ photosList: list, index })}
           />
         ) : currentView === "albums" ? (
           <AlbumsPage
@@ -378,6 +406,7 @@ function App() {
           onShowOnMap={(photo) => {
             setMapFocusedPhotoId(photo.id);
             setLightboxData(null);
+            setMapTemporaryAlbum(null);
             setCurrentView("map");
           }}
           onPhotosUpdated={triggerRefresh}

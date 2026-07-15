@@ -16,6 +16,7 @@ import { useI18n } from "./i18n";
 import { useSettings } from "./settings";
 import { createAlbum, getAlbumSummaries } from "./services/albumService";
 import { detectCards } from "./services/importService";
+import { setWorkspaceCacheLimits } from "./services/settingsService";
 import { getActiveWorkspace, getWorkspaces } from "./services/workspaceService";
 
 const WIDE_SIDEBAR_QUERY = "(min-width: 1200px)";
@@ -78,6 +79,7 @@ function App() {
   const [newAlbumDesc, setNewAlbumDesc] = useState("");
   const [createAlbumBusy, setCreateAlbumBusy] = useState(false);
   const [createAlbumError, setCreateAlbumError] = useState(null);
+  const workspaceSettings = getWorkspaceSettings(activeWorkspace);
 
   const sidebarMode = isWideViewport
     ? isWideSidebarCollapsed
@@ -179,6 +181,26 @@ function App() {
     setAlbumsError(null);
     setAlbumsLoading(false);
   }, [activeWorkspace, loadAlbums, refreshTrigger]);
+
+  useEffect(() => {
+    if (!activeWorkspace) return;
+    void setWorkspaceCacheLimits({
+      maxBytes: workspaceSettings.cacheMaxMb * 1024 * 1024,
+      maxFiles: workspaceSettings.cacheMaxImages,
+    })
+      .then((result) => {
+        if (result?.filesRemoved > 0) {
+          globalThis.dispatchEvent?.(new CustomEvent("photomanager-cache-cleared", {
+            detail: { kind: "all" },
+          }));
+        }
+      })
+      .catch((error) => console.error(error));
+  }, [
+    activeWorkspace,
+    workspaceSettings.cacheMaxImages,
+    workspaceSettings.cacheMaxMb,
+  ]);
 
   const handleToggleSidebar = useCallback(
     (requestedMode) => {
@@ -283,7 +305,6 @@ function App() {
   }
 
   const viewTitle = getViewTitle(currentView, activeAlbumName, t);
-  const workspaceSettings = getWorkspaceSettings(activeWorkspace);
 
   const sidebar = (
     <Sidebar

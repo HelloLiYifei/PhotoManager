@@ -8,9 +8,7 @@ use uuid::Uuid;
 use walkdir::WalkDir;
 
 use crate::db::DbState;
-use crate::metadata::{
-    generate_thumbnail, read_exif_metadata, thumbnail_cache_path, ImageMetadata,
-};
+use crate::metadata::{read_image_metadata, ImageMetadata};
 use crate::scan::is_supported_image;
 use rusqlite::Connection;
 
@@ -50,40 +48,7 @@ pub struct CardPhoto {
 }
 
 fn card_photo_metadata(path: &Path, is_raw: bool) -> ImageMetadata {
-    // Camera EXIF dimensions include orientation handling, so portrait photos
-    // reserve the same space before and after their thumbnail is decoded.
-    let mut metadata = read_exif_metadata(path);
-    if metadata.width.is_some_and(|width| width > 0)
-        && metadata.height.is_some_and(|height| height > 0)
-    {
-        return metadata;
-    }
-
-    let dimensions = if is_raw {
-        crate::metadata::extract_raw_small_preview(path)
-            .ok()
-            .and_then(|bytes| image::load_from_memory(&bytes).ok())
-            .map(|preview| (preview.width(), preview.height()))
-    } else {
-        image::image_dimensions(path).ok()
-    };
-
-    match dimensions {
-        Some((width, height)) if width > 0 && height > 0 => {
-            let (Ok(width), Ok(height)) = (i32::try_from(width), i32::try_from(height)) else {
-                return metadata;
-            };
-            let (width, height) = match crate::metadata::get_orientation(path) {
-                5 | 6 | 7 | 8 => (Some(height), Some(width)),
-                _ => (Some(width), Some(height)),
-            };
-            metadata.width = width;
-            metadata.height = height;
-        }
-        _ => {}
-    }
-
-    metadata
+    read_image_metadata(path, is_raw)
 }
 
 #[cfg(test)]
@@ -484,8 +449,9 @@ pub fn execute_import(
             continue;
         }
 
-        // Parse EXIF
-        let exif = read_exif_metadata(src_path);
+        // Parse metadata without decoding the full source. The thumbnail is
+        // generated later, only when the photo becomes visible.
+        let exif = read_image_metadata(src_path, is_raw);
         let date_taken_str = exif.date_taken.clone().unwrap_or_else(|| {
             let mod_time = metadata.modified().unwrap_or(std::time::SystemTime::now());
             let datetime: chrono::DateTime<Utc> = mod_time.into();
@@ -520,14 +486,10 @@ pub fn execute_import(
             }
         }
 
-        // 5. Generate cache thumbnail
+        // 5. Register the photo. No thumbnail file is created during import.
         let photo_id = Uuid::new_v4().to_string();
-        let cache_file_path = thumbnail_cache_path(workspace_root, &photo_id);
-
-        let (width, height) = match generate_thumbnail(&final_dest_path, &cache_file_path, is_raw) {
-            Ok(dims) => dims,
-            Err(_) => (exif.width.unwrap_or(0), exif.height.unwrap_or(0)),
-        };
+        let width = exif.width.unwrap_or(0);
+        let height = exif.height.unwrap_or(0);
 
         // Get relative path for database: "album_name/filename"
         let relative_dest_path = final_dest_path

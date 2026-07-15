@@ -66,5 +66,19 @@ describe("settings store", () => {
     expect(stored.global.theme).toBe("light");
     expect(stored.workspaces["id:one"].photoView).toBe("list");
   });
+
+  it("normalizes cache quotas into supported workspace limits", () => {
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify({
+      workspaces: {
+        "id:one": { cacheMaxMb: 999_999, cacheMaxImages: 0 },
+      },
+    }));
+
+    const settings = readSettings(localStorage);
+    expect(settings.workspaces["id:one"]).toMatchObject({
+      cacheMaxMb: 16_384,
+      cacheMaxImages: 1,
+    });
+  });
 });
 

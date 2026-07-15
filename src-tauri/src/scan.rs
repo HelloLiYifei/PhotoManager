@@ -7,7 +7,7 @@ use chrono::Utc;
 use serde::Serialize;
 use tauri::Emitter; // Tauri v2 Emitter trait for emitting events
 
-use crate::metadata::{generate_thumbnail, read_exif_metadata, thumbnail_cache_path};
+use crate::metadata::read_image_metadata;
 
 #[derive(Debug, Serialize, Clone)]
 pub struct ScanProgress {
@@ -139,8 +139,9 @@ pub fn scan_workspace_dir(
 
         let is_raw = matches!(file_ext.to_lowercase().as_str(), "arw" | "cr2" | "nef");
 
-        // Parse EXIF
-        let exif_meta = read_exif_metadata(&file_path);
+        // Read EXIF and header dimensions only. Thumbnail generation is lazy
+        // and begins when a photo card approaches the visible viewport.
+        let exif_meta = read_image_metadata(&file_path, is_raw);
 
         // Date taken: fallback to file modified time if EXIF is empty
         let date_taken = exif_meta.date_taken.clone().unwrap_or_else(|| {
@@ -150,16 +151,8 @@ pub fn scan_workspace_dir(
         });
 
         let photo_id = Uuid::new_v4().to_string();
-        let cache_path = thumbnail_cache_path(root_path, &photo_id);
-
-        // Generate thumbnail and get original dimensions
-        let (width, height) = match generate_thumbnail(&file_path, &cache_path, is_raw) {
-            Ok(dims) => dims,
-            Err(_) => {
-                // If thumbnail fails, try to use defaults or skip
-                (exif_meta.width.unwrap_or(0), exif_meta.height.unwrap_or(0))
-            }
-        };
+        let width = exif_meta.width.unwrap_or(0);
+        let height = exif_meta.height.unwrap_or(0);
 
         // Create simple hash based on size and modified time for fast duplicate check
         let mod_time = metadata

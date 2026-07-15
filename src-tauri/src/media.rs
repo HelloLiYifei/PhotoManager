@@ -55,6 +55,12 @@ fn legacy_thumbnail_path(workspace_root: &Path, photo_id: &str) -> PathBuf {
         .join(format!("{}.jpg", photo_id))
 }
 
+fn read_cached_thumbnail(path: PathBuf) -> std::io::Result<Vec<u8>> {
+    let bytes = fs::read(&path)?;
+    crate::thumbnail_cache::record_access(&path);
+    Ok(bytes)
+}
+
 fn valid_import_key(key: &str) -> bool {
     key.len() == 16 && key.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
@@ -150,11 +156,11 @@ pub fn serve_media_request<R: Runtime>(
 
         let v2_path = crate::metadata::thumbnail_cache_path(workspace_root, photo_id);
         if v2_path.exists() {
-            ("image/jpeg", fs::read(v2_path))
+            ("image/jpeg", read_cached_thumbnail(v2_path))
         } else {
             (
                 "image/jpeg",
-                fs::read(legacy_thumbnail_path(workspace_root, photo_id)),
+                read_cached_thumbnail(legacy_thumbnail_path(workspace_root, photo_id)),
             )
         }
     } else if let Some(source_key) = request_path.strip_prefix("import-source/") {
@@ -192,7 +198,7 @@ pub fn serve_media_request<R: Runtime>(
         }
         (
             "image/jpeg",
-            fs::read(crate::metadata::import_preview_cache_path(
+            read_cached_thumbnail(crate::metadata::import_preview_cache_path(
                 workspace_root,
                 cache_key,
             )),

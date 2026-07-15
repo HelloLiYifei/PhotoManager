@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import { createAlbum, getAlbumSummaries } from "./services/albumService";
 import { detectCards } from "./services/importService";
+import { setWorkspaceCacheLimits } from "./services/settingsService";
 import { getActiveWorkspace, getWorkspaces } from "./services/workspaceService";
 
 vi.mock("./services/albumService", () => ({
@@ -33,6 +34,7 @@ vi.mock("./services/settingsService", () => ({
   }),
   listenToScanProgress: vi.fn().mockResolvedValue(() => {}),
   scanWorkspace: vi.fn(),
+  setWorkspaceCacheLimits: vi.fn().mockResolvedValue({ filesRemoved: 0, bytesFreed: 0 }),
 }));
 
 vi.mock("./lib/thumbnailLoader", () => ({
@@ -118,6 +120,10 @@ describe("App phase-two shell", () => {
     render(<App />);
 
     expect(await screen.findByRole("main", { name: "相册" })).toBeInTheDocument();
+    await waitFor(() => expect(setWorkspaceCacheLimits).toHaveBeenCalledWith({
+      maxBytes: 512 * 1024 * 1024,
+      maxFiles: 5_000,
+    }));
     expect(screen.queryByRole("banner")).not.toBeInTheDocument();
     await waitFor(() => expect(getAlbumSummaries).toHaveBeenCalledTimes(1));
 

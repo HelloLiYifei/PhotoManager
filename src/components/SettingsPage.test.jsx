@@ -93,4 +93,24 @@ describe("SettingsPage", () => {
       expect(clearWorkspaceCache).toHaveBeenCalledWith({ kind: "thumbnails" });
     });
   });
+
+  it("persists workspace cache size and image-count limits", async () => {
+    renderPage();
+    await waitFor(() => expect(getWorkspaceStorageStats).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole("button", { name: "工作区" }));
+
+    const sizeLimit = screen.getByRole("spinbutton", { name: "缓存大小上限" });
+    fireEvent.change(sizeLimit, { target: { value: "256" } });
+    fireEvent.blur(sizeLimit);
+
+    const imageLimit = screen.getByRole("spinbutton", { name: "缓存图片数量上限" });
+    fireEvent.change(imageLimit, { target: { value: "2000" } });
+    fireEvent.blur(imageLimit);
+
+    const stored = JSON.parse(localStorage.getItem("photomanager-settings-v1"));
+    expect(stored.workspaces["id:workspace-1"]).toMatchObject({
+      cacheMaxMb: 256,
+      cacheMaxImages: 2000,
+    });
+  });
 });

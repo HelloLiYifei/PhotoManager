@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useI18n } from "../../../i18n";
 import {
   ImportGalleryPreview,
+  ImportHiddenRawBadge,
   ImportPhotoMarkers,
   ImportThumbnail,
 } from "./ImportViewShared";
@@ -197,6 +198,7 @@ export default function ImportGalleryView({
               title={filmPhoto.relativePath}
             >
               <ImportThumbnail photo={filmPhoto} scrollRoot={scrollRoot} fit="cover" />
+              <ImportHiddenRawBadge state={filmState} />
               {filmPhoto.alreadyImported && (
                 <span className={`${styles.filmStatus} ${styles.importedFilmStatus}`}>{t("import.imported")}</span>
               )}

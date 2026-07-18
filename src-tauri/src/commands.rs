@@ -412,9 +412,13 @@ pub async fn get_photo_thumbnail_url(state: State<'_, DbState>, id: String) -> R
         let workspace_path = Path::new(&workspace_root);
         let thumbnail_path = crate::metadata::thumbnail_cache_path(workspace_path, &id);
 
-        if thumbnail_path.exists() {
+        if thumbnail_path.exists() && image::image_dimensions(&thumbnail_path).is_ok() {
             crate::thumbnail_cache::record_access(&thumbnail_path);
         } else {
+            if thumbnail_path.exists() {
+                let _ = fs::remove_file(&thumbnail_path);
+                crate::thumbnail_cache::forget(&thumbnail_path);
+            }
             let photo_path = workspace_path.join(&relative_path);
             let is_raw = is_raw_image(&file_type);
             let _ = fs::create_dir_all(

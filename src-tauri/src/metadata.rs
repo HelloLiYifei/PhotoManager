@@ -6,6 +6,7 @@ use image::codecs::jpeg::JpegEncoder;
 
 pub const THUMBNAIL_MAX_DIMENSION: u32 = 512;
 const THUMBNAIL_JPEG_QUALITY: u8 = 88;
+const PANASONIC_JPG_FROM_RAW_TAG: u16 = 0x002e;
 
 /// Cache filenames include a version so existing low-resolution caches can be
 /// upgraded lazily without making the first app launch do a full rescan.
@@ -126,6 +127,13 @@ impl<'a, R: Read + Seek> TiffParser<'a, R> {
                 0x0202 => { // JPEGInterchangeFormatLength
                     jpeg_length = value_or_offset;
                 }
+                // Panasonic RW2 stores its full preview as an undefined
+                // JpgFromRaw value: the count is the JPEG length and the
+                // value is its file offset. It does not use TIFF's standard
+                // JPEGInterchangeFormat/JPEGInterchangeFormatLength pair.
+                PANASONIC_JPG_FROM_RAW_TAG if count > 4 && value_or_offset > 0 => {
+                    previews.push((value_or_offset, count));
+                }
                 0x014a => { // SubIFDs
                     // If count is 1, value_or_offset is the offset of the SubIFD.
                     // If count > 1, it's an offset to an array of offsets.
@@ -155,6 +163,11 @@ impl<'a, R: Read + Seek> TiffParser<'a, R> {
             previews.push((jpeg_offset, jpeg_length));
         }
 
+        // Read this pointer before descending into a SubIFD. Recursive calls
+        // move the shared reader, so reading it afterwards can read arbitrary
+        // bytes from a child IFD instead of this IFD's next-entry pointer.
+        let next_ifd_offset = self.read_u32()?;
+
         // Recursively check SubIFDs
         for sub_offset in sub_ifds {
             if let Ok(mut sub_previews) = self.find_jpeg_previews(sub_offset) {
@@ -163,7 +176,6 @@ impl<'a, R: Read + Seek> TiffParser<'a, R> {
         }
 
         // Check next IFD
-        let next_ifd_offset = self.read_u32()?;
         if next_ifd_offset > 0 {
             if let Ok(mut next_previews) = self.find_jpeg_previews(next_ifd_offset) {
                 previews.append(&mut next_previews);
@@ -555,7 +567,10 @@ pub fn extract_jpeg_exif_thumbnail<P: AsRef<Path>>(path: P) -> Option<Vec<u8>> {
 
 #[cfg(test)]
 mod tests {
-    use super::{extract_raw_preview, extract_raw_small_preview, read_image_metadata};
+    use super::{
+        extract_raw_preview, extract_raw_small_preview, generate_thumbnail, read_image_metadata,
+        PANASONIC_JPG_FROM_RAW_TAG,
+    };
     use image::codecs::jpeg::JpegEncoder;
 
     fn rw2_with_embedded_jpeg(width: u32, height: u32) -> Vec<u8> {
@@ -566,24 +581,57 @@ mod tests {
             .expect("encode preview JPEG");
 
         // RW2 starts like a little-endian TIFF, except that it uses `U` in
-        // the version field. The IFD below exposes the JPEG through tags
-        // 0x0201/0x0202, exactly as a camera preview does.
-        let jpeg_offset = 8 + 2 + (2 * 12) + 4;
+        // the version field. Panasonic places its full preview in the
+        // JpgFromRaw tag rather than TIFF's usual JPEG offset/length tags.
+        let jpeg_offset = 8 + 2 + 12 + 4;
         let mut rw2 = Vec::with_capacity(jpeg_offset + jpeg.len());
         rw2.extend_from_slice(b"IIU\0");
         rw2.extend_from_slice(&8_u32.to_le_bytes());
-        rw2.extend_from_slice(&2_u16.to_le_bytes());
-        rw2.extend_from_slice(&0x0201_u16.to_le_bytes());
-        rw2.extend_from_slice(&4_u16.to_le_bytes());
-        rw2.extend_from_slice(&1_u32.to_le_bytes());
-        rw2.extend_from_slice(&(jpeg_offset as u32).to_le_bytes());
-        rw2.extend_from_slice(&0x0202_u16.to_le_bytes());
-        rw2.extend_from_slice(&4_u16.to_le_bytes());
-        rw2.extend_from_slice(&1_u32.to_le_bytes());
+        rw2.extend_from_slice(&1_u16.to_le_bytes());
+        rw2.extend_from_slice(&PANASONIC_JPG_FROM_RAW_TAG.to_le_bytes());
+        rw2.extend_from_slice(&7_u16.to_le_bytes());
         rw2.extend_from_slice(&(jpeg.len() as u32).to_le_bytes());
+        rw2.extend_from_slice(&(jpeg_offset as u32).to_le_bytes());
         rw2.extend_from_slice(&0_u32.to_le_bytes());
         rw2.extend_from_slice(&jpeg);
         rw2
+    }
+
+    fn raw_with_sub_ifd_before_preview(width: u32, height: u32) -> Vec<u8> {
+        let image = image::DynamicImage::ImageRgb8(image::RgbImage::new(width, height));
+        let mut jpeg = Vec::new();
+        JpegEncoder::new_with_quality(&mut jpeg, 90)
+            .encode_image(&image)
+            .expect("encode preview JPEG");
+
+        // IFD0 points to an empty SubIFD and then to IFD1, which owns the
+        // embedded JPEG. This layout is common in TIFF-based camera RAWs.
+        let sub_ifd_offset = 26_u32;
+        let preview_ifd_offset = 32_u32;
+        let jpeg_offset = preview_ifd_offset + 2 + (2 * 12) + 4;
+        let mut raw = Vec::with_capacity(jpeg_offset as usize + jpeg.len());
+        raw.extend_from_slice(b"II*\0");
+        raw.extend_from_slice(&8_u32.to_le_bytes());
+        raw.extend_from_slice(&1_u16.to_le_bytes());
+        raw.extend_from_slice(&0x014a_u16.to_le_bytes());
+        raw.extend_from_slice(&4_u16.to_le_bytes());
+        raw.extend_from_slice(&1_u32.to_le_bytes());
+        raw.extend_from_slice(&sub_ifd_offset.to_le_bytes());
+        raw.extend_from_slice(&preview_ifd_offset.to_le_bytes());
+        raw.extend_from_slice(&0_u16.to_le_bytes());
+        raw.extend_from_slice(&0_u32.to_le_bytes());
+        raw.extend_from_slice(&2_u16.to_le_bytes());
+        raw.extend_from_slice(&0x0201_u16.to_le_bytes());
+        raw.extend_from_slice(&4_u16.to_le_bytes());
+        raw.extend_from_slice(&1_u32.to_le_bytes());
+        raw.extend_from_slice(&jpeg_offset.to_le_bytes());
+        raw.extend_from_slice(&0x0202_u16.to_le_bytes());
+        raw.extend_from_slice(&4_u16.to_le_bytes());
+        raw.extend_from_slice(&1_u32.to_le_bytes());
+        raw.extend_from_slice(&(jpeg.len() as u32).to_le_bytes());
+        raw.extend_from_slice(&0_u32.to_le_bytes());
+        raw.extend_from_slice(&jpeg);
+        raw
     }
 
     #[test]
@@ -604,5 +652,31 @@ mod tests {
         assert_eq!((metadata.width, metadata.height), (Some(24), Some(16)));
 
         let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn extracts_preview_after_visiting_a_raw_sub_ifd() {
+        let path = std::env::temp_dir().join(format!(
+            "photomanager-raw-sub-ifd-{}.NEF",
+            uuid::Uuid::new_v4()
+        ));
+        let thumbnail_path = path.with_extension("thumbnail.jpg");
+        std::fs::write(&path, raw_with_sub_ifd_before_preview(20, 12))
+            .expect("write RAW fixture");
+
+        let preview = extract_raw_preview(&path).expect("extract preview after SubIFD");
+        let decoded = image::load_from_memory(&preview).expect("decode embedded JPEG");
+        assert_eq!((decoded.width(), decoded.height()), (20, 12));
+        assert_eq!(
+            generate_thumbnail(&path, &thumbnail_path, true).expect("generate RAW thumbnail"),
+            (20, 12)
+        );
+        let (thumbnail_width, thumbnail_height) =
+            image::image_dimensions(&thumbnail_path).expect("read generated thumbnail");
+        assert!(thumbnail_width <= super::THUMBNAIL_MAX_DIMENSION);
+        assert!(thumbnail_height <= super::THUMBNAIL_MAX_DIMENSION);
+
+        let _ = std::fs::remove_file(path);
+        let _ = std::fs::remove_file(thumbnail_path);
     }
 }

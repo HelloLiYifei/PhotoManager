@@ -87,7 +87,24 @@ export function ImportPhotoMarkers({ photo, state }) {
           {t("import.albumMarker", { name: state.targetAlbum })}
         </span>
       )}
-      {photo.isRaw && <span className={styles.rawBadge}>RAW</span>}
+      {(photo.isRaw || state.hasHiddenRawCompanion) && (
+        <span
+          className={styles.rawBadge}
+          title={state.hasHiddenRawCompanion ? t("import.hiddenRawCompanion") : undefined}
+        >
+          RAW
+        </span>
+      )}
     </>
+  );
+}
+
+export function ImportHiddenRawBadge({ state }) {
+  const { t } = useI18n();
+  if (!state.hasHiddenRawCompanion) return null;
+  return (
+    <span className={styles.rawBadge} title={t("import.hiddenRawCompanion")}>
+      RAW
+    </span>
   );
 }

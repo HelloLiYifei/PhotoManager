@@ -25,6 +25,10 @@ import {
   ImportListView,
   ImportMasonryView,
 } from "./import/views";
+import {
+  getImportPhotoPairKey,
+  isImportJpeg,
+} from "./import/views/importViewUtils";
 import { useGlobalDialog } from "./ui";
 import { importWizardStyles as styles } from "../themes/classNames";
 
@@ -61,6 +65,7 @@ export default function ImportWizard({ onClose, onImportComplete, workspace, pre
   const [configurationOpen, setConfigurationOpen] = useState(false);
   const [hideImported, setHideImported] = useState(false);
   const [hideColored, setHideColored] = useState(false);
+  const [hideRaw, setHideRaw] = useState(false);
   const [focusedPath, setFocusedPath] = useState(null);
   const [visibleLimit, setVisibleLimit] = useState(INITIAL_VISIBLE_PHOTOS);
   const [createAlbumOpen, setCreateAlbumOpen] = useState(false);
@@ -91,13 +96,25 @@ export default function ImportWizard({ onClose, onImportComplete, workspace, pre
     () => new Set(data.selectedPaths),
     [data.selectedPaths],
   );
+  const rawPairKeys = useMemo(
+    () => new Set(data.photos
+      .filter((photo) => photo.isRaw)
+      .map(getImportPhotoPairKey)
+      .filter(Boolean)),
+    [data.photos],
+  );
+  const rawCount = useMemo(
+    () => data.photos.filter((photo) => photo.isRaw).length,
+    [data.photos],
+  );
   const filteredPhotos = useMemo(
     () => data.photos.filter((photo) => {
       if (hideImported && photo.alreadyImported) return false;
       if (hideColored && selectedPathSet.has(photo.absolutePath)) return false;
+      if (hideRaw && photo.isRaw) return false;
       return true;
     }),
-    [data.photos, hideColored, hideImported, selectedPathSet],
+    [data.photos, hideColored, hideImported, hideRaw, selectedPathSet],
   );
   const visiblePhotos = filteredPhotos.slice(0, visibleLimit);
 
@@ -108,7 +125,7 @@ export default function ImportWizard({ onClose, onImportComplete, workspace, pre
 
   useEffect(() => {
     setVisibleLimit(INITIAL_VISIBLE_PHOTOS);
-  }, [data.sourcePath, hideColored, hideImported]);
+  }, [data.sourcePath, hideColored, hideImported, hideRaw]);
 
   useEffect(() => {
     if (!sourceDraftDirtyRef.current) setSourceDraft(data.sourcePath);
@@ -180,8 +197,13 @@ export default function ImportWizard({ onClose, onImportComplete, workspace, pre
   }, [brush]);
 
   const getPhotoVisualState = useCallback(
-    (photo) => brush.getPhotoVisualState(photo, focusedPath),
-    [brush, focusedPath],
+    (photo) => ({
+      ...brush.getPhotoVisualState(photo, focusedPath),
+      hasHiddenRawCompanion: hideRaw
+        && isImportJpeg(photo)
+        && rawPairKeys.has(getImportPhotoPairKey(photo)),
+    }),
+    [brush, focusedPath, hideRaw, rawPairKeys],
   );
 
   const handleBrushChange = useCallback((albumName) => {
@@ -374,13 +396,16 @@ export default function ImportWizard({ onClose, onImportComplete, workspace, pre
                 totalCount={data.photos.length}
                 selectedCount={data.selectedImportPaths.length}
                 importedCount={data.importedCount}
+                rawCount={rawCount}
                 viewMode={viewMode}
                 hideImported={hideImported}
                 hideColored={hideColored}
+                hideRaw={hideRaw}
                 disabled={importBusy || data.scanning}
                 onViewModeChange={setViewMode}
                 onHideImportedChange={(value) => setHideImported(value)}
                 onHideColoredChange={(value) => setHideColored(value)}
+                onHideRawChange={(value) => setHideRaw(value)}
               />
 
               {data.importedCount > 0 ? (

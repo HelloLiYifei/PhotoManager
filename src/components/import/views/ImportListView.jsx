@@ -1,4 +1,5 @@
 import {
+  ImportHiddenRawBadge,
   ImportThumbnail,
 } from "./ImportViewShared";
 import {
@@ -84,6 +85,7 @@ export default function ImportListView({
               <span className={styles.listName} role="cell">
                 <span className={styles.listThumb}>
                   <ImportThumbnail photo={photo} scrollRoot={scrollRoot} fit="cover" />
+                  <ImportHiddenRawBadge state={state} />
                 </span>
                 <span title={photo.relativePath}>{photo.relativePath}</span>
               </span>

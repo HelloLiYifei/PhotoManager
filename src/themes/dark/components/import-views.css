@@ -198,11 +198,20 @@
 }
 
 .pm-import-views-list-thumb {
+  position: relative;
   width: 40px;
   height: 40px;
   flex: 0 0 40px;
   overflow: hidden;
   border-radius: 5px;
+}
+
+.pm-import-views-list-thumb .pm-import-views-raw-badge,
+.pm-import-views-film .pm-import-views-raw-badge {
+  top: 4px;
+  right: 4px;
+  padding: 2px 4px;
+  font-size: var(--font-size-micro);
 }
 
 .pm-import-views-list-status {

@@ -64,6 +64,11 @@ impl<'a, R: Read + Seek> TiffParser<'a, R> {
             b"MM" => false,
             _ => return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "Not a TIFF file")),
         };
+
+        // Panasonic RW2 uses the TIFF-like `IIU\0` signature rather than
+        // TIFF's `II*\0`, but retains the byte order and IFD-offset layout.
+        // The parser intentionally accepts both so its embedded JPEG preview
+        // follows the same path as the existing RAW formats.
         
         let ifd0_offset = if is_little_endian {
             u32::from_le_bytes(header[4..8].try_into().unwrap())
@@ -546,4 +551,58 @@ pub fn extract_jpeg_exif_thumbnail<P: AsRef<Path>>(path: P) -> Option<Vec<u8>> {
     }
     
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{extract_raw_preview, extract_raw_small_preview, read_image_metadata};
+    use image::codecs::jpeg::JpegEncoder;
+
+    fn rw2_with_embedded_jpeg(width: u32, height: u32) -> Vec<u8> {
+        let image = image::DynamicImage::ImageRgb8(image::RgbImage::new(width, height));
+        let mut jpeg = Vec::new();
+        JpegEncoder::new_with_quality(&mut jpeg, 90)
+            .encode_image(&image)
+            .expect("encode preview JPEG");
+
+        // RW2 starts like a little-endian TIFF, except that it uses `U` in
+        // the version field. The IFD below exposes the JPEG through tags
+        // 0x0201/0x0202, exactly as a camera preview does.
+        let jpeg_offset = 8 + 2 + (2 * 12) + 4;
+        let mut rw2 = Vec::with_capacity(jpeg_offset + jpeg.len());
+        rw2.extend_from_slice(b"IIU\0");
+        rw2.extend_from_slice(&8_u32.to_le_bytes());
+        rw2.extend_from_slice(&2_u16.to_le_bytes());
+        rw2.extend_from_slice(&0x0201_u16.to_le_bytes());
+        rw2.extend_from_slice(&4_u16.to_le_bytes());
+        rw2.extend_from_slice(&1_u32.to_le_bytes());
+        rw2.extend_from_slice(&(jpeg_offset as u32).to_le_bytes());
+        rw2.extend_from_slice(&0x0202_u16.to_le_bytes());
+        rw2.extend_from_slice(&4_u16.to_le_bytes());
+        rw2.extend_from_slice(&1_u32.to_le_bytes());
+        rw2.extend_from_slice(&(jpeg.len() as u32).to_le_bytes());
+        rw2.extend_from_slice(&0_u32.to_le_bytes());
+        rw2.extend_from_slice(&jpeg);
+        rw2
+    }
+
+    #[test]
+    fn extracts_preview_and_dimensions_from_panasonic_rw2() {
+        let path = std::env::temp_dir().join(format!(
+            "photomanager-panasonic-preview-{}.RW2",
+            uuid::Uuid::new_v4()
+        ));
+        std::fs::write(&path, rw2_with_embedded_jpeg(24, 16)).expect("write RW2 fixture");
+
+        for preview in [extract_raw_small_preview(&path), extract_raw_preview(&path)] {
+            let preview = preview.expect("extract embedded JPEG");
+            let decoded = image::load_from_memory(&preview).expect("decode embedded JPEG");
+            assert_eq!((decoded.width(), decoded.height()), (24, 16));
+        }
+
+        let metadata = read_image_metadata(&path, true);
+        assert_eq!((metadata.width, metadata.height), (Some(24), Some(16)));
+
+        let _ = std::fs::remove_file(path);
+    }
 }

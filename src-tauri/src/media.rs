@@ -136,7 +136,7 @@ pub fn serve_media_request<R: Runtime>(
             return response(StatusCode::NOT_FOUND, "text/plain", Vec::new());
         };
 
-        if matches!(file_type.as_str(), "arw" | "cr2" | "nef") {
+        if crate::scan::is_raw_image(&file_type) {
             match crate::metadata::extract_raw_preview(file_path) {
                 Ok(bytes) => ("image/jpeg", Ok(bytes)),
                 Err(error) => ("text/plain", Err(error)),

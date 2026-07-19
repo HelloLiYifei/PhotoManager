@@ -24,13 +24,21 @@ pub struct ScanResult {
     pub removed: i32,
 }
 
+/// Check whether an extension belongs to a supported camera RAW format.
+///
+/// Keeping this list in one place ensures scans, card imports, thumbnails,
+/// and previews use the same classification.
+pub fn is_raw_image(ext: &str) -> bool {
+    matches!(
+        ext.to_ascii_lowercase().as_str(),
+        "arw" | "cr2" | "nef" | "rw2"
+    )
+}
+
 // Check if file extension is supported
 pub fn is_supported_image(ext: &str) -> bool {
-    let ext_lower = ext.to_lowercase();
-    matches!(
-        ext_lower.as_str(),
-        "jpg" | "jpeg" | "png" | "arw" | "cr2" | "nef"
-    )
+    matches!(ext.to_ascii_lowercase().as_str(), "jpg" | "jpeg" | "png")
+        || is_raw_image(ext)
 }
 
 // Recursively scan the workspace directory
@@ -137,7 +145,7 @@ pub fn scan_workspace_dir(
             .unwrap_or("")
             .to_string();
 
-        let is_raw = matches!(file_ext.to_lowercase().as_str(), "arw" | "cr2" | "nef");
+        let is_raw = is_raw_image(&file_ext);
 
         // Read EXIF and header dimensions only. Thumbnail generation is lazy
         // and begins when a photo card approaches the visible viewport.
@@ -241,4 +249,16 @@ pub fn scan_workspace_dir(
         added: added_count,
         removed: removed_count,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{is_raw_image, is_supported_image};
+
+    #[test]
+    fn recognizes_panasonic_rw2_as_a_supported_raw_format() {
+        assert!(is_supported_image("RW2"));
+        assert!(is_raw_image("rw2"));
+        assert!(!is_raw_image("jpg"));
+    }
 }

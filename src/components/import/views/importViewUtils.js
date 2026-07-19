@@ -7,7 +7,23 @@ export function getImportPhotoState(photo, getPhotoVisualState) {
     isFocused: Boolean(state.isFocused),
     targetAlbum: state.targetAlbum || null,
     albumColor: state.albumColor || "transparent",
+    hasHiddenRawCompanion: Boolean(state.hasHiddenRawCompanion),
   };
+}
+
+export function getImportPhotoPairKey(photo) {
+  const path = String(photo?.relativePath || photo?.absolutePath || "")
+    .replace(/\\/g, "/");
+  const slashIndex = path.lastIndexOf("/");
+  const dotIndex = path.lastIndexOf(".");
+  if (dotIndex <= slashIndex + 1) return null;
+  return path.slice(0, dotIndex).toLowerCase();
+}
+
+export function isImportJpeg(photo) {
+  const path = String(photo?.relativePath || photo?.absolutePath || "");
+  const extension = path.slice(path.lastIndexOf(".") + 1).toLowerCase();
+  return extension === "jpg" || extension === "jpeg";
 }
 
 export function getImportPhotoStyle(photo, state) {

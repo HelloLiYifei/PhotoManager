@@ -164,6 +164,38 @@ describe("ImportWizard phase-four integration", () => {
     expect(screen.queryByRole("gridcell", { name: "IMG_0003.JPG" })).not.toBeInTheDocument();
   });
 
+  it("hides RAW files and marks the matching JPG in every import view", async () => {
+    const pairedRaw = {
+      ...freshTwo,
+      absolutePath: "D:/DCIM/IMG_0001.NEF",
+      relativePath: "IMG_0001.NEF",
+    };
+    mocks.scanCard.mockResolvedValueOnce([freshOne, pairedRaw]);
+    renderWizard();
+
+    await screen.findByRole("gridcell", { name: "IMG_0001.JPG" });
+    expect(screen.getByRole("gridcell", { name: "IMG_0001.NEF" })).toBeInTheDocument();
+
+    const hideRawButton = screen.getByRole("button", { name: /隐藏 RAW/ });
+    fireEvent.click(hideRawButton);
+    expect(hideRawButton).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByRole("gridcell", { name: "IMG_0001.NEF" })).not.toBeInTheDocument();
+    expect(within(screen.getByRole("gridcell", { name: "IMG_0001.JPG" }))
+      .getByText("RAW")).toHaveAttribute("title", "同名 RAW 原片已隐藏");
+
+    fireEvent.click(screen.getByRole("button", { name: "列表视图" }));
+    expect(within(screen.getByRole("row", { name: "IMG_0001.JPG" }))
+      .getByText("RAW")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "画廊视图" }));
+    const gallery = screen.getByRole("region", { name: "导入照片画廊" });
+    const galleryMedia = within(gallery).getByRole("group", { name: "当前导入照片预览" });
+    await waitFor(() => expect(within(galleryMedia).getByRole("img", { name: "IMG_0001.JPG" }))
+      .toHaveAttribute("src", "preview.jpg"));
+    expect(within(gallery).getAllByText("RAW")).toHaveLength(2);
+    expect(within(gallery).queryByText("IMG_0001.NEF")).not.toBeInTheDocument();
+  });
+
   it("uses the configuration drawer and shared album dialog", async () => {
     mocks.getAlbums
       .mockResolvedValueOnce([{ id: "album-trip", name: "旅行" }])

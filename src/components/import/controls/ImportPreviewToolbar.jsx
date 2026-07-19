@@ -1,4 +1,4 @@
-import { EyeOff, GalleryHorizontal, Grid3X3, List, Palette } from "lucide-react";
+import { EyeOff, FileImage, GalleryHorizontal, Grid3X3, List, Palette } from "lucide-react";
 
 import { useI18n } from "../../../i18n";
 import ViewSwitcher from "../../shared/ViewSwitcher";
@@ -15,13 +15,16 @@ export default function ImportPreviewToolbar({
   totalCount = 0,
   selectedCount = 0,
   importedCount = 0,
+  rawCount = 0,
   viewMode = "masonry",
   hideImported = false,
   hideColored = false,
+  hideRaw = false,
   disabled = false,
   onViewModeChange,
   onHideImportedChange,
   onHideColoredChange,
+  onHideRawChange,
 }) {
   const { formatNumber, t } = useI18n();
   const localizedViewOptions = IMPORT_VIEW_OPTIONS.map((option) => ({
@@ -56,6 +59,16 @@ export default function ImportPreviewToolbar({
           >
             <Palette aria-hidden="true" />
             {t("import.hideColored")} <small>{formatNumber(selectedCount)}</small>
+          </button>
+          <button
+            type="button"
+            className={hideRaw ? styles.pressedButton : undefined}
+            onClick={() => onHideRawChange?.(!hideRaw)}
+            disabled={disabled || rawCount === 0}
+            aria-pressed={hideRaw}
+          >
+            <FileImage aria-hidden="true" />
+            {t("import.hideRaw")} <small>{formatNumber(rawCount)}</small>
           </button>
         </div>
 

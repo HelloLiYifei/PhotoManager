@@ -123,6 +123,7 @@ describe("import controls", () => {
     const onViewModeChange = vi.fn();
     const onHideImportedChange = vi.fn();
     const onHideColoredChange = vi.fn();
+    const onHideRawChange = vi.fn();
 
     render(
       <ImportPreviewToolbar
@@ -130,10 +131,12 @@ describe("import controls", () => {
         totalCount={12}
         selectedCount={4}
         importedCount={3}
+        rawCount={2}
         viewMode="masonry"
         onViewModeChange={onViewModeChange}
         onHideImportedChange={onHideImportedChange}
         onHideColoredChange={onHideColoredChange}
+        onHideRawChange={onHideRawChange}
       />,
     );
 
@@ -142,10 +145,12 @@ describe("import controls", () => {
     fireEvent.click(screen.getByRole("button", { name: "列表视图" }));
     fireEvent.click(screen.getByRole("button", { name: /隐藏已导入/ }));
     fireEvent.click(screen.getByRole("button", { name: /隐藏已染色/ }));
+    fireEvent.click(screen.getByRole("button", { name: /隐藏 RAW/ }));
 
     expect(onViewModeChange).toHaveBeenCalledWith("list");
     expect(onHideImportedChange).toHaveBeenCalledWith(true);
     expect(onHideColoredChange).toHaveBeenCalledWith(true);
+    expect(onHideRawChange).toHaveBeenCalledWith(true);
     expect(screen.getByText("显示 9 / 12 张照片")).toBeInTheDocument();
   });
 

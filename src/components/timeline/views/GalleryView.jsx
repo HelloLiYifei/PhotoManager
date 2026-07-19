@@ -17,6 +17,9 @@ export default function GalleryView({
   selectedIds = [],
   scrollRoot,
   actionToolbar = null,
+  navigationPlacement = "overlay",
+  stageControls = null,
+  captionControls = null,
   onSelect,
   onOpen,
 }) {
@@ -74,6 +77,38 @@ export default function GalleryView({
     selectIndex(activeIndex + (delta > 0 ? 1 : -1), event);
   };
 
+  const previousButton = activeIndex > 0 ? (
+    <Button
+      variant="navigation"
+      size="icon"
+      className="gallery-stage-nav prev"
+      onClick={(event) => selectIndex(activeIndex - 1, event)}
+      aria-label={t("timeline.previous")}
+    >
+      <ChevronLeft aria-hidden="true" />
+    </Button>
+  ) : null;
+
+  const nextButton = activeIndex < photos.length - 1 ? (
+    <Button
+      variant="navigation"
+      size="icon"
+      className="gallery-stage-nav next"
+      onClick={(event) => selectIndex(activeIndex + 1, event)}
+      aria-label={t("timeline.next")}
+    >
+      <ChevronRight aria-hidden="true" />
+    </Button>
+  ) : null;
+
+  const captionActions = captionControls || (navigationPlacement === "caption" ? (
+    <>
+      {stageControls}
+      {previousButton}
+      {nextButton}
+    </>
+  ) : actionToolbar);
+
   return (
     <div
       ref={galleryRef}
@@ -90,37 +125,17 @@ export default function GalleryView({
           className="finder-gallery-media"
           onDoubleClick={() => onOpen?.(photos, activeIndex)}
         >
-          {activeIndex > 0 && (
-            <Button
-              variant="navigation"
-              size="icon"
-              className="gallery-stage-nav prev"
-              onClick={(event) => selectIndex(activeIndex - 1, event)}
-              aria-label={t("timeline.previous")}
-            >
-              <ChevronLeft aria-hidden="true" />
-            </Button>
-          )}
+          {navigationPlacement === "overlay" && previousButton}
 
           <GalleryPreviewImage id={currentPhoto.id} alt={currentPhoto.filename} />
 
-          {activeIndex < photos.length - 1 && (
-            <Button
-              variant="navigation"
-              size="icon"
-              className="gallery-stage-nav next"
-              onClick={(event) => selectIndex(activeIndex + 1, event)}
-              aria-label={t("timeline.next")}
-            >
-              <ChevronRight aria-hidden="true" />
-            </Button>
-          )}
+          {navigationPlacement === "overlay" && nextButton}
         </div>
 
         <div className="finder-gallery-caption">
           <strong>{currentPhoto.filename}</strong>
-          {actionToolbar ? (
-            <div className="finder-gallery-actions">{actionToolbar}</div>
+          {captionActions ? (
+            <div className="finder-gallery-actions">{captionActions}</div>
           ) : <span aria-hidden="true" />}
           <span>
             {currentPhoto.dateTaken || t("import.dateUnknown")} · {formatFileSize(currentPhoto.fileSize)}

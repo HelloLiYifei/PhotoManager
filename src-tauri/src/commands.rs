@@ -7,7 +7,7 @@ use chrono::Utc;
 
 use crate::db::{map_row_to_photo, Album, AlbumSummary, DbState, Photo};
 use crate::workspace::{load_workspaces, save_workspaces, open_workspace_db, Workspace};
-use crate::scan::{scan_workspace_dir, ScanResult};
+use crate::scan::{is_raw_image, scan_workspace_dir, ScanResult};
 use crate::import::{detect_removable_cards, scan_card_files, execute_import, CardInfo, CardPhoto, ImportLocation, PhotoImportInfo};
 
 fn remove_thumbnail_cache(workspace_root: &Path, photo_id: &str) {
@@ -412,11 +412,15 @@ pub async fn get_photo_thumbnail_url(state: State<'_, DbState>, id: String) -> R
         let workspace_path = Path::new(&workspace_root);
         let thumbnail_path = crate::metadata::thumbnail_cache_path(workspace_path, &id);
 
-        if thumbnail_path.exists() {
+        if thumbnail_path.exists() && image::image_dimensions(&thumbnail_path).is_ok() {
             crate::thumbnail_cache::record_access(&thumbnail_path);
         } else {
+            if thumbnail_path.exists() {
+                let _ = fs::remove_file(&thumbnail_path);
+                crate::thumbnail_cache::forget(&thumbnail_path);
+            }
             let photo_path = workspace_path.join(&relative_path);
-            let is_raw = matches!(file_type.to_lowercase().as_str(), "arw" | "cr2" | "nef");
+            let is_raw = is_raw_image(&file_type);
             let _ = fs::create_dir_all(
                 thumbnail_path
                     .parent()
@@ -879,7 +883,12 @@ pub async fn get_image_thumbnail_url(
             // Very small embedded previews are quick but visibly soft on a
             // high-density card, so fall back to the original when needed.
             if is_exif && (decoded.width() < 384 || decoded.height() < 384) {
-                let full_bytes = std::fs::read(p).map_err(|e| e.to_string())?;
+                let full_bytes = if is_raw {
+                    crate::metadata::extract_raw_preview(p)
+                        .map_err(|e| format!("RAW大预览图提取失败: {}", e))?
+                } else {
+                    std::fs::read(p).map_err(|e| e.to_string())?
+                };
                 let full_decoded = image::load_from_memory(&full_bytes)
                     .map_err(|e| format!("原图解码失败: {}", e))?;
                 (full_decoded, false)

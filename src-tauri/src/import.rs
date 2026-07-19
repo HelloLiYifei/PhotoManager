@@ -9,7 +9,7 @@ use walkdir::WalkDir;
 
 use crate::db::DbState;
 use crate::metadata::{read_image_metadata, ImageMetadata};
-use crate::scan::is_supported_image;
+use crate::scan::{is_raw_image, is_supported_image};
 use rusqlite::Connection;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -325,7 +325,7 @@ pub fn scan_card_files(card_path: &str, conn: Option<&Connection>) -> Vec<CardPh
 
                     let size = metadata.len() as i64;
                     let file_ext = ext.to_lowercase();
-                    let is_raw = matches!(file_ext.as_str(), "arw" | "cr2" | "nef");
+                    let is_raw = is_raw_image(&file_ext);
 
                     // Read EXIF once for both layout dimensions and the import
                     // lightbox's read-only photo details.
@@ -515,7 +515,7 @@ pub fn execute_import(
             .and_then(|s| s.to_str())
             .unwrap_or("unknown")
             .to_string();
-        let is_raw = matches!(file_ext.to_lowercase().as_str(), "arw" | "cr2" | "nef");
+        let is_raw = is_raw_image(&file_ext);
 
         // Re-check at execution time as the import list may be stale or may
         // come from a caller other than the wizard.

@@ -17,8 +17,7 @@ import {
   usePhotoViewPreference,
   useTimelineActions,
 } from "./timeline/hooks";
-import { ComparePreviewImage } from "./timeline/media";
-import { GalleryView, ListView, MasonryView } from "./timeline/views";
+import { CompareBrowser, GalleryView, ListView, MasonryView } from "./timeline/views";
 import { useGlobalDialog } from "./ui";
 import { timelineGridStyles as styles } from "../themes/classNames";
 
@@ -47,6 +46,7 @@ export default function TimelineGrid({
   const [newTagInput, setNewTagInput] = useState("");
   const [compareMode, setCompareMode] = useState(false);
   const [compareLockedId, setCompareLockedId] = useState(null);
+  const [comparePhotos, setComparePhotos] = useState([]);
   const [moveDialogOpen, setMoveDialogOpen] = useState(false);
   const [moveAlbums, setMoveAlbums] = useState([]);
   const [moveBusy, setMoveBusy] = useState(false);
@@ -120,6 +120,7 @@ export default function TimelineGrid({
     clearSelection();
     setCompareMode(false);
     setCompareLockedId(null);
+    setComparePhotos([]);
     setFiltersOpen(false);
   }, [
     albumId,
@@ -137,6 +138,7 @@ export default function TimelineGrid({
     ) {
       setCompareMode(false);
       setCompareLockedId(null);
+      setComparePhotos([]);
     }
   }, [compareLockedId, compareMode, photos]);
 
@@ -158,6 +160,7 @@ export default function TimelineGrid({
     if (mode !== "masonry") {
       setCompareMode(false);
       setCompareLockedId(null);
+      setComparePhotos([]);
     }
   }, [setViewMode]);
 
@@ -165,6 +168,7 @@ export default function TimelineGrid({
     if (compareMode) {
       setCompareMode(false);
       setCompareLockedId(null);
+      setComparePhotos([]);
       return;
     }
 
@@ -176,10 +180,16 @@ export default function TimelineGrid({
       return;
     }
 
+    const selectedIdSet = new Set(selectedIds);
+    const comparisonPhotos = selectedIds.length === 1
+      ? photos
+      : photos.filter((photo) => selectedIdSet.has(photo.id));
+
     setViewMode("masonry");
     setCompareLockedId(selectedIds.at(-1));
+    setComparePhotos(comparisonPhotos);
     setCompareMode(true);
-  }, [compareMode, selectedIds, setViewMode, showAlert, t]);
+  }, [compareMode, photos, selectedIds, setViewMode, showAlert, t]);
 
   const addTag = useCallback(async () => {
     try {
@@ -296,19 +306,21 @@ export default function TimelineGrid({
       aria-busy={loading}
       data-view-mode={viewMode}
     >
-      <TimelineToolbar
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        allTags={allTags}
-        tagFilter={tagFilter}
-        onTagFilterChange={setTagFilter}
-        ratingFilter={ratingFilter}
-        onRatingFilterChange={setRatingFilter}
-        viewMode={viewMode}
-        onViewModeChange={changeViewMode}
-        filtersOpen={filtersOpen}
-        onFiltersOpenChange={setFiltersOpen}
-      />
+      {!compareMode && (
+        <TimelineToolbar
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          allTags={allTags}
+          tagFilter={tagFilter}
+          onTagFilterChange={setTagFilter}
+          ratingFilter={ratingFilter}
+          onRatingFilterChange={setRatingFilter}
+          viewMode={viewMode}
+          onViewModeChange={changeViewMode}
+          filtersOpen={filtersOpen}
+          onFiltersOpenChange={setFiltersOpen}
+        />
+      )}
 
       {error && photos.length > 0 ? (
         <div className={styles.inlineError} role="alert">
@@ -351,25 +363,34 @@ export default function TimelineGrid({
               </div>
             ) : compareMode ? (
               <div className={styles.compareLayout}>
-                <div className={styles.compareBrowser}>{photoView}</div>
-                <section className={styles.comparePreview} aria-label={t("timeline.compareBaseline")}>
-                  <button
-                    type="button"
-                    className={styles.compareClose}
-                    onClick={toggleCompare}
-                    aria-label={t("timeline.exitCompare")}
-                  >
-                    <X aria-hidden="true" />
-                    {t("timeline.exitCompareText")}
-                  </button>
-                  <ComparePreviewImage id={compareLockedId} />
-                  <strong>{t("timeline.lockedBaseline")}</strong>
-                </section>
+                <div className={styles.compareBrowser}>
+                  <CompareBrowser
+                    photos={comparePhotos}
+                    lockedId={compareLockedId}
+                    scrollRoot={gridScrollRef}
+                  />
+                </div>
+                <div className={styles.compareBrowser}>
+                  <CompareBrowser
+                    photos={comparePhotos}
+                    lockedId={compareLockedId}
+                    scrollRoot={gridScrollRef}
+                  />
+                </div>
+                <button
+                  type="button"
+                  className={styles.compareExit}
+                  onClick={toggleCompare}
+                  aria-label={t("timeline.exitCompare")}
+                >
+                  <X aria-hidden="true" />
+                  {t("timeline.exitCompareText")}
+                </button>
               </div>
             ) : photoView}
           </div>
 
-          {viewMode !== "gallery" ? batchActionBar : null}
+          {viewMode !== "gallery" && !compareMode ? batchActionBar : null}
         </div>
 
         <PhotoInspector

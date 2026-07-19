@@ -20,6 +20,16 @@
   transform: translateX(-50%);
 }
 
+.finder-gallery-actions > .pm-batch-action-bar-bar {
+  position: static;
+  z-index: auto;
+  bottom: auto;
+  left: auto;
+  width: max-content;
+  max-width: 100%;
+  transform: none;
+}
+
 .pm-batch-action-bar-summary {
   flex: 0 0 auto;
   color: var(--text-muted);

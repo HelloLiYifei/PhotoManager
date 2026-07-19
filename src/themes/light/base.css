@@ -353,6 +353,11 @@ body {
   overflow: hidden;
 }
 
+.finder-gallery-actions .gallery-stage-nav {
+  position: static;
+  transform: none;
+}
+
 .gallery-preview-image {
   width: auto;
   max-width: calc(100% - 40px);
@@ -410,6 +415,7 @@ body {
   min-width: 0;
   max-width: 100%;
   justify-content: center;
+  gap: var(--space-2);
 }
 
 .finder-gallery-actions > .pm-batch-action-bar-bar {

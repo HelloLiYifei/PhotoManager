@@ -132,9 +132,11 @@ export const settingsPageStyles = freeze({
 });
 
 export const timelineGridStyles = freeze({
+  "compareAlbum": "pm-timeline-grid-compare-album",
   "browserPane": "pm-timeline-grid-browser-pane",
+  "compareBrowserDetail": "pm-timeline-grid-compare-browser-detail",
   "compareBrowser": "pm-timeline-grid-compare-browser",
-  "compareClose": "pm-timeline-grid-compare-close",
+  "compareExit": "pm-timeline-grid-compare-exit",
   "compareLayout": "pm-timeline-grid-compare-layout",
   "comparePreview": "pm-timeline-grid-compare-preview",
   "content": "pm-timeline-grid-content",

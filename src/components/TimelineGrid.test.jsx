@@ -241,7 +241,11 @@ describe("TimelineGrid phase-three integration", () => {
     }));
 
     fireEvent.click(screen.getByRole("button", { name: "对比" }));
-    expect(await screen.findByRole("region", { name: "照片对比基准" })).toBeInTheDocument();
+    expect((await screen.findAllByRole("region", { name: "对比相册" }))).toHaveLength(2);
+    expect(screen.queryByLabelText("照片视图")).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "批量操作" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "退出照片对比" }))
+      .toHaveClass("pm-timeline-grid-compare-exit");
     fireEvent.click(screen.getByRole("button", { name: "退出照片对比" }));
 
     fireEvent.click(screen.getByRole("button", { name: "移动" }));
@@ -259,6 +263,32 @@ describe("TimelineGrid phase-three integration", () => {
       id: "photo-1",
       isDeleted: true,
     }));
+  });
+
+  it("uses the album for a single-photo comparison and a temporary album for multi-photo comparison", async () => {
+    const thirdPhoto = {
+      ...photos[0],
+      id: "photo-3",
+      filename: "城市.png",
+    };
+    mocks.getPhotos.mockResolvedValue([...photos, thirdPhoto]);
+    renderTimeline();
+
+    const first = await screen.findByRole("gridcell", { name: "海边.jpg" });
+    fireEvent.click(first, { detail: 1 });
+    fireEvent.click(screen.getByRole("button", { name: "对比" }));
+    expect(screen.getAllByRole("gridcell", { name: "城市.png" })).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole("button", { name: "退出照片对比" }));
+    fireEvent.click(screen.getByRole("gridcell", { name: "树林.raw" }), {
+      ctrlKey: true,
+      detail: 1,
+    });
+    await waitFor(() => expect(mocks.getPhotoTags).toHaveBeenCalledWith({ photoId: "photo-2" }));
+    fireEvent.click(screen.getByRole("button", { name: "对比" }));
+    expect(screen.getAllByRole("gridcell", { name: "海边.jpg" })).toHaveLength(2);
+    expect(screen.getAllByRole("gridcell", { name: "树林.raw" })).toHaveLength(2);
+    expect(screen.queryAllByRole("gridcell", { name: "城市.png" })).toHaveLength(0);
   });
 
   it("keeps the photo inspector open when rating triggers a refresh", async () => {
